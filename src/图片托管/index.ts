@@ -6,12 +6,13 @@
  */
 
 import './管理界面';
-import { registerGlobalAPI } from './global-api';
+import { registerGlobalAPI, startDomObserver } from './global-api';
 import { reloadOnChatChange } from '@util/script';
 
-// 加载时注册全局 API 和聊天变更监听
+// 加载时注册全局 API、启动 DOM 观察器、和聊天变更监听
 $(() => {
     registerGlobalAPI();
+    startDomObserver();
     reloadOnChatChange();
 
     console.info('[图片托管] 脚本已加载');

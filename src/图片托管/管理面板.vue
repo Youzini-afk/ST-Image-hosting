@@ -802,13 +802,13 @@ function fallbackCopy(text: string): void {
 }
 
 function copyCode(displayName: string) {
-  copyToClipboard(`ImageHosting.getImageUrl('${displayName}')`);
+  copyToClipboard(`<img data-img="${displayName}">`);
 }
 
 function handleBatchCopyCode() {
   const codes = filteredImages.value
     .filter(img => selectedSet.value.has(img.storageName))
-    .map(img => `ImageHosting.getImageUrl('${img.display_name}')`)
+    .map(img => `<img data-img="${img.display_name}">`)
     .join('\n');
   copyToClipboard(codes);
 }

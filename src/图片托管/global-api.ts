@@ -49,3 +49,70 @@ export function registerGlobalAPI(): void {
 
     initializeGlobal('ImageHosting', api);
 }
+
+// ===== DOM 自动解析: <img data-img="显示名称"> =====
+
+/** 已处理的元素标记 (避免重复处理) */
+const RESOLVED_ATTR = 'data-img-resolved';
+
+/**
+ * 解析页面中所有带 data-img 属性的 <img> 元素
+ */
+async function resolveImgTags(root: ParentNode = document): Promise<void> {
+    const imgs = root.querySelectorAll<HTMLImageElement>(`img[data-img]:not([${RESOLVED_ATTR}])`);
+    if (imgs.length === 0) return;
+
+    const imageStore = useImageStore();
+
+    for (const img of imgs) {
+        const displayName = img.getAttribute('data-img');
+        if (!displayName) continue;
+
+        // 标记为已处理
+        img.setAttribute(RESOLVED_ATTR, '1');
+
+        // 先同步设置 (快速显示)
+        const syncUrl = imageStore.getUrlByDisplayName(displayName);
+        if (syncUrl) {
+            img.src = syncUrl;
+        }
+
+        // 再异步解析 (CDN 轮询后更新)
+        imageStore.getUrlByDisplayNameAsync(displayName).then(asyncUrl => {
+            if (asyncUrl && asyncUrl !== img.src) {
+                img.src = asyncUrl;
+            }
+        });
+    }
+}
+
+/**
+ * 启动 DOM 观察器, 自动解析新出现的 img[data-img] 元素
+ */
+export function startDomObserver(): void {
+    // 首次扫描
+    resolveImgTags();
+
+    // 监听 DOM 变化
+    const observer = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+            for (const node of mutation.addedNodes) {
+                if (node instanceof HTMLElement) {
+                    // 节点本身是 img[data-img]
+                    if (node.matches?.(`img[data-img]:not([${RESOLVED_ATTR}])`)) {
+                        resolveImgTags(node.parentNode ?? document);
+                    }
+                    // 节点的子孙中有 img[data-img]
+                    else if (node.querySelector?.(`img[data-img]:not([${RESOLVED_ATTR}])`)) {
+                        resolveImgTags(node);
+                    }
+                }
+            }
+        }
+    });
+
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+    });
+}
