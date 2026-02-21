@@ -104,6 +104,15 @@
             >
               <i class="fa-solid fa-broom"></i> 清理
             </button>
+            <button
+              class="image-hosting_btn btn-secondary"
+              style="padding: 3px 10px; font-size: 11px"
+              :disabled="refreshing"
+              @click="handleRefreshCache"
+            >
+              <i class="fa-solid" :class="refreshing ? 'fa-spinner fa-spin' : 'fa-arrows-rotate'"></i>
+              {{ refreshing ? '拉取中...' : '刷新拉取' }}
+            </button>
           </div>
           <div style="margin-top: 6px; display: flex; align-items: center; gap: 8px;">
             <label style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer;">
@@ -523,6 +532,24 @@ async function handleCleanupCache() {
     toastr.success(`已清理 ${count} 个文件`);
   } else {
     toastr.info('没有需要清理的文件');
+  }
+}
+
+const refreshing = ref(false);
+async function handleRefreshCache() {
+  refreshing.value = true;
+  try {
+    const count = await imageStore.refreshCache();
+    if (count > 0) {
+      toastr.success(`已刷新 ${count} 张远程图片缓存`);
+    } else {
+      toastr.info('没有远程缓存需要刷新');
+    }
+  } catch (err) {
+    toastr.error('刷新失败');
+    console.error(err);
+  } finally {
+    refreshing.value = false;
   }
 }
 

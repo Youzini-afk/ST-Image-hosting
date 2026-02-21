@@ -577,6 +577,48 @@ export const useImageStore = defineStore('image-hosting-images', () => {
         return cleaned;
     }
 
+    /**
+     * 刷新远程图片缓存: 清除已有缓存并重新拉取
+     * @returns 刷新的数量
+     */
+    async function refreshCache(): Promise<number> {
+        let count = 0;
+
+        // 先清除所有远程缓存
+        for (const [, meta] of Object.entries(registry.value.images)) {
+            if (meta.storage !== 'remote' || !meta.server_path) continue;
+            try { await deleteFile(meta.server_path); } catch { /* ignore */ }
+            meta.server_path = '';
+            count++;
+        }
+
+        if (count > 0) {
+            saveRegistry(registry.value);
+            resolvedRemoteCache.clear();
+        }
+
+        // 如果开启了本地缓存, 重新拉取
+        if (settingsStore.settings.remote_cache_local) {
+            for (const [storageName, meta] of Object.entries(registry.value.images)) {
+                if (meta.storage !== 'remote' || !meta.remote_url) continue;
+                // 先解析 URL (走 CDN 轮询)
+                let url = meta.remote_url;
+                if (settingsStore.settings.cdn_proxy_enabled) {
+                    url = await resolveWithCdn(
+                        meta.remote_url,
+                        settingsStore.settings.cdn_proxy_list,
+                        settingsStore.settings.cdn_preferred_proxy,
+                        settingsStore.settings.cdn_strip_enabled,
+                    );
+                }
+                // 重新缓存
+                await cacheRemoteToLocal(storageName, url);
+            }
+        }
+
+        return count;
+    }
+
     return {
         registry,
         upload,
@@ -594,5 +636,6 @@ export const useImageStore = defineStore('image-hosting-images', () => {
         getRegistryData,
         mergeRegistry,
         cleanupCache,
+        refreshCache,
     };
 });
