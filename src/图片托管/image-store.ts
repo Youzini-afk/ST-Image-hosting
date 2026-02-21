@@ -130,8 +130,38 @@ export function measureProxyLatency(
 }
 
 /**
+ * 检测 GitHub 原始文件 URL 并转换为 jsdelivr CDN URL
+ * 支持:
+ *   https://raw.githubusercontent.com/{user}/{repo}/{branch}/{path}
+ *   https://github.com/{user}/{repo}/raw/{branch}/{path}
+ * @returns jsdelivr CDN URL 或 null (非 GitHub URL)
+ */
+export function githubToJsdelivr(url: string): string | null {
+    // raw.githubusercontent.com/{user}/{repo}/{branch}/{path}
+    const rawMatch = url.match(
+        /^https?:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/([^/]+)\/(.+)$/,
+    );
+    if (rawMatch) {
+        const [, user, repo, branch, path] = rawMatch;
+        return `https://cdn.jsdelivr.net/gh/${user}/${repo}@${branch}/${path}`;
+    }
+
+    // github.com/{user}/{repo}/raw/{branch}/{path}
+    const ghRawMatch = url.match(
+        /^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/raw\/([^/]+)\/(.+)$/,
+    );
+    if (ghRawMatch) {
+        const [, user, repo, branch, path] = ghRawMatch;
+        return `https://cdn.jsdelivr.net/gh/${user}/${repo}@${branch}/${path}`;
+    }
+
+    return null;
+}
+
+/**
  * 通过 CDN 代理列表轮询, 找到第一个可用 URL
  * 如果有首选代理 (测速锚定), 优先使用
+ * 如果是 GitHub URL, 自动尝试 jsdelivr CDN
  */
 async function resolveWithCdn(
     originalUrl: string,
@@ -149,7 +179,14 @@ async function resolveWithCdn(
     const origLatency = await probeImageUrl(originalUrl, 4000);
     if (origLatency >= 0) return originalUrl;
 
-    // 3. 依次尝试代理
+    // 3. 如果是 GitHub URL, 优先尝试 jsdelivr CDN
+    const jsdelivrUrl = githubToJsdelivr(originalUrl);
+    if (jsdelivrUrl) {
+        const latency = await probeImageUrl(jsdelivrUrl, 4000);
+        if (latency >= 0) return jsdelivrUrl;
+    }
+
+    // 4. 依次尝试代理
     for (const template of proxyTemplates) {
         if (template === preferredProxy) continue; // 已测过
         const proxyUrl = applyProxyTemplate(template, originalUrl);
