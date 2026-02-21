@@ -680,29 +680,34 @@ function triggerFileInput() {
 async function uploadFiles(files: FileList | File[]) {
   if (uploading.value) return;
   uploading.value = true;
-  let completed = 0;
+  let success = 0;
+  let failed = 0;
   const total = files.length;
 
   for (const file of files) {
     if (!file.type.startsWith('image/')) {
       toastr.warning(`'${file.name}' 不是图片文件, 已跳过`);
-      completed++;
       continue;
     }
 
     try {
-      uploadProgress.value = `${completed + 1}/${total}`;
+      uploadProgress.value = `${success + failed + 1}/${total}`;
       await imageStore.upload(file);
-      completed++;
+      success++;
     } catch (err) {
-      console.error(`上传 '${file.name}' 失败:`, err);
-      toastr.error(`上传 '${file.name}' 失败`);
-      completed++;
+      failed++;
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`上传 '${file.name}' 失败:`, msg);
+      toastr.error(`上传 '${file.name}' 失败: ${msg}`);
     }
   }
 
   uploading.value = false;
-  toastr.success(`成功上传 ${completed}/${total} 张图片`);
+  if (success > 0) {
+    toastr.success(`成功上传 ${success}/${total} 张图片${failed > 0 ? ` (${failed} 张失败)` : ''}`);
+  } else if (failed > 0) {
+    toastr.error(`全部上传失败 (${failed} 张)`);
+  }
 
   // embedded 模式下检查总大小, 超过 10MB 时提醒用户
   if (settings.value.storage_mode === 'embedded') {
