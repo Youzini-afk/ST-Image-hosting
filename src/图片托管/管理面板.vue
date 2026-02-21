@@ -350,13 +350,14 @@ const editNameValue = ref('');
 // 大图预览状态
 const previewImage = ref<ImageItem | null>(null);
 
-// 横竖屏检测: 横屏=桌面端, 竖屏=移动端
-const isDesktop = ref(window.innerWidth > window.innerHeight);
+// 横竖屏检测: 使用 parent window (脚本运行在 iframe 中, 自身 window 尺寸不可靠)
+const parentWin = window.parent;
+const isDesktop = ref(parentWin.innerWidth > parentWin.innerHeight);
 function updateOrientation() {
-  isDesktop.value = window.innerWidth > window.innerHeight;
+  isDesktop.value = parentWin.innerWidth > parentWin.innerHeight;
 }
-window.addEventListener('resize', updateOrientation);
-onUnmounted(() => window.removeEventListener('resize', updateOrientation));
+parentWin.addEventListener('resize', updateOrientation);
+onUnmounted(() => parentWin.removeEventListener('resize', updateOrientation));
 
 // 注: reloadOnChatChange() 会在聊天切换时重载整个脚本 iframe,
 // 因此无需在 Vue 组件内单独监听 CHAT_CHANGED

@@ -34,8 +34,9 @@ function openPanel() {
             if (e.target === $overlay![0]) closePanel();
         });
 
-    // 创建面板容器 (桌面端更宽)
-    const isDesktop = window.innerWidth > window.innerHeight;
+    // 创建面板容器 (桌面端更宽, 使用 parent 窗口尺寸因为脚本运行在 iframe 中)
+    const parentWin = window.parent;
+    const isDesktop = parentWin.innerWidth > parentWin.innerHeight;
     const $panel = $('<div>')
         .css({
             background: 'var(--SmartThemeBlurTintColor, #1a1a2e)',
