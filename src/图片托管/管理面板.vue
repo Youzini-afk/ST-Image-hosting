@@ -492,8 +492,9 @@ const fileInputRef = ref<HTMLInputElement>();
 // CDN 测速
 const speedTesting = ref(false);
 const speedResults = ref<Record<string, number>>({});
-// 测速用图片 URL (1x1 transparent gif)
-const SPEED_TEST_IMAGE = 'https://www.google.com/images/branding/googlelogo/1x/googlelogo_color_272x92dp.png';
+
+/** 备用测速图片 (仅在没有远程图片时使用) */
+const FALLBACK_TEST_IMAGE = 'https://cdn.jsdelivr.net/gh/nicehash/Logos@latest/favicon-32x32.png';
 
 function proxyDisplayName(template: string): string {
   try {
@@ -511,25 +512,69 @@ function latencyClass(ms: number): string {
   return 'latency-slow';
 }
 
+/**
+ * 获取用于测速的图片 URL 列表 (从当前注册的 remote 图片中选取, 最多 3 张)
+ */
+function getTestImageUrls(): string[] {
+  const remoteImages = images.value.filter(img => img.storage === 'remote' && img.remote_url);
+  if (remoteImages.length === 0) return [FALLBACK_TEST_IMAGE];
+  // 取前 3 张作为采样
+  return remoteImages.slice(0, 3).map(img => img.remote_url);
+}
+
+/**
+ * 对一个来源 (直连/代理) 测试多张图片, 返回平均延迟
+ * @param testUrls 测试用的图片URL列表
+ * @param proxyTemplate 代理模板, 空字符串表示直连
+ */
+async function measureAvgLatency(testUrls: string[], proxyTemplate: string): Promise<number> {
+  const results: number[] = [];
+  for (const url of testUrls) {
+    let latency: number;
+    if (proxyTemplate) {
+      latency = await measureProxyLatency(proxyTemplate, url, 5000);
+    } else {
+      latency = await probeImageUrl(url, 5000);
+    }
+    results.push(latency);
+  }
+  // 过滤出成功的
+  const valid = results.filter(r => r >= 0);
+  if (valid.length === 0) return -1;
+  return Math.round(valid.reduce((a, b) => a + b, 0) / valid.length);
+}
+
 async function runSpeedTest() {
   speedTesting.value = true;
   speedResults.value = {};
 
-  // 测试直连
-  const directLatency = await probeImageUrl(SPEED_TEST_IMAGE, 5000);
-  speedResults.value['__direct__'] = directLatency;
+  const testUrls = getTestImageUrls();
+  const isUsingRemote = testUrls[0] !== FALLBACK_TEST_IMAGE;
 
-  // 测试每个代理
-  for (const proxy of settings.value.cdn_proxy_list) {
-    const latency = await measureProxyLatency(proxy, SPEED_TEST_IMAGE, 5000);
-    speedResults.value = { ...speedResults.value, [proxy]: latency };
+  if (isUsingRemote) {
+    toastr.info(`使用 ${testUrls.length} 张远程图片进行测速...`);
   }
 
-  // 自动锚定最快的
-  let bestProxy = '';
-  let bestLatency = directLatency;
+  // 并行测试: 直连 + 所有代理同时进行
+  const proxies = settings.value.cdn_proxy_list;
+  const tasks: Array<{ key: string; promise: Promise<number> }> = [
+    { key: '__direct__', promise: measureAvgLatency(testUrls, '') },
+    ...proxies.map(proxy => ({ key: proxy, promise: measureAvgLatency(testUrls, proxy) })),
+  ];
 
-  for (const proxy of settings.value.cdn_proxy_list) {
+  // 并行执行, 每个完成后实时更新 UI
+  await Promise.all(
+    tasks.map(async ({ key, promise }) => {
+      const latency = await promise;
+      speedResults.value = { ...speedResults.value, [key]: latency };
+    }),
+  );
+
+  // 综合评分: 找延迟最低的
+  let bestProxy = '';
+  let bestLatency = speedResults.value['__direct__'];
+
+  for (const proxy of proxies) {
     const lat = speedResults.value[proxy];
     if (lat >= 0 && (bestLatency < 0 || lat < bestLatency)) {
       bestLatency = lat;
@@ -542,8 +587,8 @@ async function runSpeedTest() {
 
   if (bestProxy) {
     toastr.success(`已自动锚定最快代理: ${proxyDisplayName(bestProxy)} (${bestLatency}ms)`);
-  } else if (directLatency >= 0) {
-    toastr.success(`直连最快 (${directLatency}ms)，无需代理`);
+  } else if (bestLatency >= 0) {
+    toastr.success(`直连最快 (${bestLatency}ms)，无需代理`);
   } else {
     toastr.warning('所有代理均超时');
   }
