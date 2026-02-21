@@ -32,6 +32,8 @@ const Settings = z
         cdn_preferred_proxy: z.string().default(''),
         /** 远程图片是否缓存到本地 (拉取一次后缓存, 之后不再重复拉取) */
         remote_cache_local: z.boolean().default(false),
+        /** 去 CDN: 自动剥离已有的 CDN 外壳, 用自己配置的代理替换 */
+        cdn_strip_enabled: z.boolean().default(false),
     })
     .prefault({});
 

@@ -183,6 +183,49 @@ function isKnownCdnUrl(url: string): boolean {
 }
 
 /**
+ * 从 CDN/代理 URL 中还原出原始 URL
+ * 支持:
+ *   - 查询参数型: wsrv.nl/?url=xxx, weserv.nl/?url=xxx
+ *   - 路径拼接型: i0/i1/i2.wp.com/domain/path
+ *   - jsdelivr GitHub: cdn.jsdelivr.net/gh/user/repo@branch/path
+ * @returns 还原的原始 URL, 无法识别时返回原 URL 不变
+ */
+export function stripCdn(url: string): string {
+    try {
+        const parsed = new URL(url);
+        const hostname = parsed.hostname;
+
+        // 查询参数型: ?url=encodedUrl
+        if (hostname === 'wsrv.nl' || hostname === 'images.weserv.nl'
+            || hostname === 'imageproxy.pimg.tw') {
+            const innerUrl = parsed.searchParams.get('url');
+            if (innerUrl) return innerUrl;
+        }
+
+        // 路径拼接型: i0.wp.com/example.com/path/img.png
+        if (/^i[0-2]\.wp\.com$/.test(hostname)) {
+            // pathname = /example.com/path/img.png → https://example.com/path/img.png
+            const path = parsed.pathname.slice(1); // 去掉开头 /
+            if (path) return `https://${path}`;
+        }
+
+        // jsdelivr GitHub → raw.githubusercontent.com
+        if (hostname === 'cdn.jsdelivr.net' || hostname === 'fastly.jsdelivr.net') {
+            const match = parsed.pathname.match(
+                /^\/gh\/([^/]+)\/([^@]+)@([^/]+)\/(.+)$/,
+            );
+            if (match) {
+                const [, user, repo, branch, path] = match;
+                return `https://raw.githubusercontent.com/${user}/${repo}/${branch}/${path}`;
+            }
+        }
+    } catch {
+        // URL 解析失败, 原样返回
+    }
+    return url;
+}
+
+/**
  * 通过 CDN 代理列表轮询, 找到第一个可用 URL
  * 如果有首选代理 (测速锚定), 优先使用
  * 如果是 GitHub URL, 自动尝试 jsdelivr CDN
@@ -192,28 +235,32 @@ async function resolveWithCdn(
     originalUrl: string,
     proxyTemplates: string[],
     preferredProxy: string,
+    stripEnabled: boolean,
 ): Promise<string> {
-    // 0. 如果 URL 已经是已知 CDN, 直接返回不套代理
-    if (isKnownCdnUrl(originalUrl)) {
-        const latency = await probeImageUrl(originalUrl, 4000);
-        if (latency >= 0) return originalUrl;
-        // CDN 本身也不通, 返回原始 URL 让浏览器自行处理
-        return originalUrl;
+    // 0. 去 CDN: 如果开启且 URL 是已知 CDN, 先剥离
+    let url = originalUrl;
+    if (stripEnabled && isKnownCdnUrl(url)) {
+        url = stripCdn(url);
+    } else if (!stripEnabled && isKnownCdnUrl(url)) {
+        // 未开启去 CDN, 已知 CDN URL 直连不套代理 (防嵌套)
+        const latency = await probeImageUrl(url, 4000);
+        if (latency >= 0) return url;
+        return url;
     }
 
     // 1. 如果有锚定的首选代理, 最先尝试
     if (preferredProxy) {
-        const proxyUrl = applyProxyTemplate(preferredProxy, originalUrl);
+        const proxyUrl = applyProxyTemplate(preferredProxy, url);
         const latency = await probeImageUrl(proxyUrl, 4000);
         if (latency >= 0) return proxyUrl;
     }
 
-    // 2. 测试原始 URL
-    const origLatency = await probeImageUrl(originalUrl, 4000);
-    if (origLatency >= 0) return originalUrl;
+    // 2. 测试原始 URL (或剥离后的)
+    const origLatency = await probeImageUrl(url, 4000);
+    if (origLatency >= 0) return url;
 
     // 3. 如果是 GitHub URL, 优先尝试 jsdelivr CDN
-    const jsdelivrUrl = githubToJsdelivr(originalUrl);
+    const jsdelivrUrl = githubToJsdelivr(url);
     if (jsdelivrUrl) {
         const latency = await probeImageUrl(jsdelivrUrl, 4000);
         if (latency >= 0) return jsdelivrUrl;
@@ -222,13 +269,13 @@ async function resolveWithCdn(
     // 4. 依次尝试代理
     for (const template of proxyTemplates) {
         if (template === preferredProxy) continue; // 已测过
-        const proxyUrl = applyProxyTemplate(template, originalUrl);
+        const proxyUrl = applyProxyTemplate(template, url);
         const latency = await probeImageUrl(proxyUrl);
         if (latency >= 0) return proxyUrl;
     }
 
     // 全部失败, 返回原始 URL
-    return originalUrl;
+    return url;
 }
 
 // ===== Store =====
@@ -375,6 +422,7 @@ export const useImageStore = defineStore('image-hosting-images', () => {
                 meta.remote_url,
                 settingsStore.settings.cdn_proxy_list,
                 settingsStore.settings.cdn_preferred_proxy,
+                settingsStore.settings.cdn_strip_enabled,
             );
         } else {
             resolvedUrl = meta.remote_url;

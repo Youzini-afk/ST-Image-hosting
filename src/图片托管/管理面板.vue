@@ -82,6 +82,17 @@
           </div>
         </label>
 
+        <label class="image-hosting_toggle-row" style="margin-top: 10px;">
+          <div class="toggle-info">
+            <span class="toggle-title">去 CDN</span>
+            <span class="toggle-desc">剥离已有 CDN 外壳，用自己配置的代理替换</span>
+          </div>
+          <div class="st-checkbox-wrapper">
+            <input v-model="settings.cdn_strip_enabled" type="checkbox" class="st-checkbox" />
+            <div class="st-checkbox-slider"></div>
+          </div>
+        </label>
+
         <!-- CDN 测速面板 -->
         <div v-if="settings.cdn_proxy_enabled" class="cdn-speed-panel">
           <div class="cdn-speed-header">
