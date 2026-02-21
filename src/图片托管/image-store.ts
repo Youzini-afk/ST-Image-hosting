@@ -25,6 +25,8 @@ const ImageMeta = z.object({
     remote_url: z.string().default(''),
     /** 存储模式 */
     storage: z.enum(['local', 'embedded', 'remote']).default('local'),
+    /** 曾用名 (改名后旧名仍可匹配) */
+    aliases: z.array(z.string()).default([]),
 });
 export type ImageMeta = z.infer<typeof ImageMeta>;
 
@@ -344,6 +346,7 @@ export const useImageStore = defineStore('image-hosting-images', () => {
             base64_data: base64Data,
             remote_url: '',
             storage: mode,
+            aliases: [],
         };
 
         registry.value.images[storageName] = meta;
@@ -368,6 +371,7 @@ export const useImageStore = defineStore('image-hosting-images', () => {
             base64_data: '',
             remote_url: remoteUrl,
             storage: 'remote',
+            aliases: [],
         };
 
         registry.value.images[storageName] = meta;
@@ -395,11 +399,18 @@ export const useImageStore = defineStore('image-hosting-images', () => {
         saveRegistry(registry.value);
     }
 
-    /** 重命名图片的显示名称 */
+    /** 重命名图片的显示名称 (旧名保留为别名) */
     function rename(storageName: string, newDisplayName: string): void {
         const meta = registry.value.images[storageName];
         if (!meta) return;
-        meta.display_name = deduplicateDisplayName(newDisplayName);
+        const oldName = meta.display_name;
+        const dedupedName = deduplicateDisplayName(newDisplayName);
+        if (oldName === dedupedName) return; // 名字没变
+        // 把旧名加到别名列表 (去重)
+        if (!meta.aliases.includes(oldName)) {
+            meta.aliases.push(oldName);
+        }
+        meta.display_name = dedupedName;
         saveRegistry(registry.value);
     }
 
@@ -493,20 +504,20 @@ export const useImageStore = defineStore('image-hosting-images', () => {
         }
     }
 
-    /** 通过显示名称获取图片 URL */
+    /** 通过显示名称或别名获取图片 URL */
     function getUrlByDisplayName(displayName: string): string | null {
         for (const [storageName, meta] of Object.entries(registry.value.images)) {
-            if (meta.display_name === displayName) {
+            if (meta.display_name === displayName || meta.aliases.includes(displayName)) {
                 return resolveUrl(storageName, meta);
             }
         }
         return null;
     }
 
-    /** 通过显示名称异步获取图片 URL (带 CDN 轮询) */
+    /** 通过显示名称或别名异步获取图片 URL (带 CDN 轮询) */
     async function getUrlByDisplayNameAsync(displayName: string): Promise<string | null> {
         for (const [storageName, meta] of Object.entries(registry.value.images)) {
-            if (meta.display_name === displayName) {
+            if (meta.display_name === displayName || meta.aliases.includes(displayName)) {
                 return resolveUrlAsync(storageName, meta);
             }
         }
