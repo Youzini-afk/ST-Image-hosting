@@ -3,211 +3,249 @@
     <div class="image-hosting_header">
       <b><i class="fa-solid fa-images"></i> 图片托管</b>
     </div>
-        <!-- 当前角色卡名 -->
-        <div class="image-hosting_block flex-container flexFlowColumn">
-          <small>当前角色卡: <b>{{ characterName }}</b></small>
-        </div>
+    
+    <!-- 当前角色卡名 -->
+    <div class="image-hosting_block flex-container flexFlowColumn" style="margin-bottom: 15px;">
+      <small style="opacity:0.7; font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase;">当前角色卡</small>
+      <div class="image-hosting_character-badge">
+        <i class="fa-solid fa-user-astronaut"></i>
+        <b>{{ characterName }}</b>
+      </div>
+    </div>
 
-        <!-- 使用统计 -->
-        <div v-if="images.length > 0" class="image-hosting_stats">
-          <div class="image-hosting_stat-item">
-            <i class="fa-solid fa-images"></i>
-            <span>{{ images.length }} 张</span>
+    <!-- 使用统计 -->
+    <div v-if="images.length > 0" class="image-hosting_stats">
+      <div class="image-hosting_stat-item">
+        <div class="stat-icon"><i class="fa-solid fa-images"></i></div>
+        <div class="stat-content">
+          <span class="stat-label">总图片</span>
+          <span class="stat-value">{{ images.length }}</span>
+        </div>
+      </div>
+      <div class="image-hosting_stat-item">
+        <div class="stat-icon"><i class="fa-solid fa-hard-drive"></i></div>
+        <div class="stat-content">
+          <span class="stat-label">总占用</span>
+          <span class="stat-value">{{ formatSize(totalSize) }}</span>
+        </div>
+      </div>
+      <div class="image-hosting_stat-item">
+        <div class="stat-icon"><i class="fa-solid fa-server"></i></div>
+        <div class="stat-content">
+          <span class="stat-label">存储分布</span>
+          <span class="stat-value">{{ localCount }} 本地 / {{ embeddedCount }} 嵌入</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 存储模式 -->
+    <div class="image-hosting_block image-hosting_glass-card">
+      <div class="flex-container" style="align-items: center; justify-content: space-between;">
+        <label style="font-weight: 600; font-size: 13px;">存储模式</label>
+        <select v-model="settings.storage_mode" class="image-hosting_select">
+          <option value="local">📁 本地文件 (需额外分享)</option>
+          <option value="embedded">📦 嵌入角色卡 (自动分享)</option>
+        </select>
+      </div>
+      <div v-if="settings.storage_mode === 'embedded'" class="image-hosting_hint-text">
+        <i class="fa-solid fa-circle-info"></i> 图片数据将使用 Base64 嵌入角色卡变量，导出卡片时自动包含。
+      </div>
+    </div>
+
+    <!-- 设置区域 -->
+    <div class="image-hosting_block image-hosting_glass-card">
+      <label class="image-hosting_toggle-row">
+        <div class="toggle-info">
+          <span class="toggle-title">开启上传压缩</span>
+          <span class="toggle-desc">自动将图片压缩并转换为 WebP 格式</span>
+        </div>
+        <div class="st-checkbox-wrapper">
+          <input v-model="settings.auto_compress" type="checkbox" class="st-checkbox" />
+          <div class="st-checkbox-slider"></div>
+        </div>
+      </label>
+      
+      <div v-if="settings.auto_compress" class="image-hosting_quality-slider">
+        <div class="slider-header">
+          <label>压缩质量</label>
+          <span class="quality-badge">{{ Math.round(settings.compress_quality * 100) }}%</span>
+        </div>
+        <input
+          v-model.number="settings.compress_quality"
+          type="range"
+          min="0.1"
+          max="1"
+          step="0.05"
+          class="image-hosting_range"
+        />
+      </div>
+    </div>
+
+    <!-- 导入导出按钮 (仅 local 模式) -->
+    <div v-if="settings.storage_mode === 'local'" class="image-hosting_block flex-container" style="gap: 10px;">
+      <button class="image-hosting_btn btn-primary" @click="handleExport">
+        <i class="fa-solid fa-file-export"></i> 导出图片包
+      </button>
+      <button class="image-hosting_btn btn-secondary" @click="handleImport">
+        <i class="fa-solid fa-file-import"></i> 导入图片包
+      </button>
+    </div>
+
+    <!-- 上传区域 -->
+    <div class="image-hosting_block">
+      <div
+        class="image-hosting_dropzone"
+        :class="{ 'image-hosting_dropzone--active': isDragging, 'image-hosting_dropzone--uploading': uploading }"
+        @dragover.prevent="isDragging = true"
+        @dragleave.prevent="isDragging = false"
+        @drop.prevent="handleDrop"
+        @click="triggerFileInput"
+      >
+        <div class="dropzone-icon">
+          <i class="fa-solid" :class="uploading ? 'fa-spinner fa-spin' : 'fa-cloud-arrow-up'"></i>
+        </div>
+        <div class="dropzone-text">
+          <span class="primary-text">{{ uploading ? `正在上传 (${uploadProgress})` : '点击选择或拖拽图片到此处' }}</span>
+          <span v-if="!uploading" class="secondary-text">支持 PNG, JPG, GIF, WebP</span>
+        </div>
+      </div>
+      <input
+        ref="fileInputRef"
+        type="file"
+        accept="image/*"
+        multiple
+        style="display: none"
+        @change="handleFileSelect"
+      />
+    </div>
+
+    <div class="image-hosting_divider"></div>
+
+    <!-- 搜索栏 + 批量操作 -->
+    <div v-if="images.length > 0" class="image-hosting_toolbar">
+      <div class="image-hosting_search-box">
+        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+        <input
+          v-model="searchQuery"
+          class="search-input"
+          placeholder="搜索图片名称..."
+        />
+        <i
+          v-if="searchQuery"
+          class="fa-solid fa-circle-xmark clear-icon"
+          @click="searchQuery = ''"
+        ></i>
+      </div>
+      
+      <div class="image-hosting_batch-bar">
+        <label class="batch-checkbox">
+          <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" />
+          <span>{{ isAllSelected ? '取消全选' : '全选' }}</span>
+        </label>
+        
+        <div class="batch-actions" :class="{ 'batch-actions--active': selectedSet.size > 0 }">
+          <span class="selected-count">{{ selectedSet.size }} 项</span>
+          <button class="icon-action-btn copy-btn" title="批量复制调用代码" @click="handleBatchCopyCode">
+            <i class="fa-solid fa-copy"></i>
+          </button>
+          <button class="icon-action-btn delete-btn" title="批量删除" @click="handleBatchDelete">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 图片列表 -->
+    <div class="image-hosting_list-container">
+      <div v-if="images.length === 0" class="image-hosting_empty-state">
+        <div class="empty-icon"><i class="fa-regular fa-images"></i></div>
+        <span>暂无图片，请在上方上传</span>
+      </div>
+      <div v-else-if="filteredImages.length === 0" class="image-hosting_empty-state">
+        <div class="empty-icon"><i class="fa-solid fa-search"></i></div>
+        <span>没有找到匹配的图片</span>
+      </div>
+      
+      <TransitionGroup name="list" tag="div" class="image-hosting_grid">
+        <div v-for="image in filteredImages" :key="image.storageName" 
+             class="image-hosting_card"
+             :class="{ 'is-selected': selectedSet.has(image.storageName) }">
+          
+          <div class="card-select">
+            <input type="checkbox" :checked="selectedSet.has(image.storageName)" @change="toggleSelect(image.storageName)" />
           </div>
-          <div class="image-hosting_stat-item">
-            <i class="fa-solid fa-hard-drive"></i>
-            <span>{{ formatSize(totalSize) }}</span>
-          </div>
-          <div class="image-hosting_stat-item">
-            <i class="fa-solid fa-server"></i>
-            <span>本地 {{ localCount }} / 嵌入 {{ embeddedCount }}</span>
-          </div>
-        </div>
-
-        <!-- 存储模式 -->
-        <div class="image-hosting_block flex-container" style="align-items: center; gap: 8px">
-          <label>存储模式</label>
-          <select v-model="settings.storage_mode" class="text_pole" style="height: 28px; flex: 1">
-            <option value="local">本地文件 (需额外分享压缩包)</option>
-            <option value="embedded">嵌入角色卡 (导出卡片时自动包含)</option>
-          </select>
-        </div>
-
-        <!-- 上传区域 -->
-        <div class="image-hosting_block">
-          <div
-            class="image-hosting_dropzone"
-            :class="{ 'image-hosting_dropzone--active': isDragging }"
-            @dragover.prevent="isDragging = true"
-            @dragleave.prevent="isDragging = false"
-            @drop.prevent="handleDrop"
-            @click="triggerFileInput"
-          >
-            <i class="fa-solid fa-cloud-arrow-up"></i>
-            <span>{{ uploading ? `上传中 (${uploadProgress})...` : '拖拽图片到此处, 或点击选择' }}</span>
-          </div>
-          <input
-            ref="fileInputRef"
-            type="file"
-            accept="image/*"
-            multiple
-            style="display: none"
-            @change="handleFileSelect"
-          />
-        </div>
-
-        <!-- 设置区域 -->
-        <div class="image-hosting_block flex-container">
-          <input v-model="settings.auto_compress" type="checkbox" />
-          <label>上传时压缩/转 WebP</label>
-        </div>
-        <div v-if="settings.auto_compress" class="image-hosting_block flex-container">
-          <label>压缩质量: {{ Math.round(settings.compress_quality * 100) }}%</label>
-          <input
-            v-model.number="settings.compress_quality"
-            type="range"
-            min="0.1"
-            max="1"
-            step="0.05"
-            style="flex: 1"
-          />
-        </div>
-
-        <!-- 导入导出按钮 (仅 local 模式) -->
-        <div v-if="settings.storage_mode === 'local'" class="image-hosting_block flex-container">
-          <input class="menu_button" type="submit" value="导出图片包" @click="handleExport" />
-          <input class="menu_button" type="submit" value="导入图片包" @click="handleImport" />
-        </div>
-        <div v-else class="image-hosting_block">
-          <small style="opacity: 0.6">
-            <i class="fa-solid fa-circle-info"></i>
-            嵌入模式: 图片数据跟随角色卡导出/导入，无需额外压缩包
-          </small>
-        </div>
-
-        <hr class="sysHR" />
-
-        <!-- 搜索栏 + 批量操作 -->
-        <div v-if="images.length > 0" class="image-hosting_toolbar">
-          <div class="image-hosting_search">
-            <i class="fa-solid fa-magnifying-glass"></i>
-            <input
-              v-model="searchQuery"
-              class="text_pole"
-              placeholder="搜索图片名称..."
-              style="flex: 1; height: 26px; font-size: 12px"
-            />
-            <i
-              v-if="searchQuery"
-              class="fa-solid fa-xmark image-hosting_icon-btn"
-              @click="searchQuery = ''"
-            ></i>
-          </div>
-          <div class="image-hosting_batch-bar">
-            <label class="image-hosting_checkbox-label">
-              <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" />
-              <span>{{ isAllSelected ? '取消全选' : '全选' }}</span>
-            </label>
-            <template v-if="selectedSet.size > 0">
-              <small style="opacity: 0.7">已选 {{ selectedSet.size }} 张</small>
-              <i
-                class="fa-solid fa-trash-can image-hosting_icon-btn"
-                title="批量删除"
-                style="color: var(--SmartThemeQuoteColor, #e74c3c)"
-                @click="handleBatchDelete"
-              ></i>
-              <i
-                class="fa-solid fa-copy image-hosting_icon-btn"
-                title="批量复制调用代码"
-                @click="handleBatchCopyCode"
-              ></i>
-            </template>
-          </div>
-        </div>
-
-        <!-- 图片列表 -->
-        <div v-if="images.length === 0" class="image-hosting_block">
-          <small style="opacity: 0.6">暂无图片, 请上传</small>
-        </div>
-        <div v-else-if="filteredImages.length === 0" class="image-hosting_block">
-          <small style="opacity: 0.6">没有匹配「{{ searchQuery }}」的图片</small>
-        </div>
-        <div v-for="image in filteredImages" :key="image.storageName" class="image-hosting_image-item">
-          <input
-            type="checkbox"
-            :checked="selectedSet.has(image.storageName)"
-            @change="toggleSelect(image.storageName)"
-            style="flex-shrink: 0"
-          />
-          <div class="image-hosting_image-preview" @click="openPreview(image)">
+          
+          <div class="card-preview" @click="openPreview(image)">
             <img :src="image.url" :alt="image.display_name" loading="lazy" />
+            <div class="preview-overlay"><i class="fa-solid fa-expand"></i></div>
+            <div v-if="image.storage === 'embedded'" class="embedded-badge" title="嵌入模式">
+              <i class="fa-solid fa-box-archive"></i>
+            </div>
           </div>
-          <div class="image-hosting_image-info">
-            <div class="image-hosting_image-name">
+          
+          <div class="card-info">
+            <div class="card-name-row">
               <template v-if="editingName !== image.storageName">
-                <span :title="image.display_name">{{ image.display_name }}</span>
-                <i
-                  class="fa-solid fa-pen-to-square image-hosting_icon-btn"
-                  title="重命名"
-                  @click="startRename(image.storageName, image.display_name)"
-                ></i>
+                <span class="card-name" :title="image.display_name">{{ image.display_name }}</span>
+                <button class="small-icon-btn" title="重命名" @click="startRename(image.storageName, image.display_name)">
+                  <i class="fa-solid fa-pen"></i>
+                </button>
               </template>
               <template v-else>
                 <input
                   v-model="editNameValue"
-                  class="text_pole"
-                  style="flex: 1; height: 24px; font-size: 12px"
+                  class="name-edit-input"
+                  v-focus
                   @keyup.enter="confirmRename(image.storageName)"
                   @keyup.escape="cancelRename"
                 />
-                <i
-                  class="fa-solid fa-check image-hosting_icon-btn"
-                  title="确认"
-                  @click="confirmRename(image.storageName)"
-                ></i>
-                <i
-                  class="fa-solid fa-xmark image-hosting_icon-btn"
-                  title="取消"
-                  @click="cancelRename"
-                ></i>
+                <button class="small-icon-btn success" @click="confirmRename(image.storageName)"><i class="fa-solid fa-check"></i></button>
+                <button class="small-icon-btn danger" @click="cancelRename"><i class="fa-solid fa-xmark"></i></button>
               </template>
             </div>
-            <small style="opacity: 0.6">
-              {{ formatSize(image.size) }} · {{ image.mime_type }}
-              <span v-if="image.storage === 'embedded'" style="color: var(--SmartThemeQuoteColor, #3498db)">
-                · 嵌入
-              </span>
-            </small>
-            <div class="image-hosting_image-actions">
-              <i
-                class="fa-solid fa-copy image-hosting_icon-btn"
-                title="复制调用代码"
-                @click="copyCode(image.display_name)"
-              ></i>
-              <i
-                class="fa-solid fa-trash-can image-hosting_icon-btn"
-                title="删除"
-                style="color: var(--SmartThemeQuoteColor, #e74c3c)"
-                @click="handleDelete(image.storageName, image.display_name)"
-              ></i>
+            
+            <div class="card-meta">
+              <span>{{ formatSize(image.size) }}</span>
+              <span class="meta-dot">•</span>
+              <span class="meta-type">{{ image.mime_type.split('/')[1]?.toUpperCase() || 'IMG' }}</span>
+            </div>
+            
+            <div class="card-actions">
+              <button class="action-btn" @click="copyCode(image.display_name)">
+                <i class="fa-regular fa-copy"></i> 复制调用代码
+              </button>
+              <button class="action-btn danger-icon" title="删除" @click="handleDelete(image.storageName, image.display_name)">
+                <i class="fa-regular fa-trash-can"></i>
+              </button>
             </div>
           </div>
         </div>
-
-        <hr class="sysHR" />
+      </TransitionGroup>
+    </div>
 
     <!-- 大图预览浮层 -->
     <Teleport to="body">
-      <div v-if="previewImage" class="image-hosting_overlay" @click.self="closePreview">
-        <div class="image-hosting_preview-container">
-          <img :src="previewImage.url" :alt="previewImage.display_name" />
-          <div class="image-hosting_preview-info">
-            <span>{{ previewImage.display_name }}</span>
-            <small>{{ formatSize(previewImage.size) }} · {{ previewImage.mime_type }}</small>
+      <Transition name="fade">
+        <div v-if="previewImage" class="image-hosting_overlay" @click.self="closePreview">
+          <div class="image-hosting_preview-container">
+            <button class="preview-close-btn" @click="closePreview">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+            <img :src="previewImage.url" :alt="previewImage.display_name" />
+            <div class="preview-footer">
+              <div class="preview-title">{{ previewImage.display_name }}</div>
+              <div class="preview-meta">
+                <span><i class="fa-solid fa-hard-drive"></i> {{ formatSize(previewImage.size) }}</span>
+                <span class="divider">|</span>
+                <span><i class="fa-solid fa-file-code"></i> {{ previewImage.mime_type }}</span>
+                <span v-if="previewImage.storage === 'embedded'" class="embedded-tag">
+                  <i class="fa-solid fa-box-archive"></i> 嵌入存储
+                </span>
+              </div>
+            </div>
           </div>
-          <i class="fa-solid fa-xmark image-hosting_preview-close" @click="closePreview"></i>
         </div>
-      </div>
+      </Transition>
     </Teleport>
   </div>
 </template>
@@ -217,6 +255,11 @@ import { storeToRefs } from 'pinia';
 import { useSettingsStore } from './settings';
 import { useImageStore, type ImageMeta } from './image-store';
 import { exportImages, importImages } from './export-import';
+
+// Custom directive for auto focus
+const vFocus = {
+  mounted: (el: HTMLInputElement) => el.focus()
+}
 
 type ImageItem = { storageName: string; url: string } & ImageMeta;
 
@@ -285,10 +328,12 @@ eventOn(tavern_events.CHAT_CHANGED, () => {
 });
 
 function triggerFileInput() {
+  if (uploading.value) return;
   fileInputRef.value?.click();
 }
 
 async function uploadFiles(files: FileList | File[]) {
+  if (uploading.value) return;
   uploading.value = true;
   let completed = 0;
   const total = files.length;
@@ -418,165 +463,607 @@ async function handleImport() {
 </script>
 
 <style scoped>
-.image-hosting_block {
-  margin: 5px 0;
-}
-
-/* 使用统计 */
-.image-hosting_stats {
-  display: flex;
-  gap: 12px;
-  padding: 8px 10px;
-  margin: 5px 0;
-  background: var(--SmartThemeBlurTintColor, rgba(255, 255, 255, 0.05));
-  border-radius: 6px;
-  border: 1px solid var(--SmartThemeBorderColor, #333);
-}
-
-.image-hosting_stat-item {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  opacity: 0.8;
-}
-
-.image-hosting_stat-item i {
-  font-size: 11px;
-  opacity: 0.6;
-}
-
-/* 搜索栏 + 批量工具栏 */
-.image-hosting_toolbar {
-  margin: 5px 0 8px;
+/* Base Variables & Theme Integration */
+.image-hosting-panel {
+  --primary-color: var(--SmartThemeQuoteColor, #3498db);
+  --primary-hover: var(--SmartThemeMessageTextColor, #2980b9);
+  --bg-color: var(--SmartThemeBlurTintColor, rgba(30, 30, 35, 0.6));
+  --card-bg: rgba(255, 255, 255, 0.04);
+  --card-hover: rgba(255, 255, 255, 0.08);
+  --border-color: var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.1));
+  --text-main: var(--SmartThemeBodyDisplayColor, #eee);
+  --text-muted: rgba(255, 255, 255, 0.5);
+  --danger-color: #ff5b5b;
+  --success-color: #20c997;
+  
+  color: var(--text-main);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  height: 100%;
 }
 
-.image-hosting_search {
+* {
+  box-sizing: border-box;
+}
+
+/* Header */
+.image-hosting_header {
+  font-size: 18px;
+  font-weight: 600;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--primary-color);
+}
+
+/* Character Badge */
+.image-hosting_character-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, var(--card-bg), rgba(255,255,255,0.01));
+  border: 1px solid var(--border-color);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  margin-top: 4px;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.image-hosting_character-badge i { color: var(--primary-color); }
+
+/* Glass Cards */
+.image-hosting_glass-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+  backdrop-filter: blur(8px);
+  transition: background 0.2s;
+}
+
+/* Base Blocks */
+.image-hosting_block {
+  margin-bottom: 12px;
+}
+.image-hosting_divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 16px 0;
+}
+
+/* Stats Row */
+.image-hosting_stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.image-hosting_stat-item {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: transform 0.2s;
+}
+.image-hosting_stat-item:hover {
+  transform: translateY(-2px);
+  background: var(--card-hover);
+}
+.stat-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: var(--primary-color);
+}
+.stat-content {
+  display: flex;
+  flex-direction: column;
+}
+.stat-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.stat-value {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Form Controls */
+.image-hosting_select {
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.image-hosting_select:focus {
+  border-color: var(--primary-color);
+}
+
+.image-hosting_hint-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 8px;
   display: flex;
   align-items: center;
   gap: 6px;
+  padding: 8px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 6px;
 }
 
-.image-hosting_search > i:first-child {
+/* Custom Toggle */
+.image-hosting_toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+.toggle-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.toggle-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+.toggle-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.st-checkbox-wrapper {
+  position: relative;
+  width: 36px;
+  height: 20px;
+}
+.st-checkbox {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.st-checkbox-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: rgba(255,255,255,0.1);
+  transition: .3s;
+  border-radius: 20px;
+}
+.st-checkbox-slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .3s;
+  border-radius: 50%;
+}
+.st-checkbox:checked + .st-checkbox-slider {
+  background-color: var(--primary-color);
+}
+.st-checkbox:checked + .st-checkbox-slider:before {
+  transform: translateX(16px);
+}
+
+/* Range Slider */
+.image-hosting_quality-slider {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border-color);
+}
+.slider-header {
+  display: flex;
+  justify-content: space-between;
   font-size: 12px;
-  opacity: 0.5;
+  margin-bottom: 8px;
+  color: var(--text-muted);
+}
+.quality-badge {
+  background: var(--primary-color);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.image-hosting_range {
+  width: 100%;
+  accent-color: var(--primary-color);
+  cursor: pointer;
+}
+
+/* Buttons */
+.image-hosting_btn {
+  flex: 1;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.image-hosting_btn:active { transform: scale(0.98); }
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary-color), #2980b9);
+  color: white;
+  box-shadow: 0 4px 10px rgba(52, 152, 219, 0.3);
+}
+.btn-primary:hover {
+  box-shadow: 0 6px 15px rgba(52, 152, 219, 0.4);
+  filter: brightness(1.1);
+}
+.btn-secondary {
+  background: rgba(255,255,255,0.08);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+}
+.btn-secondary:hover {
+  background: rgba(255,255,255,0.12);
+}
+
+/* Dropzone */
+.image-hosting_dropzone {
+  border: 2px dashed rgba(255,255,255,0.2);
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  background: rgba(0,0,0,0.15);
+}
+.image-hosting_dropzone:hover,
+.image-hosting_dropzone--active {
+  border-color: var(--primary-color);
+  background: rgba(52, 152, 219, 0.05);
+  transform: scale(1.01);
+}
+.image-hosting_dropzone--uploading {
+  border-style: solid;
+  border-color: var(--primary-color);
+  animation: pulseBg 2s infinite;
+  pointer-events: none;
+}
+@keyframes pulseBg {
+  0% { box-shadow: 0 0 0 0 rgba(52, 152, 219, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(52, 152, 219, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(52, 152, 219, 0); }
+}
+.dropzone-icon {
+  font-size: 32px;
+  color: var(--primary-color);
+  background: rgba(52, 152, 219, 0.1);
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dropzone-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.primary-text { font-size: 14px; font-weight: 500; }
+.secondary-text { font-size: 12px; color: var(--text-muted); }
+
+/* Toolbar */
+.image-hosting_toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 10px;
+}
+.image-hosting_search-box {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  padding: 4px 12px;
+  transition: border-color 0.2s;
+}
+.image-hosting_search-box:focus-within {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.1);
+}
+.search-icon { font-size: 12px; color: var(--text-muted); margin-right: 8px; }
+.clear-icon { cursor: pointer; color: var(--text-muted); transition: color 0.15s; }
+.clear-icon:hover { color: var(--text-main); }
+.search-input {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-main);
+  font-size: 13px;
+  outline: none;
+  width: 100%;
 }
 
 .image-hosting_batch-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 12px;
+  gap: 12px;
 }
-
-.image-hosting_checkbox-label {
+.batch-checkbox {
   display: flex;
   align-items: center;
-  gap: 4px;
-  cursor: pointer;
+  gap: 6px;
   font-size: 12px;
-}
-
-.image-hosting_dropzone {
-  border: 2px dashed var(--SmartThemeBorderColor, #555);
-  border-radius: 8px;
-  padding: 20px;
-  text-align: center;
   cursor: pointer;
-  transition: all 0.2s ease;
+  color: var(--text-main);
+}
+.batch-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(10px);
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.batch-actions--active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+.selected-count {
+  font-size: 11px;
+  background: var(--primary-color);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 10px;
+}
+.icon-action-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+}
+.icon-action-btn:hover { background: rgba(255,255,255,0.1); color: var(--text-main); }
+.icon-action-btn.delete-btn:hover { background: rgba(255,91,91,0.1); color: var(--danger-color); }
+
+/* List Container & Empty State */
+.image-hosting_empty-state {
+  text-align: center;
+  padding: 40px 0;
+  color: var(--text-muted);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  opacity: 0.7;
-}
-
-.image-hosting_dropzone:hover,
-.image-hosting_dropzone--active {
-  border-color: var(--SmartThemeQuoteColor, #3498db);
-  opacity: 1;
-}
-
-.image-hosting_dropzone i {
-  font-size: 24px;
-}
-
-.image-hosting_image-item {
-  display: flex;
   gap: 10px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--SmartThemeBorderColor, #333);
+}
+.empty-icon {
+  font-size: 40px;
+  opacity: 0.3;
+}
+
+.image-hosting_grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+
+/* List Transitions */
+.list-enter-active, .list-leave-active { transition: all 0.3s ease; }
+.list-enter-from { opacity: 0; transform: translateY(15px); }
+.list-leave-to { opacity: 0; transform: scale(0.9); }
+
+/* Card Design */
+.image-hosting_card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+  transition: all 0.2s;
+  overflow: hidden;
+}
+.image-hosting_card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+  border-color: rgba(255,255,255,0.2);
+}
+.image-hosting_card.is-selected {
+  border-color: var(--primary-color);
+  background: rgba(52, 152, 219, 0.05);
+}
+
+.card-select {
+  display: flex;
   align-items: center;
 }
 
-.image-hosting_image-preview {
-  width: 50px;
-  height: 50px;
-  flex-shrink: 0;
-  border-radius: 4px;
+.card-preview {
+  width: 60px;
+  height: 60px;
+  border-radius: 6px;
   overflow: hidden;
+  position: relative;
   cursor: pointer;
-  transition: opacity 0.15s;
+  flex-shrink: 0;
+  background: #000;
 }
-
-.image-hosting_image-preview:hover {
-  opacity: 0.8;
-}
-
-.image-hosting_image-preview img {
+.card-preview img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 0.3s ease;
+}
+.card-preview:hover img {
+  transform: scale(1.1);
+}
+.preview-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+  color: white;
+  font-size: 16px;
+}
+.card-preview:hover .preview-overlay { opacity: 1; }
+
+.embedded-badge {
+  position: absolute;
+  top: 4px; right: 4px;
+  background: rgba(0,0,0,0.7);
+  color: #f39c12;
+  font-size: 10px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  backdrop-filter: blur(2px);
 }
 
-.image-hosting_image-info {
+.card-info {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
-
-.image-hosting_image-name {
+.card-name-row {
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-size: 13px;
+  gap: 4px;
 }
-
-.image-hosting_image-name span {
+.card-name {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  flex: 1;
 }
-
-.image-hosting_image-actions {
-  display: flex;
-  gap: 8px;
+.name-edit-input {
+  flex: 1;
+  width: 100%;
+  background: rgba(0,0,0,0.4);
+  border: 1px solid var(--primary-color);
+  color: white;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 12px;
+  outline: none;
 }
-
-.image-hosting_icon-btn {
+.small-icon-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
   cursor: pointer;
-  opacity: 0.6;
-  transition: opacity 0.15s;
-  font-size: 13px;
+  font-size: 11px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+.small-icon-btn:hover { background: rgba(255,255,255,0.1); color: var(--text-main); }
+.small-icon-btn.success:hover { color: var(--success-color); }
+.small-icon-btn.danger:hover { color: var(--danger-color); }
+
+.card-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.meta-dot { opacity: 0.5; font-size: 8px; }
+.meta-type {
+  background: rgba(255,255,255,0.1);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 10px;
 }
 
-.image-hosting_icon-btn:hover {
-  opacity: 1;
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+.action-btn {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid transparent;
+  color: var(--text-main);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+  flex: 1;
+  justify-content: center;
+}
+.action-btn:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.1);
+}
+.action-btn.danger-icon {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+.action-btn.danger-icon:hover {
+  color: var(--danger-color);
+  border-color: rgba(255,91,91,0.2);
+  background: rgba(255,91,91,0.05);
 }
 
-/* 大图预览浮层 */
+/* Fullscreen Preview */
+.fade-enter-active, .fade-leave-active { transition: opacity 0.25s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+
 .image-hosting_overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
+  top: 0; left: 0; right: 0; bottom: 0;
   background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(5px);
   z-index: 99999;
   display: flex;
   align-items: center;
@@ -588,44 +1075,62 @@ async function handleImport() {
   position: relative;
   max-width: 90vw;
   max-height: 90vh;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  padding: 10px;
+  padding-bottom: 0;
+  border-radius: 12px;
   cursor: default;
-}
-
-.image-hosting_preview-container img {
-  max-width: 90vw;
-  max-height: 85vh;
-  object-fit: contain;
-  border-radius: 8px;
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
-}
-
-.image-hosting_preview-info {
-  text-align: center;
-  margin-top: 8px;
-  color: #ccc;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.5);
 }
 
-.image-hosting_preview-close {
+.preview-close-btn {
   position: absolute;
-  top: -12px;
-  right: -12px;
-  font-size: 20px;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.6);
+  top: -15px; right: -15px;
+  width: 36px; height: 36px;
   border-radius: 50%;
-  width: 32px;
-  height: 32px;
+  background: var(--primary-color);
+  color: white;
+  border: 2px solid #000;
+  font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  transition: transform 0.2s;
+  z-index: 10;
+}
+.preview-close-btn:hover { transform: scale(1.1); }
+
+.image-hosting_preview-container img {
+  max-width: calc(90vw - 20px);
+  max-height: calc(85vh - 60px);
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+.preview-footer {
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.preview-title { font-size: 15px; font-weight: 600; color: white; }
+.preview-meta {
   display: flex;
   align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background 0.15s;
+  gap: 12px;
+  font-size: 13px;
+  color: #aaa;
 }
-
-.image-hosting_preview-close:hover {
-  background: rgba(255, 255, 255, 0.2);
+.preview-meta .divider { opacity: 0.3; }
+.embedded-tag {
+  background: rgba(243, 156, 18, 0.15);
+  color: #f39c12;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
 }
 </style>
