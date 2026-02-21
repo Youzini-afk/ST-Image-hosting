@@ -4,6 +4,7 @@
  * 在魔法棒菜单 (#extensionsMenu) 中添加「图片管理」入口
  * 点击后打开管理面板弹窗
  */
+import { teleportStyle } from '@util/script';
 import 管理面板 from './管理面板.vue';
 
 let isOpen = false;
@@ -63,6 +64,9 @@ function closePanel() {
 }
 
 $(() => {
+    // 将 <style scoped> 复制到酒馆网页的 <head> 中, 否则样式不会在 iframe 外生效
+    const { destroy: destroyStyle } = teleportStyle();
+
     // 在魔法棒菜单中添加「图片管理」入口
     const $menuItem = $('<div>')
         .addClass('list-group-item flex-container flexGap5 interactable')
@@ -73,14 +77,15 @@ $(() => {
             $('<span>').text('图片管理'),
         );
 
-    // 用 extension_container 包裹，与酒馆助手的其他菜单项保持一致
-    $('<div>')
+    const $menuContainer = $('<div>')
         .addClass('extension_container')
         .append($menuItem)
         .appendTo('#extensionsMenu');
 
-    // 卸载时清理
+    // 卸载时清理: 关闭面板、移除菜单项、销毁传送的样式
     $(window).on('pagehide', () => {
         closePanel();
+        $menuContainer.remove();
+        destroyStyle();
     });
 });

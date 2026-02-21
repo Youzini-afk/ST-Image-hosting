@@ -15,9 +15,9 @@ const Settings = z
 export const useSettingsStore = defineStore('image-hosting-settings', () => {
     const settings = ref(Settings.parse(getVariables({ type: 'script', script_id: getScriptId() })));
 
-    watchEffect(() => {
-        insertOrAssignVariables(klona(settings.value), { type: 'script', script_id: getScriptId() });
-    });
+    watch(settings, (val) => {
+        insertOrAssignVariables(klona(val), { type: 'script', script_id: getScriptId() });
+    }, { deep: true });
 
     return { settings };
 });

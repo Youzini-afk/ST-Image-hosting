@@ -319,13 +319,8 @@ const editNameValue = ref('');
 // 大图预览状态
 const previewImage = ref<ImageItem | null>(null);
 
-// 监听角色卡切换
-eventOn(tavern_events.CHAT_CHANGED, () => {
-  characterName.value = substitudeMacros('{{char}}') || '未选择';
-  imageStore.reload();
-  selectedSet.value = new Set();
-  searchQuery.value = '';
-});
+// 注: reloadOnChatChange() 会在聊天切换时重载整个脚本 iframe,
+// 因此无需在 Vue 组件内单独监听 CHAT_CHANGED
 
 function triggerFileInput() {
   if (uploading.value) return;
@@ -358,6 +353,19 @@ async function uploadFiles(files: FileList | File[]) {
 
   uploading.value = false;
   toastr.success(`成功上传 ${completed}/${total} 张图片`);
+
+  // embedded 模式下检查总大小, 超过 10MB 时提醒用户
+  if (settings.value.storage_mode === 'embedded') {
+    const currentTotal = images.value.reduce((sum, img) => sum + img.size, 0);
+    const WARN_THRESHOLD = 10 * 1024 * 1024; // 10MB
+    if (currentTotal > WARN_THRESHOLD) {
+      toastr.warning(
+        `嵌入总大小已达 ${formatSize(currentTotal)}, 过大可能影响角色卡性能。建议切换到本地模式或压缩图片。`,
+        '嵌入容量提醒',
+        { timeOut: 8000 },
+      );
+    }
+  }
 }
 
 function handleDrop(event: DragEvent) {
@@ -421,11 +429,30 @@ async function handleBatchDelete() {
   }
 }
 
+function copyToClipboard(text: string): void {
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).then(
+      () => toastr.success('已复制调用代码'),
+      () => fallbackCopy(text),
+    );
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function fallbackCopy(text: string): void {
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.cssText = 'position:fixed;opacity:0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand('copy');
+  document.body.removeChild(textarea);
+  toastr.success('已复制调用代码');
+}
+
 function copyCode(displayName: string) {
-  const code = `ImageHosting.getImageUrl('${displayName}')`;
-  navigator.clipboard.writeText(code).then(() => {
-    toastr.success('已复制调用代码');
-  });
+  copyToClipboard(`ImageHosting.getImageUrl('${displayName}')`);
 }
 
 function handleBatchCopyCode() {
@@ -433,9 +460,7 @@ function handleBatchCopyCode() {
     .filter(img => selectedSet.value.has(img.storageName))
     .map(img => `ImageHosting.getImageUrl('${img.display_name}')`)
     .join('\n');
-  navigator.clipboard.writeText(codes).then(() => {
-    toastr.success(`已复制 ${selectedSet.value.size} 条调用代码`);
-  });
+  copyToClipboard(codes);
 }
 
 function formatSize(bytes: number): string {

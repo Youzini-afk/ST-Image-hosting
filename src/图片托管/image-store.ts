@@ -34,6 +34,7 @@ const ImageRegistry = z
     .prefault({});
 export type ImageRegistry = z.infer<typeof ImageRegistry>;
 
+/** 获取当前选中的角色名 (注: substitudeMacros 拼写为 SillyTavern 历史遗留) */
 function getCharacterName(): string {
     const name = getCharacterNames().find(
         (n: string) => n === substitudeMacros('{{char}}'),
@@ -194,12 +195,11 @@ export const useImageStore = defineStore('image-hosting-images', () => {
 
     /** 验证所有本地模式图片的完整性 */
     async function verify(): Promise<Record<string, boolean>> {
-        const localImages = _.filter(
-            _.map(registry.value.images, (meta, name) => ({ name, meta })),
-            item => item.meta.storage === 'local' && item.meta.server_path,
-        );
+        const localImages = Object.entries(registry.value.images)
+            .filter(([, meta]) => meta.storage === 'local' && meta.server_path)
+            .map(([, meta]) => meta.server_path);
         if (localImages.length === 0) return {};
-        return verifyFiles(localImages.map(i => i.meta.server_path));
+        return verifyFiles(localImages);
     }
 
     /** 重新从角色卡变量加载注册表 */

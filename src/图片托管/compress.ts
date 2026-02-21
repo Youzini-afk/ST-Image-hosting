@@ -4,6 +4,12 @@
  * 使用 Canvas API 在浏览器端进行图片压缩和 WebP 转换
  */
 
+/** 精确计算 base64 字符串对应的原始字节大小 */
+function calcBase64Size(base64: string): number {
+    const padding = (base64.match(/=+$/) || [''])[0].length;
+    return Math.ceil((base64.length * 3) / 4) - padding;
+}
+
 export interface CompressResult {
     /** 压缩后的 base64 数据 (不含前缀) */
     base64: string;
@@ -46,7 +52,7 @@ export async function compressImage(file: File, quality: number = 0.8): Promise<
             base64: jpegBase64,
             mimeType: 'image/jpeg',
             extension: 'jpg',
-            size: Math.ceil((jpegBase64.length * 3) / 4),
+            size: calcBase64Size(jpegBase64),
         };
     }
 
@@ -55,6 +61,6 @@ export async function compressImage(file: File, quality: number = 0.8): Promise<
         base64,
         mimeType,
         extension,
-        size: Math.ceil((base64.length * 3) / 4),
+        size: calcBase64Size(base64),
     };
 }

@@ -2,45 +2,58 @@
  * 导出/导入压缩包
  *
  * 使用 JSZip 打包图片资源 + manifest.json 供分享
+ * 支持 local 和 embedded 两种存储模式
  */
 import JSZip from 'jszip';
 import { uploadFile } from './api';
 import { useImageStore, type ImageRegistry } from './image-store';
+import { useSettingsStore } from './settings';
+
+const MANIFEST_VERSION = 1;
 
 /**
  * 导出当前角色卡的所有图片为 ZIP 压缩包
  */
 export async function exportImages(): Promise<void> {
     const imageStore = useImageStore();
-    const images = imageStore.getAllImages();
+    const registryData = imageStore.getRegistryData();
+    const entries = Object.entries(registryData.images);
 
-    if (images.length === 0) {
+    if (entries.length === 0) {
         toastr.warning('当前角色卡没有图片可以导出');
         return;
     }
 
     const zip = new JSZip();
-
-    // 创建 manifest.json
-    const manifest = imageStore.getRegistryData();
-    zip.file('manifest.json', JSON.stringify(manifest, null, 2));
-
-    // 下载并打包每张图片
     const imgFolder = zip.folder('images')!;
     let successCount = 0;
 
-    for (const image of images) {
+    for (const [storageName, meta] of entries) {
         try {
-            const response = await fetch(`/${image.server_path}`);
-            if (!response.ok) {
-                console.warn(`获取图片 '${image.display_name}' 失败, 跳过`);
-                continue;
+            if (meta.storage === 'embedded' && meta.base64_data) {
+                // embedded 模式: 从 base64_data 直接打包
+                const binaryString = atob(meta.base64_data);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                imgFolder.file(storageName, bytes, { binary: true });
+                successCount++;
+            } else if (meta.storage === 'local' && meta.server_path) {
+                // local 模式: 从服务端下载
+                const response = await fetch(`/${meta.server_path}`);
+                if (!response.ok) {
+                    console.warn(`获取图片 '${meta.display_name}' 失败 (${response.status}), 跳过`);
+                    continue;
+                }
+                const blob = await response.blob();
+                imgFolder.file(storageName, blob);
+                successCount++;
+            } else {
+                console.warn(`图片 '${meta.display_name}' 存储数据不完整, 跳过`);
             }
-            const blob = await response.blob();
-            imgFolder.file(image.storageName, blob);
-            successCount++;
         } catch (err) {
-            console.warn(`下载图片 '${image.display_name}' 失败:`, err);
+            console.warn(`处理图片 '${meta.display_name}' 失败:`, err);
         }
     }
 
@@ -48,6 +61,14 @@ export async function exportImages(): Promise<void> {
         toastr.error('没有成功获取到任何图片文件');
         return;
     }
+
+    // 导出时清除 base64_data 以减小 manifest 体积, 只保留元数据
+    const exportManifest = klona(registryData);
+    for (const meta of Object.values(exportManifest.images)) {
+        meta.base64_data = '';
+    }
+
+    zip.file('manifest.json', JSON.stringify({ version: MANIFEST_VERSION, ...exportManifest }, null, 2));
 
     // 生成并下载 ZIP
     const content = await zip.generateAsync({ type: 'blob' });
@@ -68,6 +89,7 @@ export async function exportImages(): Promise<void> {
 
 /**
  * 导入图片压缩包
+ * 根据当前存储模式设置决定导入方式
  */
 export async function importImages(): Promise<void> {
     const input = document.createElement('input');
@@ -94,20 +116,23 @@ export async function importImages(): Promise<void> {
                 }
 
                 const manifestText = await manifestFile.async('string');
-                const manifest = JSON.parse(manifestText) as ImageRegistry;
+                const manifestRaw = JSON.parse(manifestText);
+                // 兼容没有 version 的旧版 manifest
+                const manifest = (manifestRaw.images ? manifestRaw : { images: {} }) as ImageRegistry;
 
-                // 上传所有图片
-                const imageStore = useImageStore();
-                let successCount = 0;
                 const imagesFolder = zip.folder('images');
-
                 if (!imagesFolder) {
                     toastr.error('压缩包中缺少 images 目录');
                     resolve();
                     return;
                 }
 
+                const imageStore = useImageStore();
+                const settingsStore = useSettingsStore();
+                const currentMode = settingsStore.settings.storage_mode;
+                let successCount = 0;
                 const entries = Object.entries(manifest.images);
+
                 for (const [storageName, meta] of entries) {
                     const imageFile = imagesFolder.file(storageName);
                     if (!imageFile) {
@@ -117,13 +142,22 @@ export async function importImages(): Promise<void> {
 
                     try {
                         const base64 = await imageFile.async('base64');
-                        const serverPath = await uploadFile(storageName, base64);
 
-                        // 更新 server_path 为新路径
-                        meta.server_path = serverPath;
+                        if (currentMode === 'local') {
+                            // local 模式: 上传到服务端
+                            const serverPath = await uploadFile(storageName, base64);
+                            meta.server_path = serverPath;
+                            meta.base64_data = '';
+                            meta.storage = 'local';
+                        } else {
+                            // embedded 模式: 存储 base64 到变量
+                            meta.base64_data = base64;
+                            meta.server_path = '';
+                            meta.storage = 'embedded';
+                        }
                         successCount++;
                     } catch (err) {
-                        console.warn(`上传图片 '${meta.display_name}' 失败:`, err);
+                        console.warn(`导入图片 '${meta.display_name}' 失败:`, err);
                     }
                 }
 
