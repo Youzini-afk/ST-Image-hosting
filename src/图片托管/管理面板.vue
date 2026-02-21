@@ -130,7 +130,24 @@
                   {{ speedResults[proxy] >= 0 ? speedResults[proxy] + 'ms' : '超时' }}
                 </span>
                 <i v-if="settings.cdn_preferred_proxy === proxy" class="fa-solid fa-anchor" style="font-size: 10px; color: var(--primary-color)" title="已锚定"></i>
+                <button class="proxy-delete-btn" title="删除" @click.stop="removeProxy(idx)">
+                  <i class="fa-solid fa-xmark"></i>
+                </button>
               </div>
+            </div>
+
+            <!-- 添加新代理 -->
+            <div class="cdn-proxy-add">
+              <input
+                v-model="newProxyTemplate"
+                class="search-input remote-input"
+                placeholder="代理模板 URL（用 {url} 代替原始链接）"
+                style="font-size: 11px"
+                @keyup.enter="addProxy"
+              />
+              <button class="image-hosting_btn btn-primary" style="flex: 0 0 auto; padding: 4px 10px; font-size: 11px;" @click="addProxy">
+                <i class="fa-solid fa-plus"></i>
+              </button>
             </div>
           </div>
         </div>
@@ -530,6 +547,33 @@ async function runSpeedTest() {
   } else {
     toastr.warning('所有代理均超时');
   }
+}
+
+// 代理列表管理
+const newProxyTemplate = ref('');
+
+function addProxy() {
+  const tpl = newProxyTemplate.value.trim();
+  if (!tpl) return;
+  if (!tpl.includes('{url}')) {
+    toastr.warning('模板必须包含 {url} 占位符');
+    return;
+  }
+  if (settings.value.cdn_proxy_list.includes(tpl)) {
+    toastr.warning('该代理已存在');
+    return;
+  }
+  settings.value.cdn_proxy_list.push(tpl);
+  newProxyTemplate.value = '';
+  toastr.success(`已添加代理: ${proxyDisplayName(tpl)}`);
+}
+
+function removeProxy(idx: number) {
+  const removed = settings.value.cdn_proxy_list.splice(idx, 1)[0];
+  if (settings.value.cdn_preferred_proxy === removed) {
+    settings.value.cdn_preferred_proxy = '';
+  }
+  toastr.info(`已移除代理: ${proxyDisplayName(removed)}`);
 }
 
 // 远程 URL 输入
@@ -1574,4 +1618,28 @@ async function handleImport() {
 .latency-medium { background: rgba(241,196,15,0.15); color: #f1c40f; }
 .latency-slow { background: rgba(231,76,60,0.15); color: #e74c3c; }
 .latency-timeout { background: rgba(255,255,255,0.05); color: var(--text-muted); }
+
+.proxy-delete-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 10px;
+  opacity: 0.4;
+  transition: all 0.15s;
+  border-radius: 4px;
+}
+.proxy-delete-btn:hover {
+  opacity: 1;
+  color: #e74c3c;
+  background: rgba(231,76,60,0.1);
+}
+
+.cdn-proxy-add {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 6px;
+}
 </style>
