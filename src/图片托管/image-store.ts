@@ -242,10 +242,11 @@ async function resolveWithCdn(
     if (stripEnabled && isKnownCdnUrl(url)) {
         url = stripCdn(url);
     } else if (!stripEnabled && isKnownCdnUrl(url)) {
-        // 未开启去 CDN, 已知 CDN URL 直连不套代理 (防嵌套)
+        // 未开启去 CDN, 已知 CDN URL 先试直连
         const latency = await probeImageUrl(url, 4000);
         if (latency >= 0) return url;
-        return url;
+        // 直连失败, 尝试剥离 CDN 后重新走代理流程
+        url = stripCdn(url);
     }
 
     // 1. 如果有锚定的首选代理, 最先尝试
@@ -284,6 +285,17 @@ export const useImageStore = defineStore('image-hosting-images', () => {
     const registry = ref(loadRegistry());
     const settingsStore = useSettingsStore();
 
+    /** 确保 display_name 唯一 (重名时自动加后缀) */
+    function deduplicateDisplayName(name: string): string {
+        const existing = new Set(
+            Object.values(registry.value.images).map(m => m.display_name),
+        );
+        if (!existing.has(name)) return name;
+        let i = 2;
+        while (existing.has(`${name} (${i})`)) i++;
+        return `${name} (${i})`;
+    }
+
     /** 上传一张图片 (local / embedded 模式) */
     async function upload(file: File): Promise<string> {
         let base64: string;
@@ -303,7 +315,9 @@ export const useImageStore = defineStore('image-hosting-images', () => {
         }
 
         const storageName = generateStorageName(getCharacterName(), extension);
-        const mode = settingsStore.settings.storage_mode;
+        // upload() 仅支持 local / embedded, remote 模式回退为 local
+        const mode = settingsStore.settings.storage_mode === 'remote'
+            ? 'local' : settingsStore.settings.storage_mode;
 
         let serverPath = '';
         let base64Data = '';
@@ -316,7 +330,7 @@ export const useImageStore = defineStore('image-hosting-images', () => {
         }
 
         const meta: ImageMeta = {
-            display_name: file.name.replace(/\.[^.]+$/, ''),
+            display_name: deduplicateDisplayName(file.name.replace(/\.[^.]+$/, '')),
             original_name: file.name,
             mime_type: mimeType,
             size: fileSize,
@@ -324,7 +338,7 @@ export const useImageStore = defineStore('image-hosting-images', () => {
             server_path: serverPath,
             base64_data: base64Data,
             remote_url: '',
-            storage: mode === 'remote' ? 'local' : mode, // upload 不支持 remote, 退回 local
+            storage: mode,
         };
 
         registry.value.images[storageName] = meta;
@@ -334,10 +348,13 @@ export const useImageStore = defineStore('image-hosting-images', () => {
 
     /** 添加远程图片 (remote 模式) */
     function addRemote(displayName: string, remoteUrl: string): string {
-        const storageName = generateStorageName(getCharacterName(), 'remote');
+        // 从 URL 提取真实扩展名, 避免 .remote 后缀
+        const urlExt = remoteUrl.split(/[?#]/)[0].split('.').pop()?.toLowerCase() ?? '';
+        const safeExt = /^(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/.test(urlExt) ? urlExt : 'png';
+        const storageName = generateStorageName(getCharacterName(), safeExt);
 
         const meta: ImageMeta = {
-            display_name: displayName,
+            display_name: deduplicateDisplayName(displayName),
             original_name: remoteUrl.split('/').pop() ?? displayName,
             mime_type: 'image/*',
             size: 0,
@@ -358,7 +375,8 @@ export const useImageStore = defineStore('image-hosting-images', () => {
         const meta = registry.value.images[storageName];
         if (!meta) return;
 
-        if (meta.storage === 'local' && meta.server_path) {
+        // local 和 remote 缓存都可能有服务端文件
+        if (meta.server_path) {
             try {
                 await deleteFile(meta.server_path);
             } catch (err) {
@@ -619,29 +637,29 @@ export const useImageStore = defineStore('image-hosting-images', () => {
 
     /**
      * 刷新远程图片缓存: 清除已有缓存并重新拉取
-     * @returns 刷新的数量
+     * @returns { cleared: 清除的旧缓存数, fetched: 重新拉取数 }
      */
-    async function refreshCache(): Promise<number> {
-        let count = 0;
+    async function refreshCache(): Promise<{ cleared: number; fetched: number }> {
+        let cleared = 0;
 
         // 先清除所有远程缓存
         for (const [, meta] of Object.entries(registry.value.images)) {
             if (meta.storage !== 'remote' || !meta.server_path) continue;
             try { await deleteFile(meta.server_path); } catch { /* ignore */ }
             meta.server_path = '';
-            count++;
+            cleared++;
         }
 
-        if (count > 0) {
+        if (cleared > 0) {
             saveRegistry(registry.value);
-            resolvedRemoteCache.clear();
         }
+        resolvedRemoteCache.clear();
 
-        // 如果开启了本地缓存, 重新拉取
+        // 如果开启了本地缓存, 重新拉取所有远程图片
+        let fetched = 0;
         if (settingsStore.settings.remote_cache_local) {
             for (const [storageName, meta] of Object.entries(registry.value.images)) {
                 if (meta.storage !== 'remote' || !meta.remote_url) continue;
-                // 先解析 URL (走 CDN 轮询)
                 let url = meta.remote_url;
                 if (settingsStore.settings.cdn_proxy_enabled) {
                     url = await resolveWithCdn(
@@ -651,12 +669,12 @@ export const useImageStore = defineStore('image-hosting-images', () => {
                         settingsStore.settings.cdn_strip_enabled,
                     );
                 }
-                // 重新缓存
                 await cacheRemoteToLocal(storageName, url);
+                fetched++;
             }
         }
 
-        return count;
+        return { cleared, fetched };
     }
 
     return {

@@ -5,7 +5,7 @@
  * 支持 local 和 embedded 两种存储模式
  */
 import JSZip from 'jszip';
-import { uploadFile } from './api';
+import { uploadFile, generateStorageName } from './api';
 import { useImageStore, type ImageRegistry } from './image-store';
 import { useSettingsStore } from './settings';
 
@@ -39,8 +39,8 @@ export async function exportImages(): Promise<void> {
                 }
                 imgFolder.file(storageName, bytes, { binary: true });
                 successCount++;
-            } else if (meta.storage === 'local' && meta.server_path) {
-                // local 模式: 从服务端下载
+            } else if (meta.server_path) {
+                // local 模式 或 已缓存的 remote 模式: 从服务端下载
                 const response = await fetch(`/${meta.server_path}`);
                 if (!response.ok) {
                     console.warn(`获取图片 '${meta.display_name}' 失败 (${response.status}), 跳过`);
@@ -133,27 +133,38 @@ export async function importImages(): Promise<void> {
                 let successCount = 0;
                 const entries = Object.entries(manifest.images);
 
-                for (const [storageName, meta] of entries) {
-                    const imageFile = imagesFolder.file(storageName);
+                for (const [origStorageName, meta] of entries) {
+                    const imageFile = imagesFolder.file(origStorageName);
                     if (!imageFile) {
-                        console.warn(`压缩包中缺少图片文件: ${storageName}`);
+                        console.warn(`压缩包中缺少图片文件: ${origStorageName}`);
                         continue;
                     }
 
                     try {
                         const base64 = await imageFile.async('base64');
 
+                        // 生成新的 storageName 避免覆盖已有条目
+                        const ext = origStorageName.split('.').pop() ?? 'png';
+                        const charName = substitudeMacros('{{char}}') || 'unknown';
+                        const newStorageName = imageStore.registry.images[origStorageName]
+                            ? generateStorageName(charName, ext)  // 已有同名, 生成新名
+                            : origStorageName;  // 无冲突, 保留原名
+
                         if (currentMode === 'local') {
-                            // local 模式: 上传到服务端
-                            const serverPath = await uploadFile(storageName, base64);
+                            const serverPath = await uploadFile(newStorageName, base64);
                             meta.server_path = serverPath;
                             meta.base64_data = '';
                             meta.storage = 'local';
                         } else {
-                            // embedded 模式: 存储 base64 到变量
                             meta.base64_data = base64;
                             meta.server_path = '';
                             meta.storage = 'embedded';
+                        }
+
+                        // 用新 key 存到 manifest
+                        if (newStorageName !== origStorageName) {
+                            delete manifest.images[origStorageName];
+                            manifest.images[newStorageName] = meta;
                         }
                         successCount++;
                     } catch (err) {

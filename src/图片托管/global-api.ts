@@ -93,22 +93,15 @@ export function startDomObserver(): void {
     // 首次扫描
     resolveImgTags();
 
-    // 监听 DOM 变化
-    const observer = new MutationObserver((mutations) => {
-        for (const mutation of mutations) {
-            for (const node of mutation.addedNodes) {
-                if (node instanceof HTMLElement) {
-                    // 节点本身是 img[data-img]
-                    if (node.matches?.(`img[data-img]:not([${RESOLVED_ATTR}])`)) {
-                        resolveImgTags(node.parentNode ?? document);
-                    }
-                    // 节点的子孙中有 img[data-img]
-                    else if (node.querySelector?.(`img[data-img]:not([${RESOLVED_ATTR}])`)) {
-                        resolveImgTags(node);
-                    }
-                }
-            }
-        }
+    // debounce: 合并高频 DOM 变更, 避免每次 mutation 都 querySelectorAll
+    let pending = false;
+    const observer = new MutationObserver(() => {
+        if (pending) return;
+        pending = true;
+        requestAnimationFrame(() => {
+            pending = false;
+            resolveImgTags();
+        });
     });
 
     observer.observe(document.body, {

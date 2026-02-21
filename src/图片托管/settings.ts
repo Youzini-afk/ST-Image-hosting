@@ -41,16 +41,20 @@ export const useSettingsStore = defineStore('image-hosting-settings', () => {
     const settings = ref(Settings.parse(getVariables({ type: 'script', script_id: getScriptId() })));
 
     // 老用户迁移: 自动补充新增的默认代理 (不影响用户已有的自定义代理)
-    const existing = new Set(settings.value.cdn_proxy_list);
-    let added = false;
-    for (const proxy of DEFAULT_CDN_PROXIES) {
-        if (!existing.has(proxy)) {
-            settings.value.cdn_proxy_list.push(proxy);
-            added = true;
+    try {
+        const existing = new Set(settings.value.cdn_proxy_list);
+        let added = false;
+        for (const proxy of DEFAULT_CDN_PROXIES) {
+            if (!existing.has(proxy)) {
+                settings.value.cdn_proxy_list.push(proxy);
+                added = true;
+            }
         }
-    }
-    if (added) {
-        insertOrAssignVariables(klona(settings.value), { type: 'script', script_id: getScriptId() });
+        if (added) {
+            insertOrAssignVariables(klona(settings.value), { type: 'script', script_id: getScriptId() });
+        }
+    } catch (err) {
+        console.warn('[图片托管] 设置迁移失败, 使用默认值:', err);
     }
 
     watch(settings, (val) => {

@@ -549,11 +549,14 @@ const refreshing = ref(false);
 async function handleRefreshCache() {
   refreshing.value = true;
   try {
-    const count = await imageStore.refreshCache();
-    if (count > 0) {
-      toastr.success(`已刷新 ${count} 张远程图片缓存`);
+    const { cleared, fetched } = await imageStore.refreshCache();
+    if (cleared > 0 || fetched > 0) {
+      const parts: string[] = [];
+      if (cleared > 0) parts.push(`清除 ${cleared} 个旧缓存`);
+      if (fetched > 0) parts.push(`重新拉取 ${fetched} 张`);
+      toastr.success(`刷新完成: ${parts.join(', ')}`);
     } else {
-      toastr.info('没有远程缓存需要刷新');
+      toastr.info('没有远程图片需要刷新');
     }
   } catch (err) {
     toastr.error('刷新失败');

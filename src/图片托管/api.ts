@@ -71,7 +71,7 @@ export function fileToBase64(file: File): Promise<string> {
     reader.onload = () => {
       const result = reader.result as string;
       // 去除 data:xxxx;base64, 前缀
-      const base64 = result.split(',')[1];
+      const base64 = result.split(',')[1] ?? '';
       resolve(base64);
     };
     reader.onerror = reject;
@@ -84,9 +84,19 @@ export function fileToBase64(file: File): Promise<string> {
  * 仅使用 [a-zA-Z0-9_\-.] 字符
  */
 export function generateStorageName(characterName: string, extension: string): string {
-  // 将角色名转为拼音/hash, 保证文件名合法
-  const safeCharName = characterName.replace(/[^a-zA-Z0-9]/g, '') || 'char';
+  // 清除非 ASCII 字符, 用 hash 补充辨识度
+  const ascii = characterName.replace(/[^a-zA-Z0-9]/g, '');
+  const safeCharName = ascii || hashStr(characterName);
   const uuid = crypto.randomUUID().slice(0, 8);
   const safeExt = extension.replace(/^\./, '').replace(/[^a-zA-Z0-9]/g, '') || 'png';
   return `img_${safeCharName}_${uuid}.${safeExt}`;
+}
+
+/** 简单 hash: 将字符串转为短 hex 字符串 (非加密用途) */
+function hashStr(str: string): string {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h).toString(36).slice(0, 8) || 'char';
 }
