@@ -1,7 +1,8 @@
 /**
  * 管理界面挂载逻辑
  *
- * 通过脚本按钮打开管理面板弹窗
+ * 在魔法棒菜单 (#extensionsMenu) 中添加「图片管理」入口
+ * 点击后打开管理面板弹窗
  */
 import 管理面板 from './管理面板.vue';
 
@@ -62,13 +63,21 @@ function closePanel() {
 }
 
 $(() => {
-    // 添加脚本按钮
-    appendInexistentScriptButtons([{ name: '图片管理', visible: true }]);
+    // 在魔法棒菜单中添加「图片管理」入口
+    const $menuItem = $('<div>')
+        .addClass('list-group-item flex-container flexGap5 interactable')
+        .attr({ tabindex: '0', role: 'listitem' })
+        .on('click', () => openPanel())
+        .append(
+            $('<div>').addClass('fa-fw fa-solid fa-images extensionsMenuExtensionButton'),
+            $('<span>').text('图片管理'),
+        );
 
-    // 监听按钮点击
-    eventOn(getButtonEvent('图片管理'), () => {
-        openPanel();
-    });
+    // 用 extension_container 包裹，与酒馆助手的其他菜单项保持一致
+    $('<div>')
+        .addClass('extension_container')
+        .append($menuItem)
+        .appendTo('#extensionsMenu');
 
     // 卸载时清理
     $(window).on('pagehide', () => {
