@@ -386,9 +386,9 @@ export const useImageStore = defineStore('image-hosting-images', () => {
             return getOrCreateObjectUrl(storageName, meta.base64_data, meta.mime_type);
         }
         if (meta.storage === 'remote' && meta.remote_url) {
-            // remote: 如果已有本地缓存 (base64_data 被填充), 使用本地缓存
-            if (meta.base64_data) {
-                return getOrCreateObjectUrl(storageName, meta.base64_data, meta.mime_type);
+            // remote: 如果已有服务端缓存, 使用本地文件
+            if (meta.server_path) {
+                return `/${meta.server_path}`;
             }
             // 同步返回: 先返回缓存或原始 URL, 异步 CDN 轮询在 resolveUrlAsync 中处理
             return resolvedRemoteCache.get(storageName) ?? meta.remote_url;
@@ -406,9 +406,9 @@ export const useImageStore = defineStore('image-hosting-images', () => {
             return resolveUrl(storageName, meta);
         }
 
-        // 已有本地 base64 缓存
-        if (meta.base64_data) {
-            return getOrCreateObjectUrl(storageName, meta.base64_data, meta.mime_type);
+        // 已有服务端缓存
+        if (meta.server_path) {
+            return `/${meta.server_path}`;
         }
 
         // 已有轮询结果缓存
@@ -440,10 +440,10 @@ export const useImageStore = defineStore('image-hosting-images', () => {
         return resolvedUrl;
     }
 
-    /** 将远程图片拉取并缓存为 base64 到角色卡变量 */
+    /** 将远程图片拉取并缓存到服务端文件系统 */
     async function cacheRemoteToLocal(storageName: string, url: string): Promise<void> {
         const meta = registry.value.images[storageName];
-        if (!meta || meta.base64_data) return; // 已缓存
+        if (!meta || meta.server_path) return; // 已缓存
 
         try {
             const response = await fetch(url);
@@ -452,14 +452,15 @@ export const useImageStore = defineStore('image-hosting-images', () => {
             const base64 = await new Promise<string>((resolve, reject) => {
                 reader.onloadend = () => {
                     const result = reader.result as string;
-                    // 去掉 data:mime;base64, 前缀
                     resolve(result.split(',')[1] ?? '');
                 };
                 reader.onerror = reject;
                 reader.readAsDataURL(blob);
             });
 
-            meta.base64_data = base64;
+            // 上传到服务端文件系统
+            const serverPath = await uploadFile(storageName, base64);
+            meta.server_path = serverPath;
             meta.mime_type = blob.type || meta.mime_type;
             meta.size = blob.size;
             saveRegistry(registry.value);
