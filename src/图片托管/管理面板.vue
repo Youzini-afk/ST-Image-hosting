@@ -11,6 +11,22 @@
           <small>当前角色卡: <b>{{ characterName }}</b></small>
         </div>
 
+        <!-- 使用统计 -->
+        <div v-if="images.length > 0" class="image-hosting_stats">
+          <div class="image-hosting_stat-item">
+            <i class="fa-solid fa-images"></i>
+            <span>{{ images.length }} 张</span>
+          </div>
+          <div class="image-hosting_stat-item">
+            <i class="fa-solid fa-hard-drive"></i>
+            <span>{{ formatSize(totalSize) }}</span>
+          </div>
+          <div class="image-hosting_stat-item">
+            <i class="fa-solid fa-server"></i>
+            <span>本地 {{ localCount }} / 嵌入 {{ embeddedCount }}</span>
+          </div>
+        </div>
+
         <!-- 存储模式 -->
         <div class="image-hosting_block flex-container" style="align-items: center; gap: 8px">
           <label>存储模式</label>
@@ -74,11 +90,58 @@
 
         <hr class="sysHR" />
 
+        <!-- 搜索栏 + 批量操作 -->
+        <div v-if="images.length > 0" class="image-hosting_toolbar">
+          <div class="image-hosting_search">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input
+              v-model="searchQuery"
+              class="text_pole"
+              placeholder="搜索图片名称..."
+              style="flex: 1; height: 26px; font-size: 12px"
+            />
+            <i
+              v-if="searchQuery"
+              class="fa-solid fa-xmark image-hosting_icon-btn"
+              @click="searchQuery = ''"
+            ></i>
+          </div>
+          <div class="image-hosting_batch-bar">
+            <label class="image-hosting_checkbox-label">
+              <input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" />
+              <span>{{ isAllSelected ? '取消全选' : '全选' }}</span>
+            </label>
+            <template v-if="selectedSet.size > 0">
+              <small style="opacity: 0.7">已选 {{ selectedSet.size }} 张</small>
+              <i
+                class="fa-solid fa-trash-can image-hosting_icon-btn"
+                title="批量删除"
+                style="color: var(--SmartThemeQuoteColor, #e74c3c)"
+                @click="handleBatchDelete"
+              ></i>
+              <i
+                class="fa-solid fa-copy image-hosting_icon-btn"
+                title="批量复制调用代码"
+                @click="handleBatchCopyCode"
+              ></i>
+            </template>
+          </div>
+        </div>
+
         <!-- 图片列表 -->
         <div v-if="images.length === 0" class="image-hosting_block">
           <small style="opacity: 0.6">暂无图片, 请上传</small>
         </div>
-        <div v-for="image in images" :key="image.storageName" class="image-hosting_image-item">
+        <div v-else-if="filteredImages.length === 0" class="image-hosting_block">
+          <small style="opacity: 0.6">没有匹配「{{ searchQuery }}」的图片</small>
+        </div>
+        <div v-for="image in filteredImages" :key="image.storageName" class="image-hosting_image-item">
+          <input
+            type="checkbox"
+            :checked="selectedSet.has(image.storageName)"
+            @change="toggleSelect(image.storageName)"
+            style="flex-shrink: 0"
+          />
           <div class="image-hosting_image-preview" @click="openPreview(image)">
             <img :src="image.url" :alt="image.display_name" loading="lazy" />
           </div>
@@ -160,11 +223,50 @@ import { useSettingsStore } from './settings';
 import { useImageStore, type ImageMeta } from './image-store';
 import { exportImages, importImages } from './export-import';
 
+type ImageItem = { storageName: string; url: string } & ImageMeta;
+
 const { settings } = storeToRefs(useSettingsStore());
 const imageStore = useImageStore();
 
 const images = computed(() => imageStore.getAllImages());
 const characterName = ref(substitudeMacros('{{char}}') || '未选择');
+
+// 搜索
+const searchQuery = ref('');
+const filteredImages = computed(() => {
+  if (!searchQuery.value.trim()) return images.value;
+  const q = searchQuery.value.trim().toLowerCase();
+  return images.value.filter(img =>
+    img.display_name.toLowerCase().includes(q) ||
+    img.original_name.toLowerCase().includes(q),
+  );
+});
+
+// 使用统计
+const totalSize = computed(() => _.sumBy(images.value, 'size'));
+const localCount = computed(() => images.value.filter(i => i.storage === 'local').length);
+const embeddedCount = computed(() => images.value.filter(i => i.storage === 'embedded').length);
+
+// 批量选择
+const selectedSet = ref(new Set<string>());
+const isAllSelected = computed(() =>
+  filteredImages.value.length > 0 && filteredImages.value.every(img => selectedSet.value.has(img.storageName)),
+);
+
+function toggleSelect(storageName: string) {
+  const s = new Set(selectedSet.value);
+  if (s.has(storageName)) s.delete(storageName);
+  else s.add(storageName);
+  selectedSet.value = s;
+}
+
+function toggleSelectAll() {
+  if (isAllSelected.value) {
+    selectedSet.value = new Set();
+  } else {
+    selectedSet.value = new Set(filteredImages.value.map(img => img.storageName));
+  }
+}
 
 // 上传状态
 const uploading = ref(false);
@@ -177,12 +279,14 @@ const editingName = ref<string | null>(null);
 const editNameValue = ref('');
 
 // 大图预览状态
-const previewImage = ref<({ storageName: string; url: string } & ImageMeta) | null>(null);
+const previewImage = ref<ImageItem | null>(null);
 
 // 监听角色卡切换
 eventOn(tavern_events.CHAT_CHANGED, () => {
   characterName.value = substitudeMacros('{{char}}') || '未选择';
   imageStore.reload();
+  selectedSet.value = new Set();
+  searchQuery.value = '';
 });
 
 function triggerFileInput() {
@@ -255,7 +359,25 @@ async function handleDelete(storageName: string, displayName: string) {
   );
   if (result === SillyTavern.POPUP_RESULT.AFFIRMATIVE) {
     await imageStore.remove(storageName);
+    selectedSet.value.delete(storageName);
     toastr.success(`已删除「${displayName}」`);
+  }
+}
+
+async function handleBatchDelete() {
+  const count = selectedSet.value.size;
+  if (count === 0) return;
+  const result = await SillyTavern.callGenericPopup(
+    `确定要删除选中的 ${count} 张图片吗？`,
+    SillyTavern.POPUP_TYPE.CONFIRM,
+  );
+  if (result === SillyTavern.POPUP_RESULT.AFFIRMATIVE) {
+    const names = [...selectedSet.value];
+    for (const name of names) {
+      await imageStore.remove(name);
+    }
+    selectedSet.value = new Set();
+    toastr.success(`已删除 ${names.length} 张图片`);
   }
 }
 
@@ -266,6 +388,16 @@ function copyCode(displayName: string) {
   });
 }
 
+function handleBatchCopyCode() {
+  const codes = filteredImages.value
+    .filter(img => selectedSet.value.has(img.storageName))
+    .map(img => `ImageHosting.getImageUrl('${img.display_name}')`)
+    .join('\n');
+  navigator.clipboard.writeText(codes).then(() => {
+    toastr.success(`已复制 ${selectedSet.value.size} 条调用代码`);
+  });
+}
+
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -273,7 +405,7 @@ function formatSize(bytes: number): string {
 }
 
 // 大图预览
-function openPreview(image: { storageName: string; url: string } & ImageMeta) {
+function openPreview(image: ImageItem) {
   previewImage.value = image;
 }
 
@@ -293,6 +425,64 @@ async function handleImport() {
 <style scoped>
 .image-hosting_block {
   margin: 5px 0;
+}
+
+/* 使用统计 */
+.image-hosting_stats {
+  display: flex;
+  gap: 12px;
+  padding: 8px 10px;
+  margin: 5px 0;
+  background: var(--SmartThemeBlurTintColor, rgba(255, 255, 255, 0.05));
+  border-radius: 6px;
+  border: 1px solid var(--SmartThemeBorderColor, #333);
+}
+
+.image-hosting_stat-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.image-hosting_stat-item i {
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+/* 搜索栏 + 批量工具栏 */
+.image-hosting_toolbar {
+  margin: 5px 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.image-hosting_search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.image-hosting_search > i:first-child {
+  font-size: 12px;
+  opacity: 0.5;
+}
+
+.image-hosting_batch-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.image-hosting_checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  font-size: 12px;
 }
 
 .image-hosting_dropzone {
