@@ -77,9 +77,10 @@ function openPanel() {
         .on('click', () => closePanel())
         .appendTo($panel);
 
-    // 挂载 Vue 组件
+    // Vue 挂载到独立的子容器 (mount 会替换目标元素的 innerHTML, 不能直接挂到 $panel 上否则关闭按钮会被覆盖)
+    const $vueRoot = $('<div>').appendTo($panel);
     app = createApp(管理面板).use(createPinia());
-    app.mount($panel[0]);
+    app.mount($vueRoot[0]);
 }
 
 function closePanel() {
