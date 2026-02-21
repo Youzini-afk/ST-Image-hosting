@@ -47,8 +47,35 @@ function openPanel() {
             overflow: 'auto',
             padding: '15px',
             boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+            position: 'relative',
         })
         .appendTo($overlay);
+
+    // 关闭按钮
+    $('<button>')
+        .html('<i class="fa-solid fa-xmark"></i>')
+        .css({
+            position: 'absolute',
+            top: '10px',
+            right: '10px',
+            width: '32px',
+            height: '32px',
+            borderRadius: '50%',
+            background: 'rgba(255,255,255,0.08)',
+            border: '1px solid rgba(255,255,255,0.15)',
+            color: 'var(--SmartThemeBodyDisplayColor, #ccc)',
+            fontSize: '14px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: '10',
+            transition: 'all 0.2s',
+        })
+        .on('mouseenter', function () { $(this).css({ background: 'rgba(255,91,91,0.15)', color: '#ff5b5b', borderColor: 'rgba(255,91,91,0.3)' }); })
+        .on('mouseleave', function () { $(this).css({ background: 'rgba(255,255,255,0.08)', color: 'var(--SmartThemeBodyDisplayColor, #ccc)', borderColor: 'rgba(255,255,255,0.15)' }); })
+        .on('click', () => closePanel())
+        .appendTo($panel);
 
     // 挂载 Vue 组件
     app = createApp(管理面板).use(createPinia());
