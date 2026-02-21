@@ -14,7 +14,6 @@ export const DEFAULT_CDN_PROXIES = [
     'https://i0.wp.com/{raw}',
     'https://i1.wp.com/{raw}',
     'https://i2.wp.com/{raw}',
-    'https://image.baidu.com/search/down?url={url}',
 ];
 
 const Settings = z
