@@ -922,7 +922,7 @@
                     <textarea v-model="aiConfigCustomPrompt" class="text-input" rows="10" :placeholder="'留空则使用默认提示词。\n当前默认提示词会在选择世界书后自动填入条目名。'" style="font-size:12px;font-family:monospace;"></textarea>
                     <div style="display:flex;gap:6px;">
                       <button class="btn" type="button" style="font-size:12px;" @click="aiConfigCustomPrompt = ''">🔄 恢复默认</button>
-                      <button class="btn" type="button" style="font-size:12px;" @click="if(aiConfigTargetWorldbook) { getWorldbook(aiConfigTargetWorldbook).then(entries => { aiConfigCustomPrompt = buildConfigSystemPrompt(entries, true); }); } else { toastr.warning('请先选择目标世界书'); }">📋 加载默认提示词</button>
+                      <button class="btn" type="button" style="font-size:12px;" @click="loadDefaultConfigPrompt">📋 加载默认提示词</button>
                     </div>
                   </div>
                 </details>
@@ -3640,6 +3640,21 @@ function buildConfigSystemPrompt(entries: WorldbookEntry[], forceDefault = false
 [{"name":"old_name","new_name":"世界观设定","strategy_type":"constant","position_order":1,"prevent_incoming":true}]
 </worldbook_config>`;
 }
+
+async function loadDefaultConfigPrompt(): Promise<void> {
+  const targetName = aiConfigTargetWorldbook.value;
+  if (!targetName) {
+    toastr.warning('请先选择目标世界书');
+    return;
+  }
+  try {
+    const entries = await getWorldbook(targetName);
+    aiConfigCustomPrompt.value = buildConfigSystemPrompt(entries, true);
+  } catch (e) {
+    toastr.error('加载失败');
+  }
+}
+
 
 async function aiConfigGenerate(): Promise<void> {
   const input = aiConfigInput.value.trim();
