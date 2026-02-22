@@ -861,8 +861,8 @@ function init(): void {
     if (!panel) return;
 
     // Lock height to saved full height (extends behind keyboard)
-    panel.style.height = `${mobileFullHeight}px`;
-    panel.style.top = '0px';
+    // Must use setProperty with 'important' to override CSS `height: 100vh !important`
+    panel.style.setProperty('height', `${mobileFullHeight}px`, 'important');
 
     // Scroll input into view after keyboard animation
     setTimeout(() => {
@@ -886,8 +886,8 @@ function init(): void {
       if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) {
         return; // Don't reset, another input took focus
       }
-      panel.style.height = '';
-      panel.style.top = '';
+      // Remove the important override, let CSS take over again
+      panel.style.removeProperty('height');
     }, 100);
   };
   doc.addEventListener('focusout', focusoutHandler, true);
