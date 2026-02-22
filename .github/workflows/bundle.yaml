@@ -93,9 +93,3 @@ jobs:
           # 创建并推送新 tag
           git tag "$NEW_TAG"
           git push origin "$NEW_TAG"
-
-          # 删除旧 tag（如果存在）
-          if [ -n "$OLD_TAG" ] && [ "$OLD_TAG" != "$NEW_TAG" ]; then
-            git tag -d "$OLD_TAG"
-            git push --delete origin "$OLD_TAG"
-          fi
