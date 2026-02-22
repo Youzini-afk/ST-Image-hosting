@@ -7971,6 +7971,7 @@ watch(hasUnsavedChanges, (val) => {
 
   .wb-entry-list {
     max-height: 80vh !important;
+    max-height: 80lvh !important;
     overflow-y: auto;
   }
 
@@ -7980,6 +7981,7 @@ watch(hasUnsavedChanges, (val) => {
 
   .list-scroll {
     max-height: 60vh;
+    max-height: 60lvh;
   }
 
   .wb-floating-window {
@@ -8540,6 +8542,7 @@ watch(hasUnsavedChanges, (val) => {
   .editor-content-area {
     flex: 1;
     min-height: 40vh;
+    min-height: 40lvh;
   }
 
   .content-resize-handle {

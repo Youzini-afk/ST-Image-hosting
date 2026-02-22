@@ -18,7 +18,6 @@ let destroyTeleport: (() => void) | null = null;
 let menuObserver: MutationObserver | null = null;
 let menuRetryTimer: number | null = null;
 let isPanelVisible = false;
-let viewportResizeHandler: (() => void) | null = null;
 
 function getHostWindow(): Window {
   return window.parent || window;
@@ -238,6 +237,7 @@ function ensurePanelStyle(): void {
     transform: none !important;
     width: 100vw !important;
     height: 100vh !important;
+    height: 100lvh !important;
     min-width: unset;
     min-height: unset;
     max-width: none;
@@ -267,9 +267,6 @@ function ensurePanelStyle(): void {
     flex: 1;
     min-height: 0;
     overflow: hidden;
-    /* Push content above virtual keyboard using CSS env variable */
-    padding-bottom: env(keyboard-inset-height, 0px);
-    transition: padding-bottom 0.15s ease;
   }
 
   #${PANEL_BODY_ID} > div {
@@ -513,6 +510,8 @@ function enablePanelDrag(panel: HTMLDivElement): void {
   };
 
   handle.addEventListener('pointerdown', event => {
+    // Disable drag on mobile portrait mode
+    if (window.matchMedia('(orientation: portrait)').matches) return;
     if (event.button !== 0) {
       return;
     }
@@ -833,40 +832,6 @@ function init(): void {
     console.warn('[WB-FAB] createFab error:', e);
   }
 
-  // ── Mobile keyboard handling ──
-  // Strategy 1: VirtualKeyboard API (Chrome Android 94+)
-  // Tells browser to NOT resize viewport when keyboard opens.
-  // Combined with CSS `env(keyboard-inset-height)` on the panel body
-  // to push content above the keyboard.
-  if ('virtualKeyboard' in navigator) {
-    (navigator as any).virtualKeyboard.overlaysContent = true;
-  }
-
-  // Strategy 2: VisualViewport fallback (for non-Chrome browsers)
-  // Detects keyboard by comparing visualViewport.height to window.innerHeight
-  // and adds padding-bottom to the panel body dynamically.
-  const vv = window.visualViewport;
-  if (vv) {
-    viewportResizeHandler = () => {
-      if (!isPanelVisible) return;
-      if (!window.matchMedia('(orientation: portrait)').matches) return;
-      // If VirtualKeyboard API is active, env() handles it — skip JS fallback
-      if ('virtualKeyboard' in navigator && (navigator as any).virtualKeyboard.overlaysContent) return;
-
-      const panelBody = doc.getElementById(PANEL_BODY_ID) as HTMLElement | null;
-      if (!panelBody) return;
-
-      const kbHeight = window.innerHeight - vv.height;
-      if (kbHeight > 50) {
-        // Keyboard is open — add padding to push content above it
-        panelBody.style.paddingBottom = `${kbHeight}px`;
-      } else {
-        // Keyboard closed — remove padding
-        panelBody.style.paddingBottom = '';
-      }
-    };
-    vv.addEventListener('resize', viewportResizeHandler);
-  }
 
   toastr.success('世界书助手已挂载到魔法棒菜单', 'Worldbook Assistant');
 }
@@ -878,14 +843,6 @@ function cleanup(): void {
   $(doc).off(EVENT_NS);
   doc.removeEventListener('pointerdown', closeThemeDropdownOnOutside, true);
 
-  // Clean up keyboard handling
-  if ('virtualKeyboard' in navigator) {
-    (navigator as any).virtualKeyboard.overlaysContent = false;
-  }
-  if (viewportResizeHandler && window.visualViewport) {
-    window.visualViewport.removeEventListener('resize', viewportResizeHandler);
-    viewportResizeHandler = null;
-  }
 
   $(`#${MENU_ID}`, doc).remove();
   $(`#${PANEL_ID}`, doc).remove();
