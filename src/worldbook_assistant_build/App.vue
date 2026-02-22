@@ -8099,7 +8099,7 @@ watch(hasUnsavedChanges, (val) => {
   border-right: 1px solid var(--wb-border);
   display: flex;
   flex-direction: column;
-  background: var(--wb-bg-main);
+  background: var(--wb-bg-panel);
 }
 
 .ai-sidebar-head {
@@ -8244,7 +8244,7 @@ watch(hasUnsavedChanges, (val) => {
 
 .ai-chat-bubble.assistant {
   align-self: flex-start;
-  background: var(--wb-bg-main);
+  background: var(--wb-bg-panel);
   border: 1px solid var(--wb-border);
   border-bottom-left-radius: 4px;
 }
@@ -8283,7 +8283,7 @@ watch(hasUnsavedChanges, (val) => {
   gap: 8px;
   padding: 12px 16px;
   border-top: 1px solid var(--wb-border);
-  background: var(--wb-bg-main);
+  background: var(--wb-bg-panel);
   align-items: flex-end;
 }
 
@@ -8334,7 +8334,7 @@ watch(hasUnsavedChanges, (val) => {
 }
 
 .ai-tag-review-modal {
-  background: var(--wb-bg-main);
+  background: var(--wb-bg-root);
   border-radius: var(--wb-radius);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
   width: 580px;
