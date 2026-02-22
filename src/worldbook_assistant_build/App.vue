@@ -824,6 +824,17 @@
                   </select>
                 </label>
               </div>
+              <details class="ai-tag-ignore-config">
+                <summary>🚫 忽略标签配置</summary>
+                <div style="padding:8px 0 0;font-size:12px;color:var(--wb-text-muted);margin-bottom:4px;">匹配到这些标签时跳过导入，但继续扫描其内部可用标签（逗号或换行分隔）</div>
+                <textarea
+                  class="text-input"
+                  rows="2"
+                  :value="persistedState.extract_ignore_tags.join(', ')"
+                  @change="updateIgnoreTags(($event.target as HTMLTextAreaElement).value)"
+                  style="width:100%;font-size:12px;"
+                ></textarea>
+              </details>
               <div class="ai-tag-list">
                 <label
                   v-for="(tag, idx) in aiExtractedTags"
@@ -1833,6 +1844,7 @@ interface PersistedState {
   theme: ThemeKey;
   ai_chat: AIGeneratorState;
   worldbook_tags: WorldbookTagState;
+  extract_ignore_tags: string[];
 }
 
 interface ActivationLog {
@@ -3041,6 +3053,7 @@ function createDefaultPersistedState(): PersistedState {
     theme: 'ocean',
     ai_chat: { sessions: [], activeSessionId: null },
     worldbook_tags: { definitions: [], assignments: {} },
+    extract_ignore_tags: ['thinking', 'recap', 'content', 'details', 'summary'],
   };
 }
 
@@ -3208,6 +3221,9 @@ function normalizePersistedState(input: unknown): PersistedState {
     theme: (toStringSafe(root.theme) as ThemeKey) || 'ocean',
     ai_chat: aiChat,
     worldbook_tags: { definitions: tagDefs.slice(0, TAG_LIMIT), assignments: tagAssignmentsNorm },
+    extract_ignore_tags: Array.isArray(root.extract_ignore_tags)
+      ? root.extract_ignore_tags.map((t: unknown) => toStringSafe(t).trim().toLowerCase()).filter(Boolean)
+      : ['thinking', 'recap', 'content', 'details', 'summary'],
   };
 }
 
@@ -3373,7 +3389,8 @@ async function aiSendMessage(): Promise<void> {
     aiStreamingText.value = '';
 
     // Auto-extract tags
-    const tags = aiExtractTags(result);
+    const ignoreSet = new Set(persistedState.value.extract_ignore_tags.map(t => t.toLowerCase()));
+    const tags = aiExtractTags(result, ignoreSet);
     if (tags.length > 0) {
       aiExtractedTags.value = tags;
       aiShowTagReview.value = true;
@@ -3397,18 +3414,37 @@ function aiStopGeneration(): void {
 }
 
 // ── AI Chat: tag extraction ────────────────────────────────────────
-function aiExtractTags(text: string): ExtractedTag[] {
+function aiExtractTags(text: string, ignoreTags?: Set<string>): ExtractedTag[] {
   const regex = /<([^/<>\s]+)>([\s\S]*?)<\/\1>/g;
   const results: ExtractedTag[] = [];
   let match: RegExpExecArray | null;
   while ((match = regex.exec(text)) !== null) {
-    results.push({
-      tag: match[1],
-      content: match[0],
-      selected: true,
-    });
+    const tagName = match[1];
+    const innerContent = match[2];
+    if (ignoreTags && ignoreTags.has(tagName.toLowerCase())) {
+      // Tag is ignored — skip it, but recursively scan its inner content
+      const nested = aiExtractTags(innerContent, ignoreTags);
+      results.push(...nested);
+    } else {
+      results.push({
+        tag: tagName,
+        content: match[0],
+        selected: true,
+      });
+    }
   }
   return results;
+}
+
+function updateIgnoreTags(raw: string): void {
+  const tags = raw
+    .split(/[,\n]+/)
+    .map(t => t.trim().toLowerCase())
+    .filter(Boolean);
+  const unique = [...new Set(tags)];
+  updatePersistedState(state => {
+    state.extract_ignore_tags = unique;
+  });
 }
 
 function extractFromChat(): void {
@@ -3419,9 +3455,10 @@ function extractFromChat(): void {
       return;
     }
     const messages = getChatMessages(`0-${lastId}`);
+    const ignoreSet = new Set(persistedState.value.extract_ignore_tags.map(t => t.toLowerCase()));
     const allTags: ExtractedTag[] = [];
     for (const msg of messages) {
-      const tags = aiExtractTags(msg.message || '');
+      const tags = aiExtractTags(msg.message || '', ignoreSet);
       allTags.push(...tags);
     }
 
