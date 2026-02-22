@@ -916,7 +916,17 @@
 
 所有条目启用不可递归和防止进一步递归"></textarea>
                 </label>
-                <button class="btn primary" type="button" :disabled="!aiConfigInput.trim() || !aiConfigTargetWorldbook || aiConfigGenerating" @click="aiConfigGenerate" style="width:100%;">
+                <details style="margin-top:4px;">
+                  <summary style="cursor:pointer;color:var(--wb-text-dim);font-size:12px;user-select:none;">📝 查看/修改系统提示词</summary>
+                  <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">
+                    <textarea v-model="aiConfigCustomPrompt" class="text-input" rows="10" :placeholder="'留空则使用默认提示词。\n当前默认提示词会在选择世界书后自动填入条目名。'" style="font-size:12px;font-family:monospace;"></textarea>
+                    <div style="display:flex;gap:6px;">
+                      <button class="btn" type="button" style="font-size:12px;" @click="aiConfigCustomPrompt = ''">🔄 恢复默认</button>
+                      <button class="btn" type="button" style="font-size:12px;" @click="if(aiConfigTargetWorldbook) { getWorldbook(aiConfigTargetWorldbook).then(entries => { aiConfigCustomPrompt = buildConfigSystemPrompt(entries, true); }); } else { toastr.warning('请先选择目标世界书'); }">📋 加载默认提示词</button>
+                    </div>
+                  </div>
+                </details>
+                <button class="btn primary" type="button" :disabled="!aiConfigInput.trim() || !aiConfigTargetWorldbook || aiConfigGenerating" @click="aiConfigGenerate" style="width:100%;margin-top:8px;">
                   {{ aiConfigGenerating ? '⏳ AI 分析中...' : '🤖 发送给 AI 分析' }}
                 </button>
               </div>
@@ -2124,6 +2134,7 @@ const aiConfigChanges = ref<ConfigChange[]>([]);
 const aiConfigPreview = ref(false);
 const aiConfigGenerating = ref(false);
 const aiConfigTargetWorldbook = ref('');
+const aiConfigCustomPrompt = ref('');
 
 const AI_CHAT_SESSION_LIMIT = 50;
 const AI_CHAT_MESSAGE_LIMIT = 200;
@@ -3610,7 +3621,10 @@ const STRATEGY_TYPE_LABELS: Record<string, string> = {
   vectorized: '向量化',
 };
 
-function buildConfigSystemPrompt(entries: WorldbookEntry[]): string {
+function buildConfigSystemPrompt(entries: WorldbookEntry[], forceDefault = false): string {
+  if (!forceDefault && aiConfigCustomPrompt.value.trim()) {
+    return aiConfigCustomPrompt.value;
+  }
   const names = entries.map(e => `"${e.name}"`).join(', ');
 
   return `你是世界书配置助手。将用户的自然语言指令转为JSON。只输出修改项，name必填且须精确匹配条目列表中的名称。
