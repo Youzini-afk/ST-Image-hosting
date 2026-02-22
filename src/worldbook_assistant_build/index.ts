@@ -38,12 +38,10 @@ function ensurePanelStyle(): void {
 #${PANEL_ID} {
   position: fixed;
   z-index: 10020;
-  left: 50%;
-  top: 50%;
-  --wb-translate-x: -50%;
-  --wb-translate-y: -50%;
-  --wb-scale: 0.95;
-  transform: translate(var(--wb-translate-x), var(--wb-translate-y)) scale(var(--wb-scale));
+  inset: 0;
+  margin: auto;
+  transform: scale(0.95);
+  transform-origin: center center;
   width: min(1280px, calc(100vw - 120px));
   height: calc(100vh - 16px);
   min-width: 920px;
@@ -62,14 +60,13 @@ function ensurePanelStyle(): void {
   overflow: hidden;
   resize: both;
   transition: opacity 0.25s cubic-bezier(0.19, 1, 0.22, 1), transform 0.25s cubic-bezier(0.19, 1, 0.22, 1), visibility 0.25s;
-  will-change: transform, opacity;
 }
 
 #${PANEL_ID}.active {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
-  --wb-scale: 1;
+  transform: none;
   transition: opacity 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
@@ -235,11 +232,9 @@ function ensurePanelStyle(): void {
 
 @media (orientation: portrait) {
   #${PANEL_ID} {
-    left: 0 !important;
-    top: 0 !important;
+    inset: 0 !important;
+    margin: 0 !important;
     transform: none !important;
-    --wb-translate-x: 0;
-    --wb-translate-y: 0;
     width: 100vw !important;
     height: 100vh !important;
     min-width: unset;
@@ -500,10 +495,6 @@ function enablePanelDrag(panel: HTMLDivElement): void {
     const nextTop = Math.min(maxTop, Math.max(8, event.clientY - offsetY));
     panel.style.left = `${nextLeft}px`;
     panel.style.top = `${nextTop}px`;
-    panel.style.right = 'auto';
-    panel.style.bottom = 'auto';
-    panel.style.setProperty('--wb-translate-x', '0px');
-    panel.style.setProperty('--wb-translate-y', '0px');
   };
 
   const onPointerUp = () => {
@@ -528,12 +519,11 @@ function enablePanelDrag(panel: HTMLDivElement): void {
     offsetX = event.clientX - rect.left;
     offsetY = event.clientY - rect.top;
     dragging = true;
+    // Switch from inset centering to absolute left/top
+    panel.style.inset = 'auto';
+    panel.style.margin = '0';
     panel.style.left = `${rect.left}px`;
     panel.style.top = `${rect.top}px`;
-    panel.style.right = 'auto';
-    panel.style.bottom = 'auto';
-    panel.style.setProperty('--wb-translate-x', '0px');
-    panel.style.setProperty('--wb-translate-y', '0px');
     // Fast transition while dragging
     panel.style.transition = 'none';
     hostWin.document.addEventListener('pointermove', onPointerMove, true);
@@ -543,12 +533,10 @@ function enablePanelDrag(panel: HTMLDivElement): void {
 }
 
 function centerPanel(panel: HTMLDivElement): void {
-  panel.style.left = '50%';
-  panel.style.top = '50%';
-  panel.style.right = 'auto';
-  panel.style.bottom = 'auto';
-  panel.style.setProperty('--wb-translate-x', '-50%');
-  panel.style.setProperty('--wb-translate-y', '-50%');
+  panel.style.left = '';
+  panel.style.top = '';
+  panel.style.inset = '0';
+  panel.style.margin = 'auto';
 }
 
 function setMenuActive(active: boolean): void {
