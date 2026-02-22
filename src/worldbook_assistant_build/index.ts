@@ -18,7 +18,8 @@ let destroyTeleport: (() => void) | null = null;
 let menuObserver: MutationObserver | null = null;
 let menuRetryTimer: number | null = null;
 let isPanelVisible = false;
-let viewportResizeHandler: (() => void) | null = null;
+let focusinHandler: ((e: Event) => void) | null = null;
+let savedViewportContent: string | null = null;
 
 function getHostWindow(): Window {
   return window.parent || window;
@@ -238,7 +239,6 @@ function ensurePanelStyle(): void {
     transform: none !important;
     width: 100vw !important;
     height: 100vh !important;
-    height: 100dvh !important;
     min-width: unset;
     min-height: unset;
     max-width: none;
@@ -831,18 +831,33 @@ function init(): void {
     console.warn('[WB-FAB] createFab error:', e);
   }
 
-  // Mobile keyboard-aware height: listen to visualViewport resize
+  // Mobile keyboard overlay mode:
+  // 1. Patch viewport meta to let keyboard overlay content instead of resizing
   const hostWin = getHostWindow();
-  if (hostWin.visualViewport) {
-    viewportResizeHandler = () => {
-      const vv = hostWin.visualViewport!;
-      const panel = doc.getElementById(PANEL_ID) as HTMLDivElement | null;
-      if (panel && isPanelVisible && hostWin.matchMedia('(orientation: portrait)').matches) {
-        panel.style.height = `${vv.height}px`;
-      }
-    };
-    hostWin.visualViewport.addEventListener('resize', viewportResizeHandler);
+  const metaViewport = doc.querySelector('meta[name="viewport"]') as HTMLMetaElement | null;
+  if (metaViewport) {
+    savedViewportContent = metaViewport.content;
+    if (!metaViewport.content.includes('interactive-widget')) {
+      metaViewport.content += ', interactive-widget=overlays-content';
+    }
   }
+  // 2. Use VirtualKeyboard API if available (Chrome 94+)
+  if ('virtualKeyboard' in hostWin.navigator) {
+    (hostWin.navigator as any).virtualKeyboard.overlaysContent = true;
+  }
+  // 3. Scroll focused input into view above the keyboard
+  focusinHandler = (e: Event) => {
+    const target = e.target as HTMLElement;
+    if (!target || !isPanelVisible) return;
+    if (!hostWin.matchMedia('(orientation: portrait)').matches) return;
+    const tag = target.tagName;
+    if (tag !== 'INPUT' && tag !== 'TEXTAREA' && !target.isContentEditable) return;
+    // Delay to let the keyboard finish opening
+    setTimeout(() => {
+      target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, 300);
+  };
+  doc.addEventListener('focusin', focusinHandler, true);
 
   toastr.success('世界书助手已挂载到魔法棒菜单', 'Worldbook Assistant');
 }
@@ -855,10 +870,22 @@ function cleanup(): void {
   $(doc).off(EVENT_NS);
   doc.removeEventListener('pointerdown', closeThemeDropdownOnOutside, true);
 
-  // Clean up visualViewport listener
-  if (viewportResizeHandler && hostWin.visualViewport) {
-    hostWin.visualViewport.removeEventListener('resize', viewportResizeHandler);
-    viewportResizeHandler = null;
+  // Clean up focusin listener
+  if (focusinHandler) {
+    doc.removeEventListener('focusin', focusinHandler, true);
+    focusinHandler = null;
+  }
+  // Restore original viewport meta
+  if (savedViewportContent !== null) {
+    const metaViewport = doc.querySelector('meta[name="viewport"]') as HTMLMetaElement | null;
+    if (metaViewport) {
+      metaViewport.content = savedViewportContent;
+    }
+    savedViewportContent = null;
+  }
+  // Reset VirtualKeyboard API
+  if ('virtualKeyboard' in hostWin.navigator) {
+    (hostWin.navigator as any).virtualKeyboard.overlaysContent = false;
   }
 
   $(`#${MENU_ID}`, doc).remove();
