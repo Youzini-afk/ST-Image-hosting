@@ -4,6 +4,9 @@ import WorldbookAssistantApp from './App.vue';
 
 const MENU_ID = 'wb-assistant-menu-item';
 const PANEL_ID = 'wb-assistant-panel';
+const FAB_ID = 'wb-assistant-fab';
+const FAB_POS_KEY = '__WB_FAB_POS__';
+const FAB_VISIBLE_KEY = '__WB_FAB_VISIBLE__';
 const PANEL_STYLE_ID = 'wb-assistant-panel-style';
 const PANEL_BODY_ID = 'wb-assistant-panel-body';
 const EVENT_NS = '.wbAssistantMenu';
@@ -37,25 +40,37 @@ function ensurePanelStyle(): void {
   z-index: 10020;
   left: 50%;
   top: 50%;
-  transform: translate(-50%, -50%);
+  --wb-translate-x: -50%;
+  --wb-translate-y: -50%;
+  --wb-scale: 0.95;
+  transform: translate(var(--wb-translate-x), var(--wb-translate-y)) scale(var(--wb-scale));
   width: min(1280px, calc(100vw - 120px));
   height: calc(100vh - 16px);
   min-width: 920px;
   min-height: 560px;
   max-width: calc(100vw - 16px);
   max-height: calc(100vh - 16px);
-  display: none;
-  border: 1px solid #334155;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  border: 1px solid var(--wb-host-border, #334155);
   border-radius: 10px;
-  background: #0b1220;
+  background: var(--wb-host-bg, #0b1220);
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
   overflow: hidden;
   resize: both;
+  transition: opacity 0.2s cubic-bezier(0.4, 0, 1, 1), transform 0.2s cubic-bezier(0.4, 0, 1, 1), visibility 0.2s;
+  will-change: transform, opacity;
 }
 
 #${PANEL_ID}.active {
-  display: flex;
-  flex-direction: column;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  --wb-scale: 1;
+  transition: opacity 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 #${PANEL_ID} .wb-assistant-header {
@@ -64,14 +79,14 @@ function ensurePanelStyle(): void {
   align-items: center;
   justify-content: space-between;
   padding: 0 10px 0 12px;
-  background: #111827;
-  border-bottom: 1px solid #334155;
+  background: var(--wb-host-header-bg, #111827);
+  border-bottom: 1px solid var(--wb-host-border, #334155);
   cursor: move;
   user-select: none;
 }
 
 #${PANEL_ID} .wb-assistant-header-title {
-  color: #e2e8f0;
+  color: var(--wb-host-text, #e2e8f0);
   font-size: 14px;
   font-weight: 600;
 }
@@ -85,47 +100,231 @@ function ensurePanelStyle(): void {
 #${PANEL_ID} .wb-assistant-tool {
   width: 30px;
   height: 30px;
-  border: 1px solid #475569;
+  border: 1px solid var(--wb-host-tool-border, #475569);
   border-radius: 6px;
-  background: #1f2937;
-  color: #e2e8f0;
+  background: var(--wb-host-tool-bg, #1f2937);
+  color: var(--wb-host-text, #e2e8f0);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: 14px;
+  transition: all 0.2s ease;
 }
 
 #${PANEL_ID} .wb-assistant-tool:hover {
-  border-color: #22d3ee;
+  border-color: #60a5fa;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+}
+
+#${PANEL_ID} .wb-assistant-tool:active {
+  transform: translateY(1px) scale(0.95);
+  box-shadow: none;
+}
+
+#${PANEL_ID} .wb-assistant-theme:hover {
+  border-color: #a78bfa;
 }
 
 #${PANEL_ID} .wb-assistant-save:hover {
-  border-color: #60a5fa;
+  border-color: #34d399;
+}
+
+@keyframes wb-pulse-glow {
+  0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.4); border-color: rgba(52, 211, 153, 0.6); }
+  70% { box-shadow: 0 0 0 6px rgba(52, 211, 153, 0); border-color: rgba(52, 211, 153, 1); }
+  100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); border-color: rgba(52, 211, 153, 0.6); }
+}
+
+#${PANEL_ID} .wb-assistant-save.glow-pulse {
+  animation: wb-pulse-glow 2s infinite ease-out;
+  border-color: #34d399;
+  color: #34d399;
 }
 
 #${PANEL_ID} .wb-assistant-close {
   width: 30px;
   height: 30px;
-  border: 1px solid #475569;
+  border: 1px solid var(--wb-host-tool-border, #475569);
   border-radius: 6px;
-  background: #1f2937;
-  color: #e2e8f0;
+  background: var(--wb-host-tool-bg, #1f2937);
+  color: var(--wb-host-text, #e2e8f0);
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 #${PANEL_ID} .wb-assistant-close:hover {
   border-color: #f43f5e;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(244,63,94,0.25);
+}
+
+#${PANEL_ID} .wb-assistant-close:active {
+  transform: translateY(1px) scale(0.95);
+  box-shadow: none;
 }
 
 #${PANEL_BODY_ID} {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#${PANEL_BODY_ID} > div {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 #${MENU_ID}.active {
   background-color: rgba(56, 189, 248, 0.18) !important;
+}
+
+#${PANEL_ID} .wb-theme-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 10300;
+  margin-top: 4px;
+  border: 1px solid var(--wb-host-border, #334155);
+  border-radius: 8px;
+  background: var(--wb-host-header-bg, #111827);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+  padding: 4px;
+  min-width: 140px;
+  opacity: 0;
+  transform: translateY(-8px) scale(0.95);
+  transform-origin: top right;
+  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  pointer-events: none;
+}
+
+#${PANEL_ID} .wb-theme-dropdown.show {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+#${PANEL_ID} .wb-theme-dropdown button {
+  display: block;
+  width: 100%;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--wb-host-text, #e2e8f0);
+  padding: 6px 12px;
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+#${PANEL_ID} .wb-theme-dropdown button:hover {
+  background: rgba(124, 58, 237, 0.15);
+}
+
+#${PANEL_ID} .wb-theme-dropdown button.active {
+  background: rgba(124, 58, 237, 0.25);
+  color: #c4b5fd;
+}
+
+@media (orientation: portrait) {
+  #${PANEL_ID} {
+    left: 0 !important;
+    top: 0 !important;
+    transform: none !important;
+    --wb-translate-x: 0;
+    --wb-translate-y: 0;
+    width: 100vw !important;
+    height: 100vh !important;
+    min-width: unset;
+    min-height: unset;
+    max-width: none;
+    max-height: none;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+    resize: none;
+    /* Mobile: use display:none to avoid blocking FAB behind the invisible panel */
+    display: none;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: none;
+  }
+
+  #${PANEL_ID}.active {
+    display: flex;
+    flex-direction: column;
+  }
+
+  #${PANEL_ID} .wb-assistant-header {
+    cursor: default;
+  }
+
+  #${PANEL_BODY_ID} {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  #${PANEL_BODY_ID} > div {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+#${FAB_ID} {
+  position: fixed;
+  z-index: 10019;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #e2e8f0;
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 0 0 1.5px rgba(96, 165, 250, 0.3), 0 4px 16px rgba(0,0,0,0.35);
+  touch-action: none;
+  user-select: none;
+  transition: box-shadow 0.2s, transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transform: translateZ(0);
+  -webkit-font-smoothing: antialiased;
+}
+
+#${FAB_ID}:hover {
+  box-shadow: 0 0 0 1.5px #60a5fa, 0 4px 20px rgba(96,165,250,0.3);
+  transform: scale(1.05) translateZ(0);
+}
+
+#${FAB_ID}:active {
+  transform: scale(0.92) translateZ(0);
+}
+
+#${FAB_ID}.panel-open {
+  box-shadow: 0 0 0 1.5px rgba(244, 63, 94, 0.5), 0 4px 16px rgba(0,0,0,0.35);
+  font-size: 18px;
+}
+
+#${FAB_ID}.panel-open:hover {
+  box-shadow: 0 0 0 1.5px #fb7185, 0 4px 20px rgba(244,63,94,0.3);
+}
+
+#${PANEL_ID} .wb-assistant-fab-toggle.fab-on {
+  border-color: #34d399;
+  color: #34d399;
 }
 `;
   doc.head.append(style);
@@ -161,6 +360,8 @@ function ensurePanelElement(): JQuery {
     <div class="wb-assistant-header-title">世界书助手</div>
     <div class="wb-assistant-header-actions">
       <button type="button" class="wb-assistant-tool wb-assistant-refresh" title="刷新">↻</button>
+      <button type="button" class="wb-assistant-tool wb-assistant-fab-toggle" title="悬浮按钮">📌</button>
+      <button type="button" class="wb-assistant-tool wb-assistant-theme" title="切换主题">🎨</button>
       <button type="button" class="wb-assistant-tool wb-assistant-save" title="保存">💾</button>
       <button type="button" class="wb-assistant-close" title="关闭">×</button>
     </div>
@@ -178,11 +379,94 @@ function ensurePanelElement(): JQuery {
   $panel.off(`click${EVENT_NS}`, '.wb-assistant-save').on(`click${EVENT_NS}`, '.wb-assistant-save', () => {
     window.dispatchEvent(new Event('wb-helper:save'));
   });
+  $panel.off(`click${EVENT_NS}`, '.wb-assistant-theme').on(`click${EVENT_NS}`, '.wb-assistant-theme', (evt) => {
+    evt.stopPropagation();
+    toggleThemeDropdown($panel[0] as HTMLDivElement);
+  });
+  // Close theme dropdown on clicks elsewhere
+  // Only register once — guard against duplicate registration
+  getHostDocument().removeEventListener('pointerdown', closeThemeDropdownOnOutside, true);
+  getHostDocument().addEventListener('pointerdown', closeThemeDropdownOnOutside, true);
   $panel.off(`click${EVENT_NS}`, '.wb-assistant-close').on(`click${EVENT_NS}`, '.wb-assistant-close', () => {
     hidePanel();
   });
+  $panel.off(`click${EVENT_NS}`, '.wb-assistant-fab-toggle').on(`click${EVENT_NS}`, '.wb-assistant-fab-toggle', () => {
+    toggleFabVisibility();
+  });
+  // Sync FAB toggle button state
+  syncFabToggleButton();
 
   return $panel;
+}
+
+const THEME_ITEMS: { key: string; label: string }[] = [
+  { key: 'ocean', label: '深海' },
+  { key: 'nebula', label: '星云' },
+  { key: 'forest', label: '森林' },
+  { key: 'sunset', label: '日落' },
+  { key: 'coffee', label: '咖啡' },
+  { key: 'paper', label: '纸莎草' },
+  { key: 'snow', label: '雪白' },
+];
+
+function toggleThemeDropdown(panel: HTMLDivElement): void {
+  const existing = panel.querySelector('.wb-theme-dropdown');
+  if (existing) {
+    existing.classList.remove('show');
+    // Cancel any previous pending remove timer
+    const prevTimer = (existing as any).__removeTimer as number | undefined;
+    if (prevTimer) clearTimeout(prevTimer);
+    (existing as any).__removeTimer = setTimeout(() => existing.remove(), 200);
+    return;
+  }
+
+  const themeBtn = panel.querySelector('.wb-assistant-theme') as HTMLElement;
+  if (themeBtn) {
+    themeBtn.style.position = 'relative';
+  }
+
+  const dropdown = document.createElement('div');
+  dropdown.className = 'wb-theme-dropdown';
+
+  for (const item of THEME_ITEMS) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = item.label;
+    btn.dataset.themeKey = item.key;
+    btn.addEventListener('click', () => {
+      window.dispatchEvent(new CustomEvent('wb-helper:set-theme', { detail: item.key }));
+      dropdown.classList.remove('show');
+      const timer = setTimeout(() => dropdown.remove(), 200);
+      (dropdown as any).__removeTimer = timer;
+    });
+    dropdown.appendChild(btn);
+  }
+
+  if (themeBtn) {
+    themeBtn.appendChild(dropdown);
+  } else {
+    panel.querySelector('.wb-assistant-header-actions')?.appendChild(dropdown);
+  }
+
+  // trigger animation
+  requestAnimationFrame(() => dropdown.classList.add('show'));
+}
+
+function closeThemeDropdownOnOutside(event: PointerEvent): void {
+  const target = event.target as HTMLElement | null;
+  if (!target) {
+    return;
+  }
+  if (target.closest('.wb-assistant-theme') || target.closest('.wb-theme-dropdown')) {
+    return;
+  }
+  const doc = getHostDocument();
+  const dropdown = doc.querySelector('.wb-theme-dropdown');
+  if (dropdown) {
+    dropdown.classList.remove('show');
+    const timer = setTimeout(() => dropdown.remove(), 200);
+    (dropdown as any).__removeTimer = timer;
+  }
 }
 
 function enablePanelDrag(panel: HTMLDivElement): void {
@@ -196,7 +480,7 @@ function enablePanelDrag(panel: HTMLDivElement): void {
   let offsetX = 0;
   let offsetY = 0;
 
-  const onMouseMove = (event: MouseEvent) => {
+  const onPointerMove = (event: PointerEvent) => {
     if (!dragging) {
       return;
     }
@@ -209,19 +493,22 @@ function enablePanelDrag(panel: HTMLDivElement): void {
     panel.style.top = `${nextTop}px`;
     panel.style.right = 'auto';
     panel.style.bottom = 'auto';
-    panel.style.transform = 'none';
+    panel.style.setProperty('--wb-translate-x', '0px');
+    panel.style.setProperty('--wb-translate-y', '0px');
   };
 
-  const onMouseUp = () => {
+  const onPointerUp = () => {
     if (!dragging) {
       return;
     }
     dragging = false;
-    hostWin.document.removeEventListener('mousemove', onMouseMove, true);
-    hostWin.document.removeEventListener('mouseup', onMouseUp, true);
+    // Restore transition so open/close animations work after drag
+    panel.style.transition = '';
+    hostWin.document.removeEventListener('pointermove', onPointerMove, true);
+    hostWin.document.removeEventListener('pointerup', onPointerUp, true);
   };
 
-  handle.addEventListener('mousedown', event => {
+  handle.addEventListener('pointerdown', event => {
     if (event.button !== 0) {
       return;
     }
@@ -236,48 +523,55 @@ function enablePanelDrag(panel: HTMLDivElement): void {
     panel.style.top = `${rect.top}px`;
     panel.style.right = 'auto';
     panel.style.bottom = 'auto';
-    panel.style.transform = 'none';
-    hostWin.document.addEventListener('mousemove', onMouseMove, true);
-    hostWin.document.addEventListener('mouseup', onMouseUp, true);
+    panel.style.setProperty('--wb-translate-x', '0px');
+    panel.style.setProperty('--wb-translate-y', '0px');
+    // Fast transition while dragging
+    panel.style.transition = 'none';
+    hostWin.document.addEventListener('pointermove', onPointerMove, true);
+    hostWin.document.addEventListener('pointerup', onPointerUp, true);
     event.preventDefault();
   });
 }
 
 function centerPanel(panel: HTMLDivElement): void {
-  const hostWin = getHostWindow();
-  const rect = panel.getBoundingClientRect();
-  const maxLeft = Math.max(8, hostWin.innerWidth - rect.width - 8);
-  const maxTop = Math.max(8, hostWin.innerHeight - rect.height - 8);
-  const nextLeft = Math.min(maxLeft, Math.max(8, Math.round((hostWin.innerWidth - rect.width) / 2)));
-  const nextTop = Math.min(maxTop, Math.max(8, Math.round((hostWin.innerHeight - rect.height) / 2)));
-  panel.style.left = `${nextLeft}px`;
-  panel.style.top = `${nextTop}px`;
+  panel.style.left = '50%';
+  panel.style.top = '50%';
   panel.style.right = 'auto';
   panel.style.bottom = 'auto';
-  panel.style.transform = 'none';
+  panel.style.setProperty('--wb-translate-x', '-50%');
+  panel.style.setProperty('--wb-translate-y', '-50%');
 }
 
 function setMenuActive(active: boolean): void {
   const doc = getHostDocument();
   const $menuItem = $(`#${MENU_ID}`, doc);
-  if (!$menuItem.length) {
-    return;
+  if ($menuItem.length) {
+    $menuItem.toggleClass('active', active);
   }
-  $menuItem.toggleClass('active', active);
+  // Sync FAB state
+  const fab = doc.getElementById(FAB_ID);
+  if (fab) {
+    fab.classList.toggle('panel-open', active);
+    fab.textContent = active ? '✕' : '📖';
+  }
 }
+
 
 function showPanel(): void {
   const doc = getHostDocument();
   const $panel = ensurePanelElement();
   mountAppIntoPanel();
-  $panel.css('visibility', 'hidden');
-  $panel.addClass('active');
   const panelElement = $panel[0] as HTMLDivElement;
+
+  // Clean up any pending inline styles from drag to re-center natively
+  panelElement.style.transition = 'none';
   centerPanel(panelElement);
-  $panel.css('visibility', '');
-  requestAnimationFrame(() => {
-    centerPanel(panelElement);
-  });
+  // Force a reflow to apply the reset instantly before animating
+  void panelElement.offsetHeight;
+  panelElement.style.transition = '';
+
+  $panel.addClass('active');
+
   isPanelVisible = true;
   setMenuActive(true);
   // 打开面板后主动触发一次刷新
@@ -325,29 +619,39 @@ function togglePanel(): void {
   }
 }
 
-function ensureMenuItem(): boolean {
-  const doc = getHostDocument();
-  const $menu = $('#extensionsMenu', doc);
-  if (!$menu.length) {
-    return false;
-  }
+let _insideMenuEnsure = false;
 
-  const $existing = $(`#${MENU_ID}`, doc);
-  if ($existing.length && !$existing.closest('#extensionsMenu').length) {
-    $existing.remove();
-  }
-  if (!$(`#${MENU_ID}`, doc).length) {
-    const menuHtml = `
+function ensureMenuItem(): boolean {
+  if (_insideMenuEnsure) return true;
+  _insideMenuEnsure = true;
+  try {
+    const doc = getHostDocument();
+    const $menu = $('#extensionsMenu', doc);
+    if (!$menu.length) {
+      return false;
+    }
+
+    const $existing = $(`#${MENU_ID}`, doc);
+    if ($existing.length && !$existing.closest('#extensionsMenu').length) {
+      $existing.remove();
+    }
+    if (!$(`#${MENU_ID}`, doc).length) {
+      const menuHtml = `
 <div id="${MENU_ID}" class="list-group-item flex-container flexGap5 interactable" title="世界书助手" tabIndex="0">
   <i class="fa-solid fa-book-open"></i>
   <span>世界书助手</span>
 </div>
 `;
-    $menu.append(menuHtml);
+      $menu.append(menuHtml);
+    }
+    setMenuActive(isPanelVisible);
+    return true;
+  } finally {
+    _insideMenuEnsure = false;
   }
-  setMenuActive(isPanelVisible);
-  return true;
 }
+
+let _menuObserverRaf: number | null = null;
 
 function startMenuObserver(): void {
   const doc = getHostDocument();
@@ -355,14 +659,22 @@ function startMenuObserver(): void {
     return;
   }
   menuObserver = new MutationObserver(() => {
-    ensureMenuItem();
+    // Debounce with rAF to avoid high-frequency re-entry
+    if (_menuObserverRaf) return;
+    _menuObserverRaf = requestAnimationFrame(() => {
+      _menuObserverRaf = null;
+      ensureMenuItem();
+    });
   });
-  menuObserver.observe(doc.body, { childList: true, subtree: true });
+  // Only watch #extensionsMenu if it exists, else fall back to body
+  const menu = doc.getElementById('extensionsMenu');
+  menuObserver.observe(menu || doc.body, { childList: true, subtree: true });
 }
 
 function stopMenuObserver(): void {
   menuObserver?.disconnect();
   menuObserver = null;
+  if (_menuObserverRaf) { cancelAnimationFrame(_menuObserverRaf); _menuObserverRaf = null; }
 }
 
 function ensureMenuRetry(): void {
@@ -385,6 +697,117 @@ function stopMenuRetry(): void {
   menuRetryTimer = null;
 }
 
+function isFabVisible(): boolean {
+  try {
+    return localStorage.getItem(FAB_VISIBLE_KEY) !== 'false';
+  } catch { return true; }
+}
+
+function syncFabToggleButton(): void {
+  const doc = getHostDocument();
+  const btn = doc.querySelector(`#${PANEL_ID} .wb-assistant-fab-toggle`);
+  if (btn) {
+    btn.classList.toggle('fab-on', isFabVisible());
+  }
+}
+
+function toggleFabVisibility(): void {
+  const doc = getHostDocument();
+  const fab = doc.getElementById(FAB_ID);
+  const visible = !isFabVisible();
+  try { localStorage.setItem(FAB_VISIBLE_KEY, String(visible)); } catch { /* ignore */ }
+  if (visible) {
+    if (!fab) createFab();
+  } else {
+    fab?.remove();
+  }
+  syncFabToggleButton();
+}
+
+function createFab(): void {
+  const doc = getHostDocument();
+  if (doc.getElementById(FAB_ID)) return;
+  if (!isFabVisible()) return;
+
+  // Mobile SillyTavern clips position:fixed elements via body{position:fixed;overflow:hidden}.
+  // Skip FAB on mobile — users open panel via the extensions (wand) menu instead.
+  const isMobile = window.matchMedia('(max-width: 1000px)').matches;
+  if (isMobile) return;
+
+  const fab = doc.createElement('div');
+  fab.id = FAB_ID;
+  fab.textContent = '📖';
+  fab.title = '世界书助手';
+
+  // Restore saved position or default to bottom-right
+  const hostWin = getHostWindow();
+  let savedPos: { x: number; y: number } | null = null;
+  try {
+    const raw = localStorage.getItem(FAB_POS_KEY);
+    if (raw) savedPos = JSON.parse(raw);
+  } catch { /* ignore */ }
+
+  if (savedPos) {
+    fab.style.left = Math.min(savedPos.x, hostWin.innerWidth - 56) + 'px';
+    fab.style.top = Math.min(savedPos.y, hostWin.innerHeight - 56) + 'px';
+  } else {
+    fab.style.right = '16px';
+    fab.style.bottom = '80px';
+  }
+
+  // Drag support
+  let dragging = false;
+  let dragMoved = false;
+  let startX = 0;
+  let startY = 0;
+  let fabStartX = 0;
+  let fabStartY = 0;
+
+  fab.addEventListener('pointerdown', (e: PointerEvent) => {
+    if (e.button !== 0) return;
+    dragging = true;
+    dragMoved = false;
+    startX = e.clientX;
+    startY = e.clientY;
+    const rect = fab.getBoundingClientRect();
+    fabStartX = rect.left;
+    fabStartY = rect.top;
+    fab.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+
+  fab.addEventListener('pointermove', (e: PointerEvent) => {
+    if (!dragging) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragMoved = true;
+    const maxX = hostWin.innerWidth - 56;
+    const maxY = hostWin.innerHeight - 56;
+    const nx = Math.max(0, Math.min(maxX, fabStartX + dx));
+    const ny = Math.max(0, Math.min(maxY, fabStartY + dy));
+    fab.style.left = nx + 'px';
+    fab.style.top = ny + 'px';
+    fab.style.right = 'auto';
+    fab.style.bottom = 'auto';
+  });
+
+  fab.addEventListener('pointerup', () => {
+    if (!dragging) return;
+    dragging = false;
+    try {
+      const rect = fab.getBoundingClientRect();
+      localStorage.setItem(FAB_POS_KEY, JSON.stringify({ x: rect.left, y: rect.top }));
+    } catch { /* ignore */ }
+  });
+
+  fab.addEventListener('click', () => {
+    if (dragMoved) { dragMoved = false; return; }
+    togglePanel();
+  });
+
+  doc.body.appendChild(fab);
+}
+
 function init(): void {
   // 不使用聊天框上方脚本按钮
   replaceScriptButtons([]);
@@ -400,6 +823,11 @@ function init(): void {
     ensureMenuRetry();
   }
   startMenuObserver();
+  try {
+    createFab();
+  } catch (e) {
+    console.warn('[WB-FAB] createFab error:', e);
+  }
   toastr.success('世界书助手已挂载到魔法棒菜单', 'Worldbook Assistant');
 }
 
@@ -408,9 +836,11 @@ function cleanup(): void {
   stopMenuRetry();
   stopMenuObserver();
   $(doc).off(EVENT_NS);
+  doc.removeEventListener('pointerdown', closeThemeDropdownOnOutside, true);
   $(`#${MENU_ID}`, doc).remove();
   $(`#${PANEL_ID}`, doc).remove();
   doc.getElementById(PANEL_STYLE_ID)?.remove();
+  doc.getElementById(FAB_ID)?.remove();
 
   app?.unmount();
   app = null;

@@ -1,6 +1,357 @@
 <template>
-  <div class="wb-assistant-root">
-          <section class="wb-toolbar">
+  <div ref="rootRef" class="wb-assistant-root" :style="themeStyles">
+
+    <!-- ═══ Mobile Tab View ═══ -->
+    <template v-if="isMobile">
+      <div class="mobile-tab-view">
+        <div class="mobile-tab-content">
+
+          <!-- Tab: 列表 -->
+          <Transition name="mobile-tab">
+            <div v-show="mobileTab === 'list'" class="mobile-pane">
+              <section class="wb-toolbar">
+                <label class="toolbar-label">
+                <span>世界书</span>
+                <div ref="worldbookPickerRef" class="worldbook-picker">
+                  <button class="worldbook-picker-trigger" type="button" @click="toggleWorldbookPicker">
+                    <span class="worldbook-picker-trigger-text" :title="selectedWorldbookName || '请选择世界书'">
+                      {{ selectedWorldbookName || '请选择世界书' }}
+                    </span>
+                    <span class="worldbook-picker-arrow">▾</span>
+                  </button>
+                  <div v-if="worldbookPickerOpen" class="worldbook-picker-dropdown">
+                    <input
+                      v-model="worldbookPickerSearchText"
+                      type="text"
+                      class="text-input worldbook-picker-search"
+                      placeholder="搜索世界书..."
+                      @keydown.enter.prevent="filteredSelectableWorldbookNames[0] && selectWorldbookFromPicker(filteredSelectableWorldbookNames[0])"
+                    />
+                    <div class="worldbook-picker-list">
+                      <button
+                        v-for="name in filteredSelectableWorldbookNames"
+                        :key="`wb-pick-m-${name}`"
+                        class="worldbook-picker-item"
+                        :class="{ active: name === selectedWorldbookName }"
+                        type="button"
+                        @click="selectWorldbookFromPicker(name)"
+                      >{{ name }}</button>
+                      <div v-if="!filteredSelectableWorldbookNames.length" class="empty-note">没有匹配的世界书</div>
+                    </div>
+                  </div>
+                </div>
+              </label>
+              <div class="toolbar-btns" style="display:flex;gap:6px;flex-wrap:wrap;">
+                <button class="btn" type="button" :class="{ 'glow-pulse': hasUnsavedChanges }" :disabled="!hasUnsavedChanges" @click="saveCurrentWorldbook" style="padding:8px 14px;font-size:13px;">💾 保存</button>
+                <button class="btn" type="button" @click="addEntry" style="padding:8px 14px;font-size:13px;">+ 新条目</button>
+                <button class="btn" type="button" @click="triggerImport" style="padding:8px 14px;font-size:13px;">📥 导入</button>
+                <button class="btn" type="button" :disabled="!selectedWorldbookName" @click="exportCurrentWorldbook" style="padding:8px 14px;font-size:13px;">📤 导出</button>
+                <button class="btn" type="button" @click="toggleGlobalMode" :style="{ padding:'8px 14px', fontSize:'13px', background: globalWorldbookMode ? '#2563eb' : '', color: globalWorldbookMode ? '#fff' : '' }">🌐 全局</button>
+              </div>
+            </section>
+            <div class="wb-bindings" v-if="bindings.global.length || bindings.charPrimary || bindings.charAdditional.length || bindings.chat">
+              <span v-for="name in bindings.global" :key="`bg-m-${name}`" class="binding-chip global" :title="name">{{ name }}</span>
+              <span v-if="bindings.charPrimary" :key="`bc-m-${bindings.charPrimary}`" class="binding-chip char" :title="bindings.charPrimary">{{ bindings.charPrimary }}</span>
+              <span v-for="name in bindings.charAdditional" :key="`bca-m-${name}`" class="binding-chip char" :title="name">{{ name }}</span>
+              <span v-if="bindings.chat" :key="`bch-m-${bindings.chat}`" class="binding-chip chat" :title="bindings.chat">{{ bindings.chat }}</span>
+            </div>
+            <!-- Global Mode Panel (mobile) -->
+            <div v-if="globalWorldbookMode" style="border:1px solid var(--wb-border-subtle);border-radius:8px;padding:10px;margin-bottom:8px;background:var(--wb-bg-card);">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <span style="font-weight:600;font-size:13px;">🌐 全局世界书（{{ bindings.global.length }}）</span>
+                <button class="btn mini danger" type="button" :disabled="!bindings.global.length" @click="clearGlobalWorldbooks" style="font-size:11px;">清空</button>
+              </div>
+              <label class="field" style="margin-bottom:6px;">
+                <span style="font-size:12px;">预设（切换即应用）</span>
+                <select v-model="selectedGlobalPresetId" class="text-input" @change="onGlobalPresetSelectionChanged" style="font-size:12px;">
+                  <option value="">默认预设（清空全局世界书）</option>
+                  <option v-for="preset in globalWorldbookPresets" :key="preset.id" :value="preset.id">
+                    {{ preset.name }}（{{ preset.worldbooks.length }}）
+                  </option>
+                </select>
+              </label>
+              <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;">
+                <button class="btn mini" type="button" :disabled="!bindings.global.length" @click="saveCurrentAsGlobalPreset" style="font-size:11px;">保存组合</button>
+                <button class="btn mini" type="button" :disabled="!selectedGlobalPreset" @click="overwriteSelectedGlobalPreset" style="font-size:11px;">覆盖预设</button>
+                <button class="btn mini danger" type="button" :disabled="!selectedGlobalPreset" @click="deleteSelectedGlobalPreset" style="font-size:11px;">删除预设</button>
+              </div>
+              <label class="field" style="margin-bottom:6px;">
+                <span style="font-size:12px;">搜索并添加</span>
+                <input v-model="globalAddSearchText" type="text" class="text-input" placeholder="搜索世界书..." @keydown.enter.prevent="addFirstGlobalCandidate" style="font-size:12px;" />
+              </label>
+              <div v-if="globalAddCandidates.length" style="max-height:120px;overflow-y:auto;margin-bottom:6px;">
+                <button v-for="name in globalAddCandidates" :key="`m-add-${name}`" type="button" style="display:flex;justify-content:space-between;align-items:center;width:100%;padding:6px 8px;border:none;background:var(--wb-input-bg);border-radius:4px;color:var(--wb-text-main);font-size:12px;margin-bottom:2px;cursor:pointer;" @click="addGlobalWorldbook(name)">
+                  <span>{{ name }}</span><span style="color:#22c55e;">+ 添加</span>
+                </button>
+              </div>
+              <div v-if="filteredGlobalWorldbooks.length" style="font-size:12px;margin-bottom:4px;opacity:0.7;">已启用：</div>
+              <div style="display:flex;flex-direction:column;gap:2px;margin-bottom:8px;">
+                <button v-for="name in filteredGlobalWorldbooks" :key="`m-gl-${name}`" type="button" style="display:flex;justify-content:space-between;align-items:center;width:100%;padding:6px 8px;border:none;background:var(--wb-input-bg);border-radius:4px;color:var(--wb-text-main);font-size:12px;cursor:pointer;" @click="removeGlobalWorldbook(name)">
+                  <span>{{ name }}</span><span style="color:#ef4444;">移除</span>
+                </button>
+              </div>
+              <!-- Role Binding Section -->
+              <div style="border-top:1px solid var(--wb-border-subtle);padding-top:8px;margin-top:4px;">
+                <div style="font-size:12px;font-weight:600;margin-bottom:6px;">角色绑定</div>
+                <div style="font-size:11px;margin-bottom:6px;opacity:0.8;" :style="{ color: currentRoleContext ? '#60a5fa' : '#94a3b8' }">
+                  {{ currentRoleContext ? `当前角色: ${currentRoleContext.name}` : '当前未进入角色聊天' }}
+                </div>
+                <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px;">
+                  <button class="btn mini" type="button" :disabled="!selectedGlobalPreset || !currentRoleContext" @click="bindCurrentRoleToSelectedPreset" style="font-size:11px;">绑定当前角色</button>
+                  <button class="btn mini" type="button" :disabled="!selectedGlobalPreset || !isCurrentRoleBoundToSelectedPreset" @click="unbindCurrentRoleFromSelectedPreset" style="font-size:11px;">解绑当前角色</button>
+                </div>
+                <div style="margin-bottom:6px;">
+                  <button type="button" :disabled="!selectedGlobalPreset" @click="toggleRolePicker" style="display:flex;justify-content:space-between;align-items:center;width:100%;padding:6px 8px;border:1px solid var(--wb-border-subtle);border-radius:4px;background:var(--wb-input-bg);color:var(--wb-text-main);font-size:12px;cursor:pointer;">
+                    <span>{{ selectedGlobalPreset ? '从角色卡列表选择绑定' : '请先选择预设' }}</span>
+                    <span>{{ rolePickerOpen ? '▴' : '▾' }}</span>
+                  </button>
+                  <div v-if="rolePickerOpen" style="margin-top:4px;">
+                    <input v-model="roleBindSearchText" type="text" class="text-input" placeholder="搜索角色名..." style="font-size:12px;margin-bottom:4px;" @keydown.enter.prevent="bindFirstRoleCandidate" />
+                    <div style="max-height:120px;overflow-y:auto;">
+                      <button v-for="candidate in roleBindingCandidates" :key="`m-role-${candidate.key}`" type="button" :disabled="candidate.bound" style="display:flex;justify-content:space-between;align-items:center;width:100%;padding:6px 8px;border:none;background:var(--wb-input-bg);border-radius:4px;color:var(--wb-text-main);font-size:12px;margin-bottom:2px;cursor:pointer;opacity: 1;" :style="{ opacity: candidate.bound ? '0.5' : '1' }" @click="bindRoleCandidateToSelectedPreset(candidate)">
+                        <span>{{ candidate.name }}</span><span :style="{ color: candidate.bound ? '#94a3b8' : '#22c55e' }">{{ candidate.bound ? '已绑定' : '绑定' }}</span>
+                      </button>
+                      <div v-if="!roleBindingCandidates.length" style="font-size:11px;opacity:0.5;padding:4px;">没有匹配角色</div>
+                    </div>
+                  </div>
+                </div>
+                <div v-if="selectedGlobalPreset" style="display:flex;flex-wrap:wrap;gap:4px;">
+                  <button v-for="binding in selectedGlobalPresetRoleBindings" :key="`m-rb-${selectedGlobalPreset?.id}-${binding.key}`" type="button" style="display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border:1px solid var(--wb-border-subtle);border-radius:4px;background:var(--wb-input-bg);color:var(--wb-text-main);font-size:11px;cursor:pointer;" @click="removeRoleBindingFromSelectedPreset(binding.key)">
+                    {{ binding.name }} <span style="color:#ef4444;">×</span>
+                  </button>
+                  <div v-if="!selectedGlobalPresetRoleBindings.length" style="font-size:11px;opacity:0.5;">当前预设尚未绑定角色</div>
+                </div>
+                <div v-else style="font-size:11px;opacity:0.5;">选择预设后可配置角色绑定</div>
+              </div>
+            </div>
+            <div class="mobile-entry-list">
+              <button
+                v-for="entry in filteredEntries"
+                :key="`me-${entry.uid}`"
+                type="button"
+                class="entry-item"
+                :data-status="getEntryVisualStatus(entry)"
+                :class="{ selected: entry.uid === selectedEntryUid, disabled: !entry.enabled }"
+                @click="selectEntry(entry.uid)"
+                style="border: 1px solid var(--wb-border-subtle); border-radius: 8px; padding: 8px 10px; margin-bottom: 4px;"
+              >
+                <div class="entry-item-head">
+                  <span class="entry-status-dot" :data-status="getEntryVisualStatus(entry)"></span>
+                  <div class="entry-item-title">{{ entry.name || `条目 ${entry.uid}` }}</div>
+                  <span class="entry-chip uid">#{{ entry.uid }}</span>
+                </div>
+                <div class="entry-item-keys" v-if="entry.strategy.keys?.length">
+                  {{ entry.strategy.keys.join(', ') }}
+                </div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;font-size:10px;opacity:0.8;">
+                  <span style="background:var(--wb-input-bg);padding:2px 6px;border-radius:4px;">📍 {{ getPositionTypeLabel(entry.position.type) }}</span>
+                  <span style="background:var(--wb-input-bg);padding:2px 6px;border-radius:4px;">⚖️ #{{ entry.position.order }}</span>
+                  <span v-if="entry.recursion.prevent_incoming" style="background:var(--wb-input-bg);padding:2px 6px;border-radius:4px;color:#f59e0b;">🚫入</span>
+                  <span v-if="entry.recursion.prevent_outgoing" style="background:var(--wb-input-bg);padding:2px 6px;border-radius:4px;color:#f59e0b;">🚫出</span>
+                </div>
+              </button>
+              <div v-if="!filteredEntries.length" class="empty-note">暂无条目</div>
+            </div>
+          </Transition>
+
+          <!-- Tab: 编辑 -->
+          <Transition name="mobile-tab">
+            <div v-show="mobileTab === 'edit'" class="mobile-pane">
+              <template v-if="selectedEntry">
+              <header class="editor-head">
+                <label class="field editor-comment">
+                  <span>备注 (COMMENT)</span>
+                  <input v-model="selectedEntry.name" type="text" class="text-input" />
+                </label>
+                <div class="editor-badges">
+                  <span class="editor-badge" :class="selectedEntry.enabled ? 'on' : 'off'">{{ selectedEntry.enabled ? 'EN' : 'OFF' }}</span>
+                  <span class="editor-badge mono">#{{ selectedEntry.uid }}</span>
+                  <span class="editor-badge mono">~{{ selectedTokenEstimate }}T</span>
+                </div>
+              </header>
+              <section class="editor-grid two-cols editor-keyword-grid">
+                <label class="field">
+                  <span>主要关键词 (KEYS)</span>
+                  <textarea v-model="selectedKeysText" class="text-area compact"></textarea>
+                </label>
+                <label class="field">
+                  <span>次要关键词 (SECONDARY)</span>
+                  <textarea v-model="selectedSecondaryKeysText" class="text-area compact"></textarea>
+                </label>
+              </section>
+              <section class="editor-content-block" ref="editorContentBlockRef">
+                <div v-if="isMobile" class="content-top-drag-handle" @pointerdown="startContentTopDrag">
+                  <span class="content-top-drag-grip">━━━</span>
+                </div>
+                <div class="editor-content-title">世界观设定 / 内容 (CONTENT)</div>
+                <textarea
+                  ref="contentTextareaRef"
+                  v-model="selectedEntry.content"
+                  class="text-area large editor-content-area"
+                  style="min-height: calc(100vh - 500px);"
+                ></textarea>
+                <div class="content-resize-handle" @pointerdown="startContentResize">
+                  <span class="content-resize-grip">━━━</span>
+                </div>
+              </section>
+            </template>
+            <div v-else class="empty-block">请在列表中选择一个条目</div>
+          </div>
+          </Transition>
+
+          <!-- Tab: 设置 -->
+          <Transition name="mobile-tab">
+          <div v-show="mobileTab === 'settings'" class="mobile-pane">
+            <template v-if="selectedEntry">
+              <article class="editor-card">
+                <h4>触发策略 (STRATEGY)</h4>
+                <label class="field checkbox-inline">
+                  <input v-model="selectedEntry.enabled" type="checkbox" />
+                  <span>启用条目</span>
+                </label>
+                <div class="strategy-switch">
+                  <button type="button" class="strategy-pill constant" :class="{ active: selectedEntry.strategy.type === 'constant' }" @click="selectedEntry.strategy.type = 'constant'">🔵 常驻</button>
+                  <button type="button" class="strategy-pill vector" :class="{ active: selectedEntry.strategy.type === 'vectorized' }" @click="selectedEntry.strategy.type = 'vectorized'">📎 向量化</button>
+                  <button type="button" class="strategy-pill selective" :class="{ active: selectedEntry.strategy.type === 'selective' }" @click="selectedEntry.strategy.type = 'selective'">🟢 关键词</button>
+                </div>
+                <details class="editor-advanced">
+                  <summary>高级策略设置</summary>
+                  <label class="field">
+                    <span>次要逻辑 (LOGIC)</span>
+                    <select v-model="selectedEntry.strategy.keys_secondary.logic" class="text-input">
+                      <option v-for="item in secondaryLogicOptions" :key="`ml-${item}`" :value="item">{{ getSecondaryLogicLabel(item) }}</option>
+                    </select>
+                  </label>
+                  <label class="field">
+                    <span>扫描深度</span>
+                    <input v-model="selectedScanDepthText" type="text" class="text-input" placeholder="留空或 same_as_global" />
+                  </label>
+                  <label class="field">
+                    <span>概率(0-100)</span>
+                    <input v-model.number="selectedEntry.probability" type="number" class="text-input" min="0" max="100" step="1" />
+                  </label>
+                </details>
+              </article>
+              <article class="editor-card">
+                <h4>插入设置 (INSERTION)</h4>
+                <label class="field">
+                  <span>位置 (Position)</span>
+                  <select v-model="selectedEntry.position.type" class="text-input" @change="handleSelectedPositionTypeChanged">
+                    <option v-for="item in positionTypeOptions" :key="`mp-${item}`" :value="item">{{ getPositionTypeLabel(item) }}</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>权重 (Order)</span>
+                  <input v-model.number="selectedEntry.position.order" type="number" class="text-input" step="1" />
+                </label>
+                <div class="editor-grid two-cols">
+                  <label class="field" :class="{ disabled: selectedEntry.position.type !== 'at_depth' }">
+                    <span>at_depth role</span>
+                    <select v-model="selectedEntry.position.role" class="text-input" :disabled="selectedEntry.position.type !== 'at_depth'">
+                      <option value="system">system</option>
+                      <option value="assistant">assistant</option>
+                      <option value="user">user</option>
+                    </select>
+                  </label>
+                  <label class="field" :class="{ disabled: selectedEntry.position.type !== 'at_depth' }">
+                    <span>at_depth depth</span>
+                    <input v-model.number="selectedEntry.position.depth" type="number" class="text-input" min="1" step="1" :disabled="selectedEntry.position.type !== 'at_depth'" />
+                  </label>
+                </div>
+              </article>
+              <article class="editor-card">
+                <h4>递归与效果 (RECURSION)</h4>
+                <label class="field checkbox-inline">
+                  <input v-model="selectedEntry.recursion.prevent_incoming" type="checkbox" />
+                  <span>不可递归命中</span>
+                </label>
+                <label class="field checkbox-inline">
+                  <input v-model="selectedEntry.recursion.prevent_outgoing" type="checkbox" />
+                  <span>阻止后续递归</span>
+                </label>
+              </article>
+              <details class="editor-advanced">
+                <summary>高级字段 / extra JSON</summary>
+                <label class="field">
+                  <span>extra JSON（未知字段）</span>
+                  <textarea v-model="selectedExtraText" class="text-area compact" placeholder="{ ... }"></textarea>
+                </label>
+                <div class="field-actions">
+                  <button class="btn" type="button" @click="applyExtraJson">应用 extra</button>
+                  <button class="btn" type="button" @click="clearExtra">清空 extra</button>
+                </div>
+              </details>
+              <div class="mobile-danger-zone">
+                <button class="btn danger" type="button" @click="removeSelectedEntry">🗑 删除此条目</button>
+                <button class="btn" type="button" @click="duplicateSelectedEntry">📋 复制条目</button>
+              </div>
+            </template>
+            <div v-else class="empty-block">请在列表中选择一个条目</div>
+          </div>
+          </Transition>
+
+          <!-- Tab: AI -->
+          <Transition name="mobile-tab">
+          <div v-show="mobileTab === 'ai'" class="mobile-pane">
+            <section class="ai-generator-panel mobile-ai-panel">
+              <div class="ai-chat-area">
+                <div v-if="!aiActiveSession" class="ai-chat-empty">
+                  <div class="ai-chat-empty-icon">🤖</div>
+                  <div class="ai-chat-empty-text">新建一个对话开始生成</div>
+                  <button class="btn" type="button" @click="aiCreateSession">+ 新建对话</button>
+                </div>
+                <template v-else>
+                  <div class="ai-chat-messages" ref="aiChatMessagesRef">
+                    <div v-for="(msg, idx) in aiActiveMessages" :key="`mmsg-${idx}`" class="ai-chat-bubble" :class="msg.role">
+                      <div class="ai-chat-bubble-role">{{ msg.role === 'user' ? '👤 你' : '🤖 AI' }}</div>
+                      <div class="ai-chat-bubble-content">{{ msg.content }}</div>
+                    </div>
+                    <div v-if="aiIsGenerating && aiStreamingText" class="ai-chat-bubble assistant streaming">
+                      <div class="ai-chat-bubble-role">🤖 AI</div>
+                      <div class="ai-chat-bubble-content">{{ aiStreamingText }}<span class="ai-cursor">▌</span></div>
+                    </div>
+                    <div v-if="aiIsGenerating && !aiStreamingText" class="ai-chat-bubble assistant streaming">
+                      <div class="ai-chat-bubble-role">🤖 AI</div>
+                      <div class="ai-chat-bubble-content"><span class="ai-thinking">思考中...</span></div>
+                    </div>
+                  </div>
+                  <div class="ai-chat-input-bar">
+                    <label class="ai-context-toggle" title="开启后，AI 将能看到酒馆的预设、世界书和正则上下文">
+                      <input v-model="aiUseContext" type="checkbox" />
+                      <span>{{ aiUseContext ? '📖 附带上下文' : '🔒 纯净模式' }}</span>
+                    </label>
+                    <textarea v-model="aiChatInputText" class="text-input ai-chat-input" placeholder="输入提示词..." rows="2" :disabled="aiIsGenerating" @keydown.enter.exact.prevent="aiSendMessage"></textarea>
+                    <button v-if="!aiIsGenerating" class="btn ai-send-btn" type="button" :disabled="!aiChatInputText.trim()" @click="aiSendMessage">发送</button>
+                    <button v-else class="btn danger ai-stop-btn" type="button" @click="aiStopGeneration">停止</button>
+                  </div>
+                </template>
+              </div>
+            </section>
+          </div>
+          </Transition>
+
+        </div>
+      </div>
+      <!-- Tab Bar: bottom, direct child of wb-assistant-root via fragment -->
+      <div style="display:flex !important;flex-shrink:0;height:52px;background:#1e293b;border-top:1px solid #334155;z-index:99999;">
+        <button @click="mobileTab = 'list'" :style="{ flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',border:'none',borderTop: mobileTab==='list' ? '2px solid #60a5fa' : '2px solid transparent',background:'transparent',color: mobileTab==='list' ? '#e2e8f0' : '#94a3b8',fontSize:'10px',padding:'4px 0',gap:'2px' }">
+          <span style="font-size:20px;">📋</span><span>列表</span>
+        </button>
+        <button @click="mobileTab = 'edit'" :style="{ flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',border:'none',borderTop: mobileTab==='edit' ? '2px solid #60a5fa' : '2px solid transparent',background:'transparent',color: mobileTab==='edit' ? '#e2e8f0' : '#94a3b8',fontSize:'10px',padding:'4px 0',gap:'2px' }">
+          <span style="font-size:20px;">✏️</span><span>编辑</span>
+        </button>
+        <button @click="mobileTab = 'settings'" :style="{ flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',border:'none',borderTop: mobileTab==='settings' ? '2px solid #60a5fa' : '2px solid transparent',background:'transparent',color: mobileTab==='settings' ? '#e2e8f0' : '#94a3b8',fontSize:'10px',padding:'4px 0',gap:'2px' }">
+          <span style="font-size:20px;">⚙️</span><span>设置</span>
+        </button>
+        <button @click="mobileTab = 'ai'" :style="{ flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',border:'none',borderTop: mobileTab==='ai' ? '2px solid #60a5fa' : '2px solid transparent',background:'transparent',color: mobileTab==='ai' ? '#e2e8f0' : '#94a3b8',fontSize:'10px',padding:'4px 0',gap:'2px' }">
+          <span style="font-size:20px;">🤖</span><span>AI</span>
+        </button>
+      </div>
+    </template>
+
+    <!-- ═══ Desktop Layout ═══ -->
+    <template v-if="!isMobile">
+    <section class="wb-toolbar">
             <label class="toolbar-label">
               <span>世界书</span>
               <div ref="worldbookPickerRef" class="worldbook-picker">
@@ -55,6 +406,7 @@
             />
           </section>
 
+          <div class="wb-scroll-area">
           <section class="wb-bindings">
             <div class="wb-history-shortcuts">
               <button
@@ -93,6 +445,14 @@
               >
                 📡 激活监控
               </button>
+              <button
+                class="btn history-btn utility-btn"
+                type="button"
+                :class="{ active: aiGeneratorMode }"
+                @click="aiToggleMode"
+              >
+                🤖 AI 生成
+              </button>
             </div>
             <div v-if="globalWorldbookMode" class="global-mode-panel">
               <div class="global-mode-head">
@@ -105,7 +465,7 @@
                 <label class="field">
                   <span>世界书预设（切换即应用）</span>
                   <select v-model="selectedGlobalPresetId" class="text-input" @change="onGlobalPresetSelectionChanged">
-                    <option value="">请选择预设...</option>
+                    <option value="">默认预设（清空全局世界书）</option>
                     <option v-for="preset in globalWorldbookPresets" :key="preset.id" :value="preset.id">
                       {{ preset.name }}（{{ preset.worldbooks.length }}）
                     </option>
@@ -147,22 +507,34 @@
                       解绑当前角色
                     </button>
                   </div>
-                  <details class="preset-role-picker">
-                    <summary>从角色卡列表选择绑定</summary>
-                    <div class="preset-role-picker-body">
+                  <div ref="rolePickerRef" class="role-picker">
+                    <button
+                      class="role-picker-trigger"
+                      type="button"
+                      :disabled="!selectedGlobalPreset"
+                      @click="toggleRolePicker"
+                    >
+                      <span class="role-picker-trigger-text">
+                        {{ selectedGlobalPreset ? '从角色卡列表选择绑定' : '请先选择预设' }}
+                      </span>
+                      <span class="role-picker-trigger-arrow">{{ rolePickerOpen ? '▴' : '▾' }}</span>
+                    </button>
+                    <div v-if="rolePickerOpen" class="role-picker-dropdown">
                       <input
+                        ref="rolePickerSearchInputRef"
                         v-model="roleBindSearchText"
                         type="text"
-                        class="text-input"
+                        class="text-input role-picker-search"
                         placeholder="搜索角色名 / avatar..."
+                        @keydown.enter.prevent="bindFirstRoleCandidate"
                       />
-                      <div class="preset-role-picker-list">
+                      <div class="role-picker-list">
                         <button
                           v-for="candidate in roleBindingCandidates"
                           :key="`role-candidate-${candidate.key}`"
-                          class="preset-role-picker-item"
+                          class="role-picker-item"
                           type="button"
-                          :disabled="!selectedGlobalPreset || candidate.bound"
+                          :disabled="candidate.bound"
                           @click="bindRoleCandidateToSelectedPreset(candidate)"
                         >
                           <span class="name">{{ candidate.name }}</span>
@@ -171,7 +543,7 @@
                         <div v-if="!roleBindingCandidates.length" class="empty-note">没有匹配角色</div>
                       </div>
                     </div>
-                  </details>
+                  </div>
                   <div class="preset-role-tags">
                     <button
                       v-for="binding in selectedGlobalPresetRoleBindings"
@@ -252,8 +624,134 @@
             </div>
           </section>
 
-          <section ref="mainLayoutRef" class="wb-main-layout" :style="mainLayoutStyle">
-            <aside class="wb-entry-list">
+          <!-- ═══ AI Generator Panel ═══ -->
+          <section v-if="aiGeneratorMode" class="ai-generator-panel">
+            <div class="ai-sidebar">
+              <div class="ai-sidebar-head">
+                <span class="ai-sidebar-title">对话列表</span>
+                <button class="btn mini" type="button" @click="aiCreateSession">+ 新建</button>
+              </div>
+              <div class="ai-session-list">
+                <button
+                  v-for="session in aiSessions"
+                  :key="session.id"
+                  class="ai-session-item"
+                  :class="{ active: session.id === aiActiveSession?.id }"
+                  type="button"
+                  @click="aiSwitchSession(session.id)"
+                >
+                  <span class="ai-session-title">{{ session.title }}</span>
+                  <span class="ai-session-meta">{{ session.messages.length }} 条消息</span>
+                  <button
+                    class="ai-session-delete"
+                    type="button"
+                    title="删除对话"
+                    @click.stop="aiDeleteSession(session.id)"
+                  >×</button>
+                </button>
+                <div v-if="!aiSessions.length" class="empty-note">暂无对话，点击上方新建</div>
+              </div>
+            </div>
+            <div class="ai-chat-area">
+              <div v-if="!aiActiveSession" class="ai-chat-empty">
+                <div class="ai-chat-empty-icon">🤖</div>
+                <div class="ai-chat-empty-text">选择或新建一个对话开始生成</div>
+              </div>
+              <template v-else>
+                <div class="ai-chat-messages" ref="aiChatMessagesRef">
+                  <div
+                    v-for="(msg, idx) in aiActiveMessages"
+                    :key="`msg-${idx}`"
+                    class="ai-chat-bubble"
+                    :class="msg.role"
+                  >
+                    <div class="ai-chat-bubble-role">{{ msg.role === 'user' ? '👤 你' : '🤖 AI' }}</div>
+                    <div class="ai-chat-bubble-content">{{ msg.content }}</div>
+                  </div>
+                  <div v-if="aiIsGenerating && aiStreamingText" class="ai-chat-bubble assistant streaming">
+                    <div class="ai-chat-bubble-role">🤖 AI</div>
+                    <div class="ai-chat-bubble-content">{{ aiStreamingText }}<span class="ai-cursor">▌</span></div>
+                  </div>
+                  <div v-if="aiIsGenerating && !aiStreamingText" class="ai-chat-bubble assistant streaming">
+                    <div class="ai-chat-bubble-role">🤖 AI</div>
+                    <div class="ai-chat-bubble-content"><span class="ai-thinking">思考中...</span></div>
+                  </div>
+                </div>
+                <div class="ai-chat-input-bar">
+                  <label class="ai-context-toggle" title="开启后，AI 将能看到酒馆的预设、世界书和正则上下文">
+                    <input v-model="aiUseContext" type="checkbox" />
+                    <span>{{ aiUseContext ? '📖 附带上下文' : '🔒 纯净模式' }}</span>
+                  </label>
+                  <textarea
+                    v-model="aiChatInputText"
+                    class="text-input ai-chat-input"
+                    placeholder="输入提示词，让 AI 生成世界书条目..."
+                    rows="2"
+                    :disabled="aiIsGenerating"
+                    @keydown.enter.exact.prevent="aiSendMessage"
+                  ></textarea>
+                  <button
+                    v-if="!aiIsGenerating"
+                    class="btn ai-send-btn"
+                    type="button"
+                    :disabled="!aiChatInputText.trim()"
+                    @click="aiSendMessage"
+                  >发送</button>
+                  <button
+                    v-else
+                    class="btn danger ai-stop-btn"
+                    type="button"
+                    @click="aiStopGeneration"
+                  >停止</button>
+                </div>
+              </template>
+            </div>
+          </section>
+
+          <!-- ═══ Tag Review Modal ═══ -->
+          <div v-if="aiShowTagReview" class="ai-tag-review-overlay" @click.self="aiShowTagReview = false">
+            <div class="ai-tag-review-modal">
+              <div class="ai-tag-review-head">
+                <span class="ai-tag-review-title">📋 提取到的条目（{{ aiExtractedTags.length }}）</span>
+                <button class="ai-tag-review-close" type="button" @click="aiShowTagReview = false">×</button>
+              </div>
+              <div class="ai-tag-review-target">
+                <label class="field">
+                  <span>目标世界书</span>
+                  <select v-model="aiTargetWorldbook" class="text-input">
+                    <option value="">请选择目标世界书</option>
+                    <option v-for="name in worldbookNames" :key="`ai-wb-${name}`" :value="name">{{ name }}</option>
+                  </select>
+                </label>
+              </div>
+              <div class="ai-tag-list">
+                <label
+                  v-for="(tag, idx) in aiExtractedTags"
+                  :key="`tag-${idx}`"
+                  class="ai-tag-item"
+                >
+                  <input v-model="tag.selected" type="checkbox" />
+                  <div class="ai-tag-info">
+                    <span class="ai-tag-name">{{ tag.tag }}</span>
+                    <span class="ai-tag-preview">{{ tag.content.slice(0, 120) }}{{ tag.content.length > 120 ? '...' : '' }}</span>
+                  </div>
+                </label>
+              </div>
+              <div class="ai-tag-review-actions">
+                <button class="btn" type="button" @click="aiExtractedTags.forEach(t => t.selected = true)">全选</button>
+                <button class="btn" type="button" @click="aiExtractedTags.forEach(t => t.selected = false)">全不选</button>
+                <button
+                  class="btn primary"
+                  type="button"
+                  :disabled="!aiTargetWorldbook || !aiExtractedTags.some(t => t.selected)"
+                  @click="aiCreateSelectedEntries"
+                >创建选中条目（{{ aiExtractedTags.filter(t => t.selected).length }}）</button>
+              </div>
+            </div>
+          </div>
+
+          <section v-show="!aiGeneratorMode" ref="mainLayoutRef" class="wb-main-layout" :style="mainLayoutStyle">
+            <aside v-show="!showMobileEditor" class="wb-entry-list">
               <div class="list-search">
                 <input v-model="searchText" type="text" class="text-input" placeholder="搜索名称 / 内容 / 关键词" />
                 <label class="checkbox-inline">
@@ -308,16 +806,20 @@
               </div>
             </aside>
             <div
+              v-show="!isMobile"
               class="wb-resize-handle main"
               :class="{ dragging: paneResizeState?.key === 'main' }"
               @pointerdown="startPaneResize('main', $event)"
             ></div>
 
-            <main class="wb-editor">
+            <main v-show="!isMobile || showMobileEditor" class="wb-editor">
               <template v-if="selectedEntry">
                 <div ref="editorShellRef" class="wb-editor-shell" :style="editorShellStyle">
                   <section class="editor-center">
                     <header class="editor-head">
+                      <div v-if="isMobile" class="editor-back-btn" @click="goBackToList">
+                        ← 返回
+                      </div>
                       <label class="field editor-comment">
                         <span>备注 (COMMENT)</span>
                         <input v-model="selectedEntry.name" type="text" class="text-input" />
@@ -348,7 +850,17 @@
 
                     <section class="editor-content-block">
                       <div class="editor-content-title">世界观设定 / 内容 (CONTENT)</div>
-                      <textarea v-model="selectedEntry.content" class="text-area large editor-content-area"></textarea>
+                      <textarea
+                        ref="contentTextareaRef"
+                        v-model="selectedEntry.content"
+                        class="text-area large editor-content-area"
+                      ></textarea>
+                      <div
+                        class="content-resize-handle"
+                        @pointerdown="startContentResize"
+                      >
+                        <span class="content-resize-grip">⋯</span>
+                      </div>
                     </section>
 
                     <details class="editor-advanced">
@@ -364,6 +876,7 @@
                     </details>
                   </section>
                   <div
+                    v-show="!isMobile"
                     class="wb-resize-handle editor"
                     :class="{ dragging: paneResizeState?.key === 'editor' }"
                     @pointerdown="startPaneResize('editor', $event)"
@@ -537,14 +1050,17 @@
               </template>
             </main>
           </section>
+          </div>
 
-          <footer class="wb-status">
+          <footer class="wb-status" :class="{ 'has-unsaved': hasUnsavedChanges }">
             <span>{{ isBusy ? '加载中...' : statusMessage }}</span>
             <span>
               当前条目: {{ draftEntries.length }} | 内容字符: {{ totalContentChars }} |
               {{ hasUnsavedChanges ? '存在未保存修改' : '已同步' }}
             </span>
           </footer>
+    </template>
+    <!-- ═══ End Desktop Layout ═══ -->
 
           <div v-if="showEntryHistoryModal" class="wb-modal-backdrop" @click.self="showEntryHistoryModal = false">
             <div class="wb-history-modal">
@@ -882,6 +1398,165 @@ interface PaneResizeState {
   win: Window;
 }
 
+type ThemeKey = 'ocean' | 'nebula' | 'forest' | 'sunset' | 'coffee' | 'paper' | 'snow';
+
+const THEMES: Record<ThemeKey, { name: string; label: string; colors: Record<string, string> }> = {
+  ocean: {
+    name: 'Ocean (Deep)',
+    label: '深海',
+    colors: {
+      '--wb-bg-root': '#0f172a',
+      '--wb-bg-panel': '#1e293b',
+      '--wb-text-main': '#f1f5f9',
+      '--wb-text-muted': '#94a3b8',
+      '--wb-primary': '#0ea5e9',
+      '--wb-primary-light': '#38bdf8',
+      '--wb-primary-hover': 'rgba(56, 189, 248, 0.15)',
+      '--wb-primary-soft': 'rgba(14, 165, 233, 0.15)',
+      '--wb-primary-glow': 'rgba(14, 165, 233, 0.4)',
+      '--wb-input-bg': 'rgba(0, 0, 0, 0.25)',
+      '--wb-input-bg-hover': 'rgba(0, 0, 0, 0.35)',
+      '--wb-input-bg-focus': 'rgba(0, 0, 0, 0.45)',
+      '--wb-border-subtle': 'rgba(255, 255, 255, 0.08)',
+      '--wb-border-main': 'rgba(255, 255, 255, 0.12)',
+      '--wb-shadow-main': '0 12px 28px rgba(0, 0, 0, 0.5)',
+      '--wb-scrollbar-thumb': 'rgba(255, 255, 255, 0.2)',
+    },
+  },
+  nebula: {
+    name: 'Nebula (Dark)',
+    label: '星云',
+    colors: {
+      '--wb-bg-root': '#170b25',
+      '--wb-bg-panel': '#261836',
+      '--wb-text-main': '#f3e8ff',
+      '--wb-text-muted': '#a855f7',
+      '--wb-primary': '#c084fc',
+      '--wb-primary-light': '#d8b4fe',
+      '--wb-primary-hover': 'rgba(192, 132, 252, 0.15)',
+      '--wb-primary-soft': 'rgba(168, 85, 247, 0.15)',
+      '--wb-primary-glow': 'rgba(192, 132, 252, 0.4)',
+      '--wb-input-bg': 'rgba(0, 0, 0, 0.25)',
+      '--wb-input-bg-hover': 'rgba(0, 0, 0, 0.35)',
+      '--wb-input-bg-focus': 'rgba(0, 0, 0, 0.45)',
+      '--wb-border-subtle': 'rgba(255, 255, 255, 0.08)',
+      '--wb-border-main': 'rgba(255, 255, 255, 0.12)',
+      '--wb-shadow-main': '0 12px 28px rgba(0, 0, 0, 0.5)',
+      '--wb-scrollbar-thumb': 'rgba(255, 255, 255, 0.2)',
+    },
+  },
+  forest: {
+    name: 'Forest',
+    label: '森林',
+    colors: {
+      '--wb-bg-root': '#051812',
+      '--wb-bg-panel': '#0d2b21',
+      '--wb-text-main': '#ecfdf5',
+      '--wb-text-muted': '#34d399',
+      '--wb-primary': '#10b981',
+      '--wb-primary-light': '#34d399',
+      '--wb-primary-hover': 'rgba(16, 185, 129, 0.15)',
+      '--wb-primary-soft': 'rgba(5, 150, 105, 0.15)',
+      '--wb-primary-glow': 'rgba(16, 185, 129, 0.4)',
+      '--wb-input-bg': 'rgba(0, 0, 0, 0.25)',
+      '--wb-input-bg-hover': 'rgba(0, 0, 0, 0.35)',
+      '--wb-input-bg-focus': 'rgba(0, 0, 0, 0.45)',
+      '--wb-border-subtle': 'rgba(255, 255, 255, 0.08)',
+      '--wb-border-main': 'rgba(255, 255, 255, 0.12)',
+      '--wb-shadow-main': '0 12px 28px rgba(0, 0, 0, 0.5)',
+      '--wb-scrollbar-thumb': 'rgba(255, 255, 255, 0.2)',
+    },
+  },
+  sunset: {
+    name: 'Sunset',
+    label: '日落',
+    colors: {
+      '--wb-bg-root': '#1a0f0f',
+      '--wb-bg-panel': '#2e1818',
+      '--wb-text-main': '#fff1f2',
+      '--wb-text-muted': '#fb7185',
+      '--wb-primary': '#fb923c',
+      '--wb-primary-light': '#fdba74',
+      '--wb-primary-hover': 'rgba(251, 146, 60, 0.15)',
+      '--wb-primary-soft': 'rgba(234, 88, 12, 0.15)',
+      '--wb-primary-glow': 'rgba(251, 146, 60, 0.4)',
+      '--wb-input-bg': 'rgba(0, 0, 0, 0.25)',
+      '--wb-input-bg-hover': 'rgba(0, 0, 0, 0.35)',
+      '--wb-input-bg-focus': 'rgba(0, 0, 0, 0.45)',
+      '--wb-border-subtle': 'rgba(255, 255, 255, 0.08)',
+      '--wb-border-main': 'rgba(255, 255, 255, 0.12)',
+      '--wb-shadow-main': '0 12px 28px rgba(0, 0, 0, 0.5)',
+      '--wb-scrollbar-thumb': 'rgba(255, 255, 255, 0.2)',
+    },
+  },
+  coffee: {
+    name: 'Coffee',
+    label: '咖啡',
+    colors: {
+      '--wb-bg-root': '#161009',
+      '--wb-bg-panel': '#291e16',
+      '--wb-text-main': '#fffbeb',
+      '--wb-text-muted': '#d97706',
+      '--wb-primary': '#fbbf24',
+      '--wb-primary-light': '#fcd34d',
+      '--wb-primary-hover': 'rgba(251, 191, 36, 0.15)',
+      '--wb-primary-soft': 'rgba(217, 119, 6, 0.15)',
+      '--wb-primary-glow': 'rgba(251, 191, 36, 0.4)',
+      '--wb-input-bg': 'rgba(0, 0, 0, 0.25)',
+      '--wb-input-bg-hover': 'rgba(0, 0, 0, 0.35)',
+      '--wb-input-bg-focus': 'rgba(0, 0, 0, 0.45)',
+      '--wb-border-subtle': 'rgba(255, 255, 255, 0.08)',
+      '--wb-border-main': 'rgba(255, 255, 255, 0.12)',
+      '--wb-shadow-main': '0 12px 28px rgba(0, 0, 0, 0.5)',
+      '--wb-scrollbar-thumb': 'rgba(255, 255, 255, 0.2)',
+    },
+  },
+  paper: {
+    name: 'Paper (Light)',
+    label: '纸莎草',
+    colors: {
+      '--wb-bg-root': '#fbf9f5',
+      '--wb-bg-panel': '#f0eadd',
+      '--wb-text-main': '#4a3b32',
+      '--wb-text-muted': '#8c7b70',
+      '--wb-primary': '#d97706',
+      '--wb-primary-light': '#b45309',
+      '--wb-primary-hover': 'rgba(217, 119, 6, 0.1)',
+      '--wb-primary-soft': 'rgba(180, 83, 9, 0.1)',
+      '--wb-primary-glow': 'rgba(217, 119, 6, 0.25)',
+      '--wb-input-bg': '#f7f3ec',
+      '--wb-input-bg-hover': '#f2ece2',
+      '--wb-input-bg-focus': '#ffffff',
+      '--wb-border-subtle': 'rgba(74, 59, 50, 0.12)',
+      '--wb-border-main': 'rgba(74, 59, 50, 0.2)',
+      '--wb-shadow-main': '0 8px 24px rgba(74, 59, 50, 0.12)',
+      '--wb-scrollbar-thumb': 'rgba(74, 59, 50, 0.25)',
+    },
+  },
+  snow: {
+    name: 'Snow (Light)',
+    label: '雪白',
+    colors: {
+      '--wb-bg-root': '#ffffff',
+      '--wb-bg-panel': '#f4f4f5',
+      '--wb-text-main': '#18181b',
+      '--wb-text-muted': '#71717a',
+      '--wb-primary': '#2563eb',
+      '--wb-primary-light': '#3b82f6',
+      '--wb-primary-hover': 'rgba(37, 99, 235, 0.1)',
+      '--wb-primary-soft': 'rgba(37, 99, 235, 0.08)',
+      '--wb-primary-glow': 'rgba(37, 99, 235, 0.25)',
+      '--wb-input-bg': '#ffffff',
+      '--wb-input-bg-hover': '#fafafa',
+      '--wb-input-bg-focus': '#ffffff',
+      '--wb-border-subtle': '#e4e4e7',
+      '--wb-border-main': '#d4d4d8',
+      '--wb-shadow-main': '0 12px 28px rgba(0, 0, 0, 0.08)',
+      '--wb-scrollbar-thumb': '#a1a1aa',
+    },
+  },
+};
+
 interface WorldbookSnapshot {
   id: string;
   label: string;
@@ -934,12 +1609,39 @@ interface GlobalWorldbookPreset {
   updated_at: number;
 }
 
+interface AIChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: number;
+}
+
+interface AIChatSession {
+  id: string;
+  title: string;
+  createdAt: number;
+  messages: AIChatMessage[];
+}
+
+interface AIGeneratorState {
+  sessions: AIChatSession[];
+  activeSessionId: string | null;
+}
+
+interface ExtractedTag {
+  tag: string;
+  content: string;
+  selected: boolean;
+}
+
 interface PersistedState {
   last_worldbook: string;
   history: Record<string, WorldbookSnapshot[]>;
   entry_history: Record<string, Record<string, EntrySnapshot[]>>;
   global_presets: GlobalWorldbookPreset[];
   last_global_preset_id: string;
+  role_override_baseline: { preset_id: string; worldbooks: string[] } | null;
+  theme: ThemeKey;
+  ai_chat: AIGeneratorState;
 }
 
 interface ActivationLog {
@@ -1000,9 +1702,28 @@ const worldbookPickerOpen = ref(false);
 const worldbookPickerSearchText = ref('');
 const worldbookPickerRef = ref<HTMLElement | null>(null);
 const worldbookPickerSearchInputRef = ref<HTMLInputElement | null>(null);
+const rolePickerOpen = ref(false);
+const rolePickerRef = ref<HTMLElement | null>(null);
+const rolePickerSearchInputRef = ref<HTMLInputElement | null>(null);
+const currentTheme = ref<ThemeKey>('ocean');
+const themePickerOpen = ref(false);
 const globalWorldbookMode = ref(false);
+const aiGeneratorMode = ref(false);
+const aiIsGenerating = ref(false);
+const aiCurrentGenerationId = ref<string | null>(null);
+const aiStreamingText = ref('');
+const aiExtractedTags = ref<ExtractedTag[]>([]);
+const aiShowTagReview = ref(false);
+const aiTargetWorldbook = ref('');
+const aiChatInputText = ref('');
+const aiUseContext = ref(true);
+const aiChatMessagesRef = ref<HTMLDivElement | null>(null);
+
+const AI_CHAT_SESSION_LIMIT = 50;
+const AI_CHAT_MESSAGE_LIMIT = 200;
 const selectedGlobalPresetId = ref('');
 const currentRoleContext = ref<PresetRoleBinding | null>(null);
+const roleBindingSourceCandidates = ref<PresetRoleBinding[]>([]);
 const originalEntries = ref<WorldbookEntry[]>([]);
 const draftEntries = ref<WorldbookEntry[]>([]);
 const selectedEntryUid = ref<number | null>(null);
@@ -1052,10 +1773,34 @@ const floatingPanelKeys: FloatingPanelKey[] = ['find', 'activation'];
 const viewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1440);
 const mainLayoutRef = ref<HTMLElement | null>(null);
 const editorShellRef = ref<HTMLElement | null>(null);
+const contentTextareaRef = ref<HTMLTextAreaElement | null>(null);
 const mainPaneWidth = ref(320);
 const editorSideWidth = ref(360);
 const paneResizeState = ref<PaneResizeState | null>(null);
 const hostResizeWindow = ref<Window | null>(null);
+
+const screenWidth = ref(typeof window !== 'undefined' ? window.screen.width : 1440);
+const screenHeight = ref(typeof window !== 'undefined' ? window.screen.height : 900);
+
+const isMobile = computed(() => screenWidth.value < screenHeight.value);
+
+// Keep screen dimensions in sync on orientation change
+let _screenSyncCleanup: (() => void) | null = null;
+if (typeof window !== 'undefined') {
+  const syncScreenDims = () => {
+    screenWidth.value = window.screen.width;
+    screenHeight.value = window.screen.height;
+  };
+  const orientHandler = () => setTimeout(syncScreenDims, 150);
+  window.addEventListener('orientationchange', orientHandler);
+  window.addEventListener('resize', syncScreenDims);
+  _screenSyncCleanup = () => {
+    window.removeEventListener('orientationchange', orientHandler);
+    window.removeEventListener('resize', syncScreenDims);
+  };
+}
+const showMobileEditor = computed(() => isMobile.value && selectedEntryUid.value !== null);
+const mobileTab = ref<'list' | 'edit' | 'settings' | 'ai'>('list');
 
 const bindings = reactive({
   global: [] as string[],
@@ -1113,6 +1858,13 @@ const hasUnsavedChanges = computed(() => JSON.stringify(draftEntries.value) !== 
 const isCompactLayout = computed(() => viewportWidth.value <= 1100);
 
 const mainLayoutStyle = computed<Record<string, string> | undefined>(() => {
+  if (isMobile.value) {
+    return {
+      display: 'block',
+      height: 'auto',
+      overflow: 'visible',
+    };
+  }
   if (isCompactLayout.value) {
     return undefined;
   }
@@ -1128,6 +1880,10 @@ const editorShellStyle = computed<Record<string, string> | undefined>(() => {
   return {
     gridTemplateColumns: `minmax(0, 1fr) ${RESIZE_HANDLE_SIZE}px minmax(${EDITOR_SIDE_MIN}px, min(${editorSideWidth.value}px, calc(100% - ${EDITOR_CENTER_MIN + RESIZE_HANDLE_SIZE}px)))`,
   };
+});
+
+const themeStyles = computed(() => {
+  return THEMES[currentTheme.value].colors;
 });
 
 const selectableWorldbookNames = computed(() => {
@@ -1157,7 +1913,7 @@ const isCurrentRoleBoundToSelectedPreset = computed(() => {
 const roleBindingCandidates = computed<RoleBindingCandidate[]>(() => {
   const keyword = roleBindSearchText.value.trim().toLowerCase();
   const boundSet = new Set(selectedGlobalPresetRoleBindings.value.map(item => item.key));
-  const list = collectRoleBindingCandidates();
+  const list = roleBindingSourceCandidates.value;
   const filtered = keyword
     ? list.filter(item => {
         return (
@@ -2040,6 +2796,9 @@ function createDefaultPersistedState(): PersistedState {
     entry_history: {},
     global_presets: [],
     last_global_preset_id: '',
+    role_override_baseline: null,
+    theme: 'ocean',
+    ai_chat: { sessions: [], activeSessionId: null },
   };
 }
 
@@ -2130,12 +2889,59 @@ function normalizePersistedState(input: unknown): PersistedState {
     .filter((item): item is GlobalWorldbookPreset => item !== null)
     .slice(0, GLOBAL_PRESET_LIMIT);
 
+  const rawBaseline = asRecord(root.role_override_baseline);
+  let roleOverrideBaseline: PersistedState['role_override_baseline'] = null;
+  if (rawBaseline) {
+    const baselineWorldbooks = Array.isArray(rawBaseline.worldbooks)
+      ? rawBaseline.worldbooks.map(name => toStringSafe(name).trim()).filter(Boolean)
+      : [];
+    roleOverrideBaseline = {
+      preset_id: toStringSafe(rawBaseline.preset_id),
+      worldbooks: [...new Set(baselineWorldbooks)],
+    };
+  }
+
+  const aiChatRaw = asRecord(root.ai_chat);
+  const aiChat: AIGeneratorState = { sessions: [], activeSessionId: null };
+  if (aiChatRaw) {
+    aiChat.activeSessionId = toStringSafe(aiChatRaw.activeSessionId) || null;
+    if (Array.isArray(aiChatRaw.sessions)) {
+      aiChat.sessions = aiChatRaw.sessions
+        .map((s: unknown) => {
+          const sr = asRecord(s);
+          if (!sr) return null;
+          const msgs = Array.isArray(sr.messages)
+            ? sr.messages.map((m: unknown) => {
+                const mr = asRecord(m);
+                if (!mr) return null;
+                return {
+                  role: mr.role === 'assistant' ? 'assistant' : 'user',
+                  content: toStringSafe(mr.content),
+                  timestamp: toNumberSafe(mr.timestamp, Date.now()),
+                } satisfies AIChatMessage;
+              }).filter((m): m is AIChatMessage => m !== null)
+            : [];
+          return {
+            id: toStringSafe(sr.id, createId('ai-chat')),
+            title: toStringSafe(sr.title, '新对话'),
+            createdAt: toNumberSafe(sr.createdAt, Date.now()),
+            messages: msgs.slice(0, AI_CHAT_MESSAGE_LIMIT),
+          } satisfies AIChatSession;
+        })
+        .filter((s): s is AIChatSession => s !== null)
+        .slice(0, AI_CHAT_SESSION_LIMIT);
+    }
+  }
+
   return {
     last_worldbook: toStringSafe(root.last_worldbook),
     history,
     entry_history: entryHistory,
     global_presets: globalPresets,
     last_global_preset_id: toStringSafe(root.last_global_preset_id),
+    role_override_baseline: roleOverrideBaseline,
+    theme: (toStringSafe(root.theme) as ThemeKey) || 'ocean',
+    ai_chat: aiChat,
   };
 }
 
@@ -2170,6 +2976,210 @@ function updatePersistedState(mutator: (state: PersistedState) => void): void {
   const state = readPersistedState();
   mutator(state);
   writePersistedState(state);
+}
+
+// ── AI Chat: computed ──────────────────────────────────────────────
+const aiSessions = computed(() => persistedState.value.ai_chat.sessions);
+
+const aiActiveSession = computed((): AIChatSession | null => {
+  const id = persistedState.value.ai_chat.activeSessionId;
+  if (!id) return null;
+  return aiSessions.value.find(s => s.id === id) ?? null;
+});
+
+const aiActiveMessages = computed((): AIChatMessage[] => aiActiveSession.value?.messages ?? []);
+
+// ── AI Chat: CRUD ──────────────────────────────────────────────────
+function aiCreateSession(): void {
+  const id = createId('ai-chat');
+  const session: AIChatSession = {
+    id,
+    title: `对话 ${aiSessions.value.length + 1}`,
+    createdAt: Date.now(),
+    messages: [],
+  };
+  updatePersistedState(state => {
+    state.ai_chat.sessions.unshift(session);
+    state.ai_chat.activeSessionId = id;
+  });
+  setStatus('已创建新对话');
+}
+
+function aiDeleteSession(id: string): void {
+  updatePersistedState(state => {
+    state.ai_chat.sessions = state.ai_chat.sessions.filter(s => s.id !== id);
+    if (state.ai_chat.activeSessionId === id) {
+      state.ai_chat.activeSessionId = state.ai_chat.sessions[0]?.id ?? null;
+    }
+  });
+  setStatus('已删除对话');
+}
+
+function aiSwitchSession(id: string): void {
+  updatePersistedState(state => {
+    state.ai_chat.activeSessionId = id;
+  });
+}
+
+function aiRenameSession(id: string, title: string): void {
+  updatePersistedState(state => {
+    const session = state.ai_chat.sessions.find(s => s.id === id);
+    if (session) {
+      session.title = title.trim() || session.title;
+    }
+  });
+}
+
+function aiAddMessage(role: 'user' | 'assistant', content: string): void {
+  const sessionId = persistedState.value.ai_chat.activeSessionId;
+  if (!sessionId) return;
+  updatePersistedState(state => {
+    const session = state.ai_chat.sessions.find(s => s.id === sessionId);
+    if (session) {
+      session.messages.push({ role, content, timestamp: Date.now() });
+      if (session.messages.length > AI_CHAT_MESSAGE_LIMIT) {
+        session.messages = session.messages.slice(-AI_CHAT_MESSAGE_LIMIT);
+      }
+    }
+  });
+}
+
+// ── AI Chat: generate ──────────────────────────────────────────────
+let aiStreamSubscription: { stop: () => void } | null = null;
+
+async function aiSendMessage(): Promise<void> {
+  const text = aiChatInputText.value.trim();
+  if (!text || aiIsGenerating.value) return;
+
+  const sessionId = persistedState.value.ai_chat.activeSessionId;
+  if (!sessionId) {
+    aiCreateSession();
+  }
+
+  aiChatInputText.value = '';
+  aiAddMessage('user', text);
+
+  const session = persistedState.value.ai_chat.sessions.find(
+    s => s.id === persistedState.value.ai_chat.activeSessionId
+  );
+  if (!session) return;
+
+  // Build prompts from session history (excluding the user message we just added since generate will use user_input)
+  const historyPrompts: RolePrompt[] = session.messages.slice(0, -1).map(m => ({
+    role: m.role,
+    content: m.content,
+  }));
+
+  const generationId = createId('ai-gen');
+  aiCurrentGenerationId.value = generationId;
+  aiIsGenerating.value = true;
+  aiStreamingText.value = '';
+
+  // Subscribe to streaming events
+  aiStreamSubscription = eventOn(
+    iframe_events.STREAM_TOKEN_RECEIVED_FULLY,
+    (fullText: string, genId: string) => {
+      if (genId === generationId) {
+        aiStreamingText.value = fullText;
+      }
+    }
+  );
+
+  try {
+    const generateConfig: Parameters<typeof generate>[0] = {
+      generation_id: generationId,
+      user_input: text,
+      should_stream: true,
+      should_silence: true,
+    };
+
+    if (!aiUseContext.value) {
+      // 纯净模式: 覆盖 chat_history, 不使用酒馆上下文
+      generateConfig.overrides = {
+        chat_history: { prompts: historyPrompts },
+      };
+    }
+    // 附带上下文模式: 不设置 chat_history, 让酒馆构建完整 prompt (预设+世界书+正则)
+
+    const result = await generate(generateConfig);
+
+    aiAddMessage('assistant', result);
+    aiStreamingText.value = '';
+
+    // Auto-extract tags
+    const tags = aiExtractTags(result);
+    if (tags.length > 0) {
+      aiExtractedTags.value = tags;
+      aiShowTagReview.value = true;
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    toastr.error(`AI 生成失败: ${message}`);
+    setStatus(`AI 生成失败: ${message}`);
+  } finally {
+    aiIsGenerating.value = false;
+    aiCurrentGenerationId.value = null;
+    aiStreamSubscription?.stop();
+    aiStreamSubscription = null;
+  }
+}
+
+function aiStopGeneration(): void {
+  if (aiCurrentGenerationId.value) {
+    stopGenerationById(aiCurrentGenerationId.value);
+  }
+}
+
+// ── AI Chat: tag extraction ────────────────────────────────────────
+function aiExtractTags(text: string): ExtractedTag[] {
+  const regex = /<([^/<>\s]+)>([\s\S]*?)<\/\1>/g;
+  const results: ExtractedTag[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(text)) !== null) {
+    results.push({
+      tag: match[1],
+      content: match[0],
+      selected: true,
+    });
+  }
+  return results;
+}
+
+async function aiCreateSelectedEntries(): Promise<void> {
+  const selected = aiExtractedTags.value.filter(t => t.selected);
+  if (selected.length === 0) {
+    toastr.warning('请至少勾选一个条目');
+    return;
+  }
+
+  const targetName = aiTargetWorldbook.value;
+  if (!targetName) {
+    toastr.warning('请选择目标世界书');
+    return;
+  }
+
+  try {
+    const newEntries = selected.map(t => ({
+      name: t.tag,
+      content: t.content,
+    }));
+
+    await createWorldbookEntries(targetName, newEntries);
+    toastr.success(`已创建 ${selected.length} 个条目到 "${targetName}"`);
+    setStatus(`已创建 ${selected.length} 个条目到 "${targetName}"`);
+    aiShowTagReview.value = false;
+    aiExtractedTags.value = [];
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    toastr.error(`创建条目失败: ${message}`);
+  }
+}
+
+function aiToggleMode(): void {
+  aiGeneratorMode.value = !aiGeneratorMode.value;
+  if (aiGeneratorMode.value) {
+    globalWorldbookMode.value = false;
+  }
 }
 
 function setStatus(message: string): void {
@@ -2745,6 +3755,14 @@ function ensureSelectedEntryExists(): void {
 
 function selectEntry(uid: number): void {
   selectedEntryUid.value = uid;
+  if (isMobile.value) {
+    mobileTab.value = 'edit';
+  }
+}
+
+function goBackToList(): void {
+  selectedEntryUid.value = null;
+  mobileTab.value = 'list';
 }
 
 function createEntrySnapshotRecord(
@@ -3115,7 +4133,11 @@ function removeSelectedEntry(): void {
   }
   pushEntrySnapshot('删除前快照', selectedEntry.value);
   draftEntries.value.splice(selectedEntryIndex.value, 1);
-  ensureSelectedEntryExists();
+  if (isMobile.value) {
+    selectedEntryUid.value = null;
+  } else {
+    ensureSelectedEntryExists();
+  }
   setStatus('已删除条目');
 }
 
@@ -3429,6 +4451,7 @@ function trySelectWorldbookByContext(options: { preferWhenEmptyOnly?: boolean; f
 function toggleGlobalMode(): void {
   globalWorldbookMode.value = !globalWorldbookMode.value;
   if (globalWorldbookMode.value) {
+    aiGeneratorMode.value = false;
     ensureSelectionForGlobalMode();
     setStatus('已切换到全局世界书模式');
     return;
@@ -3471,6 +4494,9 @@ async function addGlobalWorldbook(name: string): Promise<void> {
   const success = await applyGlobalWorldbooks([...bindings.global, name], `已添加到全局: ${name}`);
   if (success) {
     globalAddSearchText.value = '';
+    updatePersistedState(state => {
+      state.role_override_baseline = null;
+    });
   }
 }
 
@@ -3478,10 +4504,15 @@ async function removeGlobalWorldbook(name: string): Promise<void> {
   if (!name || !bindings.global.includes(name)) {
     return;
   }
-  await applyGlobalWorldbooks(
+  const success = await applyGlobalWorldbooks(
     bindings.global.filter(item => item !== name),
     `已移出全局: ${name}`,
   );
+  if (success) {
+    updatePersistedState(state => {
+      state.role_override_baseline = null;
+    });
+  }
 }
 
 async function clearGlobalWorldbooks(): Promise<void> {
@@ -3491,7 +4522,12 @@ async function clearGlobalWorldbooks(): Promise<void> {
   if (!confirm('确定清空所有全局世界书吗？')) {
     return;
   }
-  await applyGlobalWorldbooks([], '已清空全局世界书');
+  const success = await applyGlobalWorldbooks([], '已清空全局世界书');
+  if (success) {
+    updatePersistedState(state => {
+      state.role_override_baseline = null;
+    });
+  }
 }
 
 function getCurrentGlobalWorldbookSet(): string[] {
@@ -3516,70 +4552,62 @@ function isSameWorldbookSet(left: string[], right: string[]): boolean {
   return true;
 }
 
-function getSillyTavernContextRecord(): Record<string, unknown> | null {
-  const parentRecord = asRecord(window.parent as unknown as Record<string, unknown>);
-  const selfRecord = asRecord(window as unknown as Record<string, unknown>);
-  return asRecord(parentRecord?.SillyTavern) ?? asRecord(selfRecord?.SillyTavern);
-}
-
-function collectRoleBindingCandidates(): PresetRoleBinding[] {
-  const stContext = getSillyTavernContextRecord();
-  if (!stContext) {
-    return [];
+function refreshRoleBindingCandidates(): void {
+  let names: string[] = [];
+  try {
+    names = typeof getCharacterNames === 'function' ? getCharacterNames() : [];
+  } catch (error) {
+    console.warn('[WorldbookAssistant] getCharacterNames failed:', error);
   }
-  const characters = Array.isArray(stContext.characters) ? stContext.characters : [];
+
   const dedupe = new Set<string>();
   const result: PresetRoleBinding[] = [];
 
-  for (let index = 0; index < characters.length; index += 1) {
-    const characterRecord = asRecord(characters[index]);
-    if (!characterRecord) {
+  for (const charName of names) {
+    const trimmed = charName.trim();
+    if (!trimmed) {
       continue;
     }
-    const avatar = toStringSafe(characterRecord.avatar).trim();
-    const fallbackName = avatar || `角色#${index}`;
-    const name = toStringSafe(characterRecord.name, fallbackName).trim() || fallbackName;
-    const key = avatar ? `avatar:${avatar}` : `character:${index}`;
+    const key = `char:${trimmed}`;
     if (dedupe.has(key)) {
       continue;
     }
     dedupe.add(key);
     result.push({
       key,
-      name,
-      avatar,
+      name: trimmed,
+      avatar: '',
       updated_at: Date.now(),
     });
   }
 
   result.sort((left, right) => left.name.localeCompare(right.name, 'zh-Hans-CN'));
-  return result;
+
+  const current = resolveCurrentRoleContext();
+  if (current && !result.some(item => item.key === current.key)) {
+    result.unshift(current);
+  }
+  roleBindingSourceCandidates.value = result;
 }
 
 function resolveCurrentRoleContext(): PresetRoleBinding | null {
-  const stContext = getSillyTavernContextRecord();
-  if (!stContext) {
+  let name: string | null = null;
+  try {
+    name = typeof getCurrentCharacterName === 'function' ? getCurrentCharacterName() : null;
+  } catch (error) {
+    console.warn('[WorldbookAssistant] getCurrentCharacterName failed:', error);
+  }
+  if (!name) {
     return null;
   }
-
-  const rawCharacterId = stContext.characterId;
-  const characterIdText = toStringSafe(rawCharacterId).trim();
-  if (!characterIdText || characterIdText === 'null' || characterIdText === 'undefined') {
+  const trimmed = name.trim();
+  if (!trimmed) {
     return null;
   }
-
-  const characterIndex = Math.floor(toNumberSafe(rawCharacterId, -1));
-  const characters = Array.isArray(stContext.characters) ? stContext.characters : [];
-  const characterRecord = characterIndex >= 0 ? asRecord(characters[characterIndex]) : null;
-  const avatar = toStringSafe(characterRecord?.avatar).trim();
-  const fallbackName = avatar || `角色#${characterIdText}`;
-  const roleName = toStringSafe(characterRecord?.name, fallbackName).trim() || fallbackName;
-  const key = avatar ? `avatar:${avatar}` : `character:${characterIdText}`;
-
   return {
-    key,
-    name: roleName,
-    avatar,
+    key: `char:${trimmed}`,
+    name: trimmed,
+    avatar: '',
     updated_at: Date.now(),
   };
 }
@@ -3622,7 +4650,12 @@ async function applySelectedGlobalPreset(): Promise<void> {
   if (!preset) {
     return;
   }
-  await applyPresetWorldbooks(preset);
+  const success = await applyPresetWorldbooks(preset);
+  if (success) {
+    updatePersistedState(state => {
+      state.role_override_baseline = null;
+    });
+  }
 }
 
 function getRoleBoundPresetForCurrentContext(): GlobalWorldbookPreset | null {
@@ -3638,7 +4671,42 @@ function getRoleBoundPresetForCurrentContext(): GlobalWorldbookPreset | null {
 async function autoApplyRoleBoundPreset(): Promise<void> {
   const rolePreset = getRoleBoundPresetForCurrentContext();
   if (!rolePreset) {
+    const baseline = persistedState.value.role_override_baseline;
+    if (baseline) {
+      updatePersistedState(state => {
+        state.role_override_baseline = null;
+        state.last_global_preset_id = baseline.preset_id;
+      });
+      selectedGlobalPresetId.value = baseline.preset_id;
+      if (baseline.preset_id) {
+        const baselinePreset = globalWorldbookPresets.value.find(item => item.id === baseline.preset_id);
+        if (baselinePreset) {
+          await applyPresetWorldbooks(baselinePreset, {
+            statusPrefix: '已恢复角色切换前的预设',
+            silentWhenSame: true,
+          });
+        } else {
+          await applyGlobalWorldbooks(
+            baseline.worldbooks,
+            '已恢复角色切换前的全局世界书',
+          );
+        }
+      } else {
+        await applyGlobalWorldbooks(
+          baseline.worldbooks,
+          '已恢复角色切换前的全局世界书',
+        );
+      }
+    }
     return;
+  }
+  if (!persistedState.value.role_override_baseline) {
+    updatePersistedState(state => {
+      state.role_override_baseline = {
+        preset_id: selectedGlobalPresetId.value,
+        worldbooks: getCurrentGlobalWorldbookSet(),
+      };
+    });
   }
   selectedGlobalPresetId.value = rolePreset.id;
   await applyPresetWorldbooks(rolePreset, {
@@ -3648,11 +4716,17 @@ async function autoApplyRoleBoundPreset(): Promise<void> {
 }
 
 function onGlobalPresetSelectionChanged(): void {
+  closeRolePicker();
   if (!selectedGlobalPresetId.value) {
     updatePersistedState(state => {
       state.last_global_preset_id = '';
+      state.role_override_baseline = null;
     });
-    setStatus('已取消预设选择');
+    if (bindings.global.length) {
+      void applyGlobalWorldbooks([], '已切换到默认预设（清空全局世界书）');
+    } else {
+      setStatus('已切换到默认预设');
+    }
     return;
   }
   void applySelectedGlobalPreset();
@@ -3703,6 +4777,7 @@ function bindRoleCandidateToSelectedPreset(candidate: RoleBindingCandidate): voi
     return;
   }
   bindRoleToSelectedPreset(candidate);
+  closeRolePicker();
 }
 
 function removeRoleBindingFromSelectedPreset(bindingKey: string): void {
@@ -3821,11 +4896,27 @@ function closeWorldbookPicker(): void {
   worldbookPickerOpen.value = false;
 }
 
+function closeRolePicker(): void {
+  rolePickerOpen.value = false;
+}
+
 function openWorldbookPicker(): void {
   worldbookPickerSearchText.value = '';
   worldbookPickerOpen.value = true;
   void nextTick(() => {
     worldbookPickerSearchInputRef.value?.focus();
+  });
+}
+
+function openRolePicker(): void {
+  if (!selectedGlobalPreset.value) {
+    return;
+  }
+  roleBindSearchText.value = '';
+  refreshRoleBindingCandidates();
+  rolePickerOpen.value = true;
+  void nextTick(() => {
+    rolePickerSearchInputRef.value?.focus();
   });
 }
 
@@ -3837,6 +4928,35 @@ function toggleWorldbookPicker(): void {
   openWorldbookPicker();
 }
 
+function toggleRolePicker(): void {
+  if (rolePickerOpen.value) {
+    closeRolePicker();
+    return;
+  }
+  void openRolePicker();
+}
+
+function toggleTheme(): void {
+  const keys = Object.keys(THEMES) as ThemeKey[];
+  const index = keys.indexOf(currentTheme.value);
+  const nextIndex = (index + 1) % keys.length;
+  currentTheme.value = keys[nextIndex];
+  setStatus(`已切换主题: ${THEMES[currentTheme.value].name}`);
+}
+
+function setTheme(key: ThemeKey): void {
+  currentTheme.value = key;
+  themePickerOpen.value = false;
+  setStatus(`已切换主题: ${THEMES[key].label}`);
+}
+
+function onSetThemeEvent(event: Event): void {
+  const key = (event as CustomEvent).detail as string;
+  if (key && key in THEMES) {
+    setTheme(key as ThemeKey);
+  }
+}
+
 function selectWorldbookFromPicker(name: string): void {
   if (!name) {
     return;
@@ -3845,27 +4965,52 @@ function selectWorldbookFromPicker(name: string): void {
   closeWorldbookPicker();
 }
 
+function bindFirstRoleCandidate(): void {
+  const first = roleBindingCandidates.value.find(item => !item.bound);
+  if (!first) {
+    return;
+  }
+  bindRoleCandidateToSelectedPreset(first);
+}
+
 function onHostPointerDownForWorldbookPicker(event: PointerEvent): void {
-  if (!worldbookPickerOpen.value) {
+  if (!worldbookPickerOpen.value && !rolePickerOpen.value && !themePickerOpen.value) {
     return;
   }
-  const root = worldbookPickerRef.value;
   const target = event.target as Node | null;
-  if (!root || !target) {
+  if (!target) {
     closeWorldbookPicker();
+    closeRolePicker();
+    themePickerOpen.value = false;
     return;
   }
-  if (!root.contains(target)) {
-    closeWorldbookPicker();
+
+  if (worldbookPickerOpen.value) {
+    const worldbookRoot = worldbookPickerRef.value;
+    if (!worldbookRoot || !worldbookRoot.contains(target)) {
+      closeWorldbookPicker();
+    }
+  }
+
+  if (rolePickerOpen.value) {
+    const roleRoot = rolePickerRef.value;
+    if (!roleRoot || !roleRoot.contains(target)) {
+      closeRolePicker();
+    }
+  }
+
+  if (themePickerOpen.value) {
+    themePickerOpen.value = false;
   }
 }
 
 function onHostKeyDownForWorldbookPicker(event: KeyboardEvent): void {
-  if (!worldbookPickerOpen.value) {
+  if (!worldbookPickerOpen.value && !rolePickerOpen.value) {
     return;
   }
   if (event.key === 'Escape') {
     closeWorldbookPicker();
+    closeRolePicker();
   }
 }
 
@@ -3924,6 +5069,7 @@ async function hardRefresh(): Promise<void> {
   syncSelectedGlobalPresetFromState();
   await reloadWorldbookNames(selectedWorldbookName.value || undefined);
   await refreshBindings();
+  refreshRoleBindingCandidates();
   refreshCurrentRoleContext();
   await autoApplyRoleBoundPreset();
   if (globalWorldbookMode.value) {
@@ -4079,7 +5225,8 @@ function clampFloatingPanelToViewport(panel: FloatingPanelState): void {
 }
 
 function handleFloatingWindowResize(): void {
-  viewportWidth.value = resolveHostWindow().innerWidth;
+  const hostWin = resolveHostWindow();
+  viewportWidth.value = hostWin.innerWidth;
   clampPaneWidths();
   for (const key of floatingPanelKeys) {
     if (!floatingPanels[key].visible) {
@@ -4200,6 +5347,90 @@ function clampPaneWidths(): void {
   }
 }
 
+function startContentResize(e: PointerEvent): void {
+  e.preventDefault();
+  const textarea = contentTextareaRef.value;
+  if (!textarea) return;
+
+  const startY = e.clientY;
+  const startHeight = textarea.offsetHeight;
+  const target = e.currentTarget as HTMLElement;
+  target.setPointerCapture(e.pointerId);
+
+  // Disable textarea interaction during drag to reduce reflow
+  textarea.style.pointerEvents = 'none';
+  textarea.style.willChange = 'height';
+
+  let rafId = 0;
+  let pendingHeight = startHeight;
+
+  const applyHeight = () => {
+    textarea.style.height = `${pendingHeight}px`;
+    textarea.style.minHeight = `${pendingHeight}px`;
+    rafId = 0;
+  };
+
+  const onMove = (ev: PointerEvent) => {
+    pendingHeight = Math.max(120, startHeight + (ev.clientY - startY));
+    if (!rafId) {
+      rafId = requestAnimationFrame(applyHeight);
+    }
+  };
+
+  const onUp = () => {
+    if (rafId) cancelAnimationFrame(rafId);
+    applyHeight();
+    textarea.style.pointerEvents = '';
+    textarea.style.willChange = '';
+    target.removeEventListener('pointermove', onMove);
+    target.removeEventListener('pointerup', onUp);
+  };
+
+  target.addEventListener('pointermove', onMove);
+  target.addEventListener('pointerup', onUp);
+}
+
+const editorContentBlockRef = ref<HTMLElement | null>(null);
+let contentTopDragOffset = 0;
+
+function startContentTopDrag(e: PointerEvent): void {
+  e.preventDefault();
+  const block = editorContentBlockRef.value;
+  if (!block) return;
+
+  const startY = e.clientY;
+  const startOffset = contentTopDragOffset;
+  const target = e.currentTarget as HTMLElement;
+  target.setPointerCapture(e.pointerId);
+
+  let rafId = 0;
+  let pendingOffset = startOffset;
+
+  const apply = () => {
+    block.style.marginTop = `${-pendingOffset}px`;
+    rafId = 0;
+  };
+
+  const onMove = (ev: PointerEvent) => {
+    const delta = startY - ev.clientY; // positive = drag up
+    pendingOffset = Math.max(0, Math.min(400, startOffset + delta));
+    if (!rafId) {
+      rafId = requestAnimationFrame(apply);
+    }
+  };
+
+  const onUp = () => {
+    if (rafId) cancelAnimationFrame(rafId);
+    contentTopDragOffset = pendingOffset;
+    apply();
+    target.removeEventListener('pointermove', onMove);
+    target.removeEventListener('pointerup', onUp);
+  };
+
+  target.addEventListener('pointermove', onMove);
+  target.addEventListener('pointerup', onUp);
+}
+
 function startPaneResize(key: PaneResizeKey, event: PointerEvent): void {
   if (isCompactLayout.value) {
     return;
@@ -4284,7 +5515,45 @@ function onPanelDiscard(): void {
   discardUnsavedDraft();
 }
 
+const rootRef = ref<HTMLElement | null>(null);
+let _rootResizeObserver: ResizeObserver | null = null;
+let _mobileResizeHandler: (() => void) | null = null;
+
 onMounted(() => {
+  // Fix mobile height: compute exact pixel height based on viewport position
+  if (isMobile.value && rootRef.value) {
+    const hostWin = (() => { try { return window.parent || window; } catch { return window; } })();
+    const el = rootRef.value;
+
+    const syncHeight = () => {
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const vh = hostWin.innerHeight || window.innerHeight || 0;
+      const available = vh - rect.top;
+      if (available > 0) {
+        el.style.height = available + 'px';
+        el.style.maxHeight = available + 'px';
+        el.style.overflow = 'hidden';
+      }
+    };
+
+    // Initial + delayed (wait for layout)
+    syncHeight();
+    requestAnimationFrame(syncHeight);
+    setTimeout(syncHeight, 100);
+    setTimeout(syncHeight, 500);
+
+    // Respond to resize
+    _mobileResizeHandler = syncHeight;
+    hostWin.addEventListener('resize', syncHeight);
+
+    // Also observe parent just in case
+    const parent = el.parentElement;
+    if (parent) {
+      _rootResizeObserver = new ResizeObserver(syncHeight);
+      _rootResizeObserver.observe(parent);
+    }
+  }
   persistedState.value = readPersistedState();
   syncSelectedGlobalPresetFromState();
 
@@ -4302,6 +5571,7 @@ onMounted(() => {
     eventOn(tavern_events.CHAT_CHANGED, () => {
       void (async () => {
         await refreshBindings();
+        refreshRoleBindingCandidates();
         refreshCurrentRoleContext();
         await autoApplyRoleBoundPreset();
         if (globalWorldbookMode.value) {
@@ -4316,6 +5586,8 @@ onMounted(() => {
   window.addEventListener('wb-helper:refresh', onPanelRefresh);
   window.addEventListener('wb-helper:save', onPanelSave);
   window.addEventListener('wb-helper:discard', onPanelDiscard);
+  window.addEventListener('wb-helper:toggle-theme', toggleTheme);
+  window.addEventListener('wb-helper:set-theme', onSetThemeEvent);
   hostResizeWindow.value = resolveHostWindow();
   const hostDoc = hostResizeWindow.value.document;
   hostDoc.addEventListener('pointerdown', onHostPointerDownForWorldbookPicker, true);
@@ -4323,10 +5595,17 @@ onMounted(() => {
   hostResizeWindow.value.addEventListener('resize', handleFloatingWindowResize);
 
   handleFloatingWindowResize();
+  updateHostPanelTheme();
   void hardRefresh();
 });
 
 onUnmounted(() => {
+  _rootResizeObserver?.disconnect();
+  _rootResizeObserver = null;
+  if (_mobileResizeHandler) {
+    try { (window.parent || window).removeEventListener('resize', _mobileResizeHandler); } catch { /* ignore */ }
+    _mobileResizeHandler = null;
+  }
   const target = window as unknown as Record<string, unknown>;
   target[DIRTY_STATE_KEY] = false;
   subscriptions.forEach(subscription => {
@@ -4337,27 +5616,75 @@ onUnmounted(() => {
   window.removeEventListener('wb-helper:refresh', onPanelRefresh);
   window.removeEventListener('wb-helper:save', onPanelSave);
   window.removeEventListener('wb-helper:discard', onPanelDiscard);
+  window.removeEventListener('wb-helper:toggle-theme', toggleTheme);
+  window.removeEventListener('wb-helper:set-theme', onSetThemeEvent);
   hostResizeWindow.value?.document.removeEventListener('pointerdown', onHostPointerDownForWorldbookPicker, true);
   hostResizeWindow.value?.document.removeEventListener('keydown', onHostKeyDownForWorldbookPicker, true);
   hostResizeWindow.value?.removeEventListener('resize', handleFloatingWindowResize);
   hostResizeWindow.value = null;
+  _screenSyncCleanup?.();
+  _screenSyncCleanup = null;
 });
+
+function updateHostPanelTheme() {
+  const panel = document.getElementById('wb-assistant-panel');
+  if (!panel) return;
+  const theme = THEMES[currentTheme.value];
+  const colors = theme.colors;
+  
+  panel.style.setProperty('--wb-host-bg', colors['--wb-bg-root']);
+  panel.style.setProperty('--wb-host-header-bg', colors['--wb-bg-panel']);
+  panel.style.setProperty('--wb-host-border', colors['--wb-border-main']);
+  panel.style.setProperty('--wb-host-text', colors['--wb-text-main']);
+  panel.style.setProperty('--wb-host-tool-bg', colors['--wb-input-bg']);
+  panel.style.setProperty('--wb-host-tool-border', colors['--wb-border-subtle']);
+}
+
+watch(currentTheme, () => {
+  updateHostPanelTheme();
+});
+
+watch(hasUnsavedChanges, (val) => {
+  const panel = document.getElementById('wb-assistant-panel');
+  if (panel) {
+    const saveBtn = panel.querySelector('.wb-assistant-save');
+    if (saveBtn) {
+      if (val) {
+        saveBtn.classList.add('glow-pulse');
+      } else {
+        saveBtn.classList.remove('glow-pulse');
+      }
+    }
+  }
+}, { immediate: true });
 </script>
 
 <style scoped>
 .wb-assistant-root {
-  height: auto;
+  flex: 1;
+  min-height: 0;
   width: 100%;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   padding: 10px;
   gap: 10px;
-  background: linear-gradient(145deg, #0f172a 0%, #111827 45%, #1e293b 100%);
-  color: #e2e8f0;
+  background: var(--wb-bg-root);
+  color: var(--wb-text-main);
   font-size: 13px;
   line-height: 1.35;
   border-radius: 10px;
+  overflow: hidden;
+}
+
+
+.wb-scroll-area {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .wb-settings-wrapper {
@@ -4368,10 +5695,10 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border: 1px solid #334155;
-  border-radius: 10px;
-  padding: 8px 10px;
-  background: rgba(15, 23, 42, 0.6);
+  border-radius: 12px;
+  padding: 12px 16px;
+  background: var(--wb-bg-panel);
+  margin-bottom: 8px;
 }
 
 .wb-title {
@@ -4385,7 +5712,7 @@ onUnmounted(() => {
 }
 
 .wb-title span {
-  color: #94a3b8;
+  color: var(--wb-text-muted);
 }
 
 .wb-header-actions,
@@ -4398,20 +5725,19 @@ onUnmounted(() => {
 
 .wb-toolbar {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
   align-items: center;
-  border: 1px solid #334155;
-  border-radius: 10px;
-  padding: 8px;
-  background: rgba(15, 23, 42, 0.55);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--wb-bg-panel);
 }
 
 .toolbar-label {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #cbd5e1;
+  color: var(--wb-text-muted);
   min-width: 320px;
   flex: 1 1 520px;
 }
@@ -4433,11 +5759,11 @@ onUnmounted(() => {
 .worldbook-picker-trigger {
   width: 100%;
   box-sizing: border-box;
-  border: 1px solid #334155;
+  border: 1px solid transparent;
   border-radius: 8px;
   padding: 8px 10px;
-  background: #0f172a;
-  color: #f8fafc;
+  background: var(--wb-input-bg);
+  color: var(--wb-text-main);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -4446,7 +5772,7 @@ onUnmounted(() => {
 }
 
 .worldbook-picker-trigger:hover {
-  border-color: #38bdf8;
+  border-color: var(--wb-primary-light);
 }
 
 .worldbook-picker-trigger-text {
@@ -4458,7 +5784,7 @@ onUnmounted(() => {
 
 .worldbook-picker-trigger-arrow {
   flex-shrink: 0;
-  color: #94a3b8;
+  color: var(--wb-text-muted);
 }
 
 .worldbook-picker-dropdown {
@@ -4467,10 +5793,10 @@ onUnmounted(() => {
   right: 0;
   top: calc(100% + 6px);
   z-index: 10120;
-  border: 1px solid #334155;
+  border: 1px solid var(--wb-border-subtle);
   border-radius: 8px;
-  background: rgba(2, 6, 23, 0.98);
-  box-shadow: 0 12px 28px rgba(2, 6, 23, 0.72);
+  background: var(--wb-input-bg-focus);
+  box-shadow: var(--wb-shadow-main);
   padding: 8px;
   display: grid;
   gap: 8px;
@@ -4483,9 +5809,9 @@ onUnmounted(() => {
 .worldbook-picker-list {
   max-height: 260px;
   overflow: auto;
-  border: 1px solid #334155;
+  border: none;
   border-radius: 8px;
-  background: rgba(15, 23, 42, 0.62);
+  background: var(--wb-bg-panel);
   display: flex;
   flex-direction: column;
 }
@@ -4493,9 +5819,9 @@ onUnmounted(() => {
 .worldbook-picker-item {
   width: 100%;
   border: none;
-  border-bottom: 1px solid rgba(51, 65, 85, 0.62);
+  border-bottom: 1px solid var(--wb-border-subtle);
   background: transparent;
-  color: #e2e8f0;
+  color: var(--wb-text-main);
   padding: 8px 10px;
   text-align: left;
   cursor: pointer;
@@ -4506,21 +5832,20 @@ onUnmounted(() => {
 }
 
 .worldbook-picker-item:hover {
-  background: rgba(56, 189, 248, 0.15);
+  background: var(--wb-primary-soft);
 }
 
 .worldbook-picker-item.active {
-  background: rgba(59, 130, 246, 0.2);
-  color: #dbeafe;
+  background: var(--wb-primary-soft);
+  color: var(--wb-primary-light);
 }
 
 .wb-bindings {
-  border: 1px solid #334155;
-  border-radius: 10px;
-  padding: 8px;
+  border-radius: 12px;
+  padding: 12px;
   display: grid;
   gap: 8px;
-  background: rgba(15, 23, 42, 0.5);
+  background: var(--wb-bg-panel);
 }
 
 .wb-history-shortcuts {
@@ -4532,12 +5857,11 @@ onUnmounted(() => {
 }
 
 .global-mode-panel {
-  border: 1px solid #334155;
-  border-radius: 9px;
-  background: rgba(15, 23, 42, 0.58);
-  padding: 8px;
+  border-radius: 12px;
+  background: var(--wb-bg-panel);
+  padding: 12px;
   display: grid;
-  gap: 8px;
+  gap: 12px;
 }
 
 .global-mode-head {
@@ -4548,25 +5872,23 @@ onUnmounted(() => {
 }
 
 .global-mode-title {
-  color: #93c5fd;
+  color: var(--wb-primary-light);
   font-weight: 700;
   letter-spacing: 0.02em;
 }
 
 .global-preset-panel {
-  border: 1px solid #334155;
   border-radius: 8px;
-  background: rgba(2, 6, 23, 0.44);
-  padding: 8px;
+  background: var(--wb-bg-panel);
+  padding: 10px;
   display: grid;
   gap: 8px;
 }
 
 .preset-role-panel {
-  border: 1px solid #334155;
   border-radius: 8px;
-  background: rgba(15, 23, 42, 0.5);
-  padding: 8px;
+  background: var(--wb-bg-panel);
+  padding: 10px;
   display: grid;
   gap: 6px;
 }
@@ -4580,12 +5902,12 @@ onUnmounted(() => {
 }
 
 .preset-role-current {
-  color: #93c5fd;
+  color: var(--wb-primary);
   font-size: 12px;
 }
 
 .preset-role-current.empty {
-  color: #94a3b8;
+  color: var(--wb-text-muted);
 }
 
 .preset-role-actions {
@@ -4594,45 +5916,82 @@ onUnmounted(() => {
   flex-wrap: wrap;
 }
 
-.preset-role-picker {
-  border: 1px solid #334155;
-  border-radius: 8px;
-  background: rgba(2, 6, 23, 0.4);
-  padding: 6px 8px;
+.role-picker {
+  position: relative;
 }
 
-.preset-role-picker > summary {
+.role-picker-trigger {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--wb-input-bg);
+  color: var(--wb-text-main);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   cursor: pointer;
-  color: #cbd5e1;
-  font-size: 12px;
 }
 
-.preset-role-picker[open] > summary {
-  margin-bottom: 6px;
+.role-picker-trigger:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 
-.preset-role-picker-body {
-  display: grid;
-  gap: 6px;
+.role-picker-trigger:hover:not(:disabled) {
+  border-color: var(--wb-primary-light);
 }
 
-.preset-role-picker-list {
-  border: 1px solid #334155;
+.role-picker-trigger-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.role-picker-trigger-arrow {
+  flex-shrink: 0;
+  color: var(--wb-text-muted);
+}
+
+.role-picker-dropdown {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 10130;
+  border: 1px solid var(--wb-border-subtle);
   border-radius: 8px;
-  background: rgba(15, 23, 42, 0.65);
-  max-height: 180px;
+  background: var(--wb-input-bg-focus);
+  box-shadow: var(--wb-shadow-main);
+  padding: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+.role-picker-search {
+  width: 100%;
+}
+
+.role-picker-list {
+  border: none;
+  border-radius: 8px;
+  background: var(--wb-bg-panel);
+  max-height: 220px;
   overflow: auto;
   display: flex;
   flex-direction: column;
 }
 
-.preset-role-picker-item {
+.role-picker-item {
   width: 100%;
   border: none;
-  border-bottom: 1px solid rgba(51, 65, 85, 0.6);
+  border-bottom: 1px solid var(--wb-border-subtle);
   background: transparent;
-  color: #e2e8f0;
-  padding: 6px 8px;
+  color: var(--wb-text-main);
+  padding: 8px 10px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -4641,27 +6000,27 @@ onUnmounted(() => {
   cursor: pointer;
 }
 
-.preset-role-picker-item:last-child {
+.role-picker-item:last-child {
   border-bottom: none;
 }
 
-.preset-role-picker-item:hover:not(:disabled) {
-  background: rgba(56, 189, 248, 0.14);
+.role-picker-item:hover:not(:disabled) {
+  background: var(--wb-primary-soft);
 }
 
-.preset-role-picker-item:disabled {
+.role-picker-item:disabled {
   opacity: 0.55;
   cursor: default;
 }
 
-.preset-role-picker-item .name {
+.role-picker-item .name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.preset-role-picker-item .meta {
-  color: #93c5fd;
+.role-picker-item .meta {
+  color: var(--wb-primary-light);
   flex-shrink: 0;
   font-size: 11px;
 }
@@ -4673,10 +6032,10 @@ onUnmounted(() => {
 }
 
 .preset-role-tag {
-  border: 1px solid #475569;
+  border: 1px solid var(--wb-border-subtle);
   border-radius: 999px;
-  background: rgba(30, 41, 59, 0.72);
-  color: #e2e8f0;
+  background: var(--wb-bg-panel);
+  color: var(--wb-text-main);
   padding: 2px 10px;
   display: inline-flex;
   align-items: center;
@@ -4699,19 +6058,17 @@ onUnmounted(() => {
 }
 
 .global-mode-column {
-  border: 1px solid #334155;
   border-radius: 8px;
-  padding: 8px;
-  background: rgba(2, 6, 23, 0.42);
+  padding: 10px;
+  background: var(--wb-bg-panel);
   display: grid;
   gap: 6px;
   min-height: 168px;
 }
 
 .global-mode-list {
-  border: 1px solid #334155;
   border-radius: 8px;
-  background: rgba(15, 23, 42, 0.6);
+  background: var(--wb-input-bg);
   max-height: 176px;
   min-height: 88px;
   overflow: auto;
@@ -4722,9 +6079,9 @@ onUnmounted(() => {
 .global-mode-item {
   width: 100%;
   border: none;
-  border-bottom: 1px solid rgba(51, 65, 85, 0.6);
+  border-bottom: 1px solid var(--wb-border-subtle);
   background: transparent;
-  color: #e2e8f0;
+  color: var(--wb-text-main);
   padding: 7px 8px;
   display: flex;
   justify-content: space-between;
@@ -4739,7 +6096,7 @@ onUnmounted(() => {
 }
 
 .global-mode-item:hover {
-  background: rgba(56, 189, 248, 0.14);
+  background: var(--wb-primary-soft);
 }
 
 .global-mode-item.add .global-mode-item-action {
@@ -4761,6 +6118,37 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
+/* View Transitions */
+.mobile-tab-enter-active,
+.mobile-tab-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  width: 100%;
+  height: 100%;
+}
+.mobile-tab-enter-from {
+  opacity: 0;
+  transform: translateX(15px);
+}
+.mobile-tab-leave-to {
+  opacity: 0;
+  transform: translateX(-15px);
+}
+
+.desktop-content-enter-active,
+.desktop-content-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.desktop-content-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.desktop-content-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
 .global-mode-actions {
   display: flex;
   gap: 6px;
@@ -4768,24 +6156,24 @@ onUnmounted(() => {
 }
 
 .history-btn {
-  border-color: #3b82f6;
-  background: rgba(30, 58, 138, 0.25);
+  border-color: var(--wb-primary);
+  background: var(--wb-primary-soft);
 }
 
 .utility-btn {
-  border-color: #0ea5e9;
-  background: rgba(6, 78, 118, 0.25);
+  border-color: var(--wb-primary-light);
+  background: var(--wb-primary-soft);
 }
 
 .utility-btn.active {
-  border-color: #22d3ee;
-  background: rgba(34, 211, 238, 0.16);
-  color: #67e8f9;
+  border-color: var(--wb-primary-light);
+  background: var(--wb-primary-soft);
+  color: var(--wb-primary-light);
 }
 
 .wb-main-layout {
-  min-height: 460px;
-  max-height: 70vh;
+  flex: 1;
+  min-height: 60vh;
   display: grid;
   grid-template-columns: 320px 10px minmax(0, 1fr);
   gap: 0;
@@ -4793,24 +6181,25 @@ onUnmounted(() => {
 
 .wb-entry-list,
 .wb-editor {
-  border: 1px solid #334155;
-  border-radius: 10px;
-  padding: 8px;
+  border-radius: 12px;
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  background: rgba(15, 23, 42, 0.55);
+  background: transparent;
   min-height: 0;
 }
 
 .list-search {
   display: grid;
   gap: 6px;
+  padding: 0 8px;
 }
 
 .list-summary {
-  color: #94a3b8;
+  color: var(--wb-text-muted);
   font-size: 12px;
+  padding: 0 8px;
 }
 
 .list-scroll {
@@ -4826,16 +6215,17 @@ onUnmounted(() => {
 .entry-item {
   width: 100%;
   text-align: left;
-  border: 1px solid #334155;
-  background: linear-gradient(145deg, rgba(15, 23, 42, 0.88), rgba(2, 6, 23, 0.9));
-  color: #e2e8f0;
+  border: none;
+  background: transparent;
+  color: var(--wb-text-main);
   border-radius: 8px;
-  padding: 8px 8px 7px 10px;
+  padding: 10px 12px 10px 14px;
   cursor: pointer;
   display: grid;
   gap: 6px;
   position: relative;
-  transition: border-color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
+  transition: background-color 0.15s ease;
+  margin-bottom: 4px;
 }
 
 .entry-item::before {
@@ -4866,13 +6256,13 @@ onUnmounted(() => {
 }
 
 .entry-item:hover {
-  border-color: #475569;
-  transform: translateY(-1px);
+  background: var(--wb-primary-hover);
+  transform: none;
 }
 
 .entry-item.selected {
-  border-color: #38bdf8;
-  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.5) inset, 0 6px 16px rgba(14, 116, 144, 0.3);
+  background: var(--wb-primary-soft);
+  box-shadow: none;
 }
 
 .entry-item.disabled {
@@ -4892,7 +6282,7 @@ onUnmounted(() => {
   border-radius: 999px;
   background: #64748b;
   flex-shrink: 0;
-  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.85);
+  box-shadow: 0 0 0 2px var(--wb-bg-panel);
 }
 
 .entry-status-dot[data-status='constant'] {
@@ -4930,16 +6320,16 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  border: 1px solid #334155;
+  border: none;
   border-radius: 999px;
-  padding: 1px 8px;
-  color: #cbd5e1;
+  padding: 2px 8px;
+  color: var(--wb-text-muted);
   font-size: 11px;
-  background: rgba(15, 23, 42, 0.55);
+  background: var(--wb-bg-panel);
 }
 
 .entry-chip.uid {
-  color: #93c5fd;
+  color: var(--wb-primary-light);
   font-size: 10px;
   padding: 1px 7px;
 }
@@ -4950,31 +6340,27 @@ onUnmounted(() => {
 }
 
 .entry-chip.status[data-status='constant'] {
-  border-color: rgba(59, 130, 246, 0.65);
   color: #93c5fd;
   background: rgba(59, 130, 246, 0.16);
 }
 
 .entry-chip.status[data-status='vector'] {
-  border-color: rgba(168, 85, 247, 0.65);
   color: #d8b4fe;
   background: rgba(168, 85, 247, 0.16);
 }
 
 .entry-chip.status[data-status='normal'] {
-  border-color: rgba(34, 197, 94, 0.65);
   color: #86efac;
   background: rgba(34, 197, 94, 0.16);
 }
 
 .entry-chip.status[data-status='disabled'] {
-  border-color: rgba(107, 114, 128, 0.7);
   color: #cbd5e1;
   background: rgba(100, 116, 139, 0.15);
 }
 
 .entry-item-preview {
-  color: #94a3b8;
+  color: var(--wb-text-muted);
   font-size: 11px;
   white-space: nowrap;
   overflow: hidden;
@@ -4985,7 +6371,7 @@ onUnmounted(() => {
 
 .entry-item-preview::before {
   content: 'Keys: ';
-  color: #64748b;
+  color: var(--wb-text-muted);
   margin-right: 4px;
 }
 
@@ -5018,20 +6404,20 @@ onUnmounted(() => {
   bottom: 12px;
   width: 2px;
   border-radius: 999px;
-  background: rgba(100, 116, 139, 0.5);
+  background: var(--wb-primary-hover);
   transition: background-color 0.15s ease;
 }
 
 .wb-resize-handle:hover::before,
 .wb-resize-handle.dragging::before {
-  background: rgba(56, 189, 248, 0.95);
+  background: var(--wb-primary-light);
 }
 
 .editor-center {
-  border: 1px solid #1e293b;
-  border-radius: 10px;
-  background: rgba(2, 6, 23, 0.7);
-  padding: 10px;
+  border: none;
+  border-radius: 12px;
+  background: var(--wb-bg-panel);
+  padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -5044,8 +6430,8 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 10px;
   align-items: flex-end;
-  border-bottom: 1px solid #1e293b;
-  padding-bottom: 8px;
+  border-bottom: 1px solid var(--wb-border-subtle);
+  padding-bottom: 12px;
 }
 
 .editor-comment {
@@ -5061,11 +6447,11 @@ onUnmounted(() => {
 
 .editor-badge {
   font-size: 10px;
-  border: 1px solid #334155;
+  border: none;
   border-radius: 999px;
   padding: 2px 8px;
-  color: #94a3b8;
-  background: rgba(15, 23, 42, 0.72);
+  color: var(--wb-text-muted);
+  background: var(--wb-bg-panel);
   white-space: nowrap;
 }
 
@@ -5074,33 +6460,33 @@ onUnmounted(() => {
 }
 
 .editor-badge.on {
-  border-color: rgba(34, 197, 94, 0.65);
   color: #86efac;
+  background: rgba(34, 197, 94, 0.12);
 }
 
 .editor-badge.off {
-  border-color: rgba(107, 114, 128, 0.75);
   color: #cbd5e1;
+  background: rgba(100, 116, 139, 0.15);
 }
 
 .editor-badge.strategy[data-status='constant'] {
-  border-color: rgba(59, 130, 246, 0.65);
   color: #93c5fd;
+  background: rgba(59, 130, 246, 0.12);
 }
 
 .editor-badge.strategy[data-status='vector'] {
-  border-color: rgba(168, 85, 247, 0.65);
   color: #d8b4fe;
+  background: rgba(168, 85, 247, 0.12);
 }
 
 .editor-badge.strategy[data-status='normal'] {
-  border-color: rgba(34, 197, 94, 0.65);
   color: #86efac;
+  background: rgba(34, 197, 94, 0.12);
 }
 
 .editor-badge.strategy[data-status='disabled'] {
-  border-color: rgba(107, 114, 128, 0.75);
   color: #cbd5e1;
+  background: rgba(100, 116, 139, 0.12);
 }
 
 .editor-keyword-grid .text-area.compact {
@@ -5119,7 +6505,7 @@ onUnmounted(() => {
 
 .editor-content-title {
   font-size: 12px;
-  color: #93c5fd;
+  color: var(--wb-primary-light);
   letter-spacing: 0.01em;
 }
 
@@ -5130,17 +6516,36 @@ onUnmounted(() => {
   line-height: 1.5;
 }
 
+.content-resize-handle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  cursor: ns-resize;
+  background: var(--wb-bg-panel);
+  border-radius: 0 0 8px 8px;
+  touch-action: none;
+  user-select: none;
+}
+
+.content-resize-grip {
+  font-size: 12px;
+  color: var(--wb-text-dim);
+  letter-spacing: 3px;
+  line-height: 1;
+}
+
 .editor-advanced {
-  border: 1px solid #334155;
+  border: none;
   border-radius: 8px;
-  padding: 7px;
-  background: rgba(15, 23, 42, 0.4);
+  padding: 10px;
+  background: var(--wb-input-bg);
 }
 
 .editor-advanced > summary {
   cursor: pointer;
   font-size: 12px;
-  color: #cbd5e1;
+  color: var(--wb-text-muted);
 }
 
 .editor-advanced[open] > summary {
@@ -5156,10 +6561,10 @@ onUnmounted(() => {
 }
 
 .editor-card {
-  border: 1px solid #334155;
-  border-radius: 10px;
-  padding: 8px;
-  background: rgba(15, 23, 42, 0.7);
+  border: none;
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--wb-bg-panel);
   display: grid;
   gap: 7px;
 }
@@ -5167,7 +6572,7 @@ onUnmounted(() => {
 .editor-card h4 {
   margin: 0;
   font-size: 12px;
-  color: #f59e0b;
+  color: var(--wb-primary);
 }
 
 .strategy-switch {
@@ -5176,34 +6581,32 @@ onUnmounted(() => {
 }
 
 .strategy-pill {
-  border: 1px solid #334155;
-  border-radius: 8px;
-  background: rgba(15, 23, 42, 0.7);
-  color: #cbd5e1;
-  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: var(--wb-input-bg);
+  color: var(--wb-text-muted);
+  padding: 6px 10px;
   font-size: 12px;
   cursor: pointer;
   text-align: left;
+  transition: background-color 0.15s ease;
 }
 
 .strategy-pill:hover {
-  border-color: #475569;
+  background: var(--wb-primary-hover);
 }
 
 .strategy-pill.active.constant {
-  border-color: rgba(59, 130, 246, 0.8);
   background: rgba(59, 130, 246, 0.16);
   color: #93c5fd;
 }
 
 .strategy-pill.active.vector {
-  border-color: rgba(168, 85, 247, 0.8);
   background: rgba(168, 85, 247, 0.16);
   color: #d8b4fe;
 }
 
 .strategy-pill.active.selective {
-  border-color: rgba(34, 197, 94, 0.8);
   background: rgba(34, 197, 94, 0.16);
   color: #86efac;
 }
@@ -5228,7 +6631,7 @@ onUnmounted(() => {
 }
 
 .field > span {
-  color: #93c5fd;
+  color: var(--wb-primary-light);
 }
 
 .field.disabled {
@@ -5250,11 +6653,27 @@ onUnmounted(() => {
 .toolbar-select {
   width: 100%;
   box-sizing: border-box;
-  border: 1px solid #334155;
-  border-radius: 7px;
-  padding: 6px 8px;
-  color: #f8fafc;
-  background: #0f172a;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: var(--wb-text-main);
+  background: var(--wb-input-bg);
+  transition: all 0.2s ease;
+}
+
+.text-input:hover,
+.text-area:hover,
+.toolbar-select:hover {
+  background: var(--wb-input-bg-hover);
+}
+
+.text-input:focus,
+.text-area:focus,
+.toolbar-select:focus {
+  background: var(--wb-input-bg-focus);
+  border-color: var(--wb-primary-glow);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--wb-primary-soft);
 }
 
 .text-area {
@@ -5283,20 +6702,19 @@ onUnmounted(() => {
 }
 
 .tool-card {
-  border: 1px solid #334155;
   border-radius: 10px;
-  padding: 8px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   min-height: 170px;
-  background: rgba(15, 23, 42, 0.45);
+  background: var(--wb-bg-panel);
 }
 
 .tool-card h4 {
   margin: 0;
   font-size: 13px;
-  color: #93c5fd;
+  color: var(--wb-primary-light);
 }
 
 .tool-line.stacked {
@@ -5319,26 +6737,26 @@ onUnmounted(() => {
 
 .find-summary-text {
   margin-left: auto;
-  color: #93c5fd;
+  color: var(--wb-primary-light);
   font-size: 12px;
 }
 
 .find-active-hit {
-  border: 1px solid #334155;
+  border: 1px solid var(--wb-border-main);
   border-radius: 7px;
   padding: 6px 8px;
   display: grid;
   gap: 2px;
-  background: rgba(2, 6, 23, 0.45);
+  background: var(--wb-bg-panel);
 }
 
 .find-active-hit strong {
-  color: #cbd5e1;
+  color: var(--wb-text-main);
   font-size: 12px;
 }
 
 .find-active-hit span {
-  color: #94a3b8;
+  color: var(--wb-text-muted);
   font-size: 11px;
   white-space: nowrap;
   overflow: hidden;
@@ -5346,7 +6764,7 @@ onUnmounted(() => {
 }
 
 .batch-exclude-note {
-  color: #94a3b8;
+  color: var(--wb-text-muted);
   font-size: 11px;
 }
 
@@ -5357,24 +6775,24 @@ onUnmounted(() => {
 }
 
 .exclude-chip {
-  border: 1px solid #475569;
+  border: 1px solid var(--wb-border-subtle);
   border-radius: 999px;
   padding: 1px 8px;
   font-size: 11px;
-  color: #cbd5e1;
-  background: rgba(15, 23, 42, 0.6);
+  color: var(--wb-text-main);
+  background: var(--wb-bg-panel);
 }
 
 .tool-details {
-  border: 1px solid #334155;
+  border: 1px solid var(--wb-border-main);
   border-radius: 8px;
   padding: 6px;
-  background: rgba(15, 23, 42, 0.35);
+  background: var(--wb-bg-panel);
 }
 
 .tool-details > summary {
   cursor: pointer;
-  color: #cbd5e1;
+  color: var(--wb-text-main);
   font-size: 12px;
 }
 
@@ -5394,32 +6812,32 @@ onUnmounted(() => {
 }
 
 .history-preview-card {
-  border: 1px solid #334155;
+  border: 1px solid var(--wb-border-main);
   border-radius: 8px;
   padding: 6px;
   display: grid;
   gap: 3px;
-  background: rgba(2, 6, 23, 0.48);
+  background: var(--wb-bg-panel);
 }
 
 .history-preview-card strong {
-  color: #93c5fd;
+  color: var(--wb-primary-light);
   font-size: 11px;
 }
 
 .history-preview-card span {
-  color: #94a3b8;
+  color: var(--wb-text-muted);
   font-size: 11px;
   line-height: 1.35;
 }
 
 .history-note {
-  border: 1px dashed #334155;
+  border: 1px dashed var(--wb-border-main);
   border-radius: 8px;
   padding: 6px;
-  color: #94a3b8;
+  color: var(--wb-text-muted);
   font-size: 11px;
-  background: rgba(15, 23, 42, 0.32);
+  background: var(--wb-bg-panel);
 }
 
 .tool-scroll {
@@ -5430,13 +6848,13 @@ onUnmounted(() => {
 }
 
 .tool-list-item {
-  border: 1px solid #334155;
   border-radius: 8px;
-  padding: 6px;
+  padding: 8px;
   display: flex;
   justify-content: space-between;
   gap: 8px;
   align-items: center;
+  background: var(--wb-input-bg);
 }
 
 .item-main {
@@ -5454,7 +6872,7 @@ onUnmounted(() => {
 }
 
 .item-main span {
-  color: #94a3b8;
+  color: var(--wb-text-muted);
   font-size: 12px;
 }
 
@@ -5464,11 +6882,11 @@ onUnmounted(() => {
 }
 
 .activation-item {
-  border: 1px solid #334155;
   border-radius: 8px;
-  padding: 6px;
+  padding: 8px;
   display: grid;
   gap: 3px;
+  background: var(--wb-input-bg);
 }
 
 .activation-main,
@@ -5480,7 +6898,7 @@ onUnmounted(() => {
 
 .activation-main span,
 .activation-sub {
-  color: #94a3b8;
+  color: var(--wb-text-muted);
   font-size: 12px;
 }
 
@@ -5496,10 +6914,10 @@ onUnmounted(() => {
   position: fixed;
   max-width: calc(100vw - 16px);
   max-height: min(74vh, 760px);
-  border: 1px solid #334155;
+  border: 1px solid var(--wb-border-subtle);
   border-radius: 10px;
-  background: linear-gradient(155deg, rgba(2, 6, 23, 0.95), rgba(15, 23, 42, 0.95));
-  box-shadow: 0 14px 36px rgba(2, 6, 23, 0.7);
+  background: var(--wb-bg-root);
+  box-shadow: var(--wb-shadow-main);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -5511,8 +6929,8 @@ onUnmounted(() => {
   gap: 8px;
   align-items: center;
   padding: 8px 10px;
-  border-bottom: 1px solid #334155;
-  background: rgba(15, 23, 42, 0.9);
+  border-bottom: 1px solid var(--wb-border-subtle);
+  background: var(--wb-bg-panel);
   cursor: move;
   user-select: none;
   touch-action: none;
@@ -5520,7 +6938,7 @@ onUnmounted(() => {
 
 .wb-floating-header strong {
   font-size: 12px;
-  color: #cbd5e1;
+  color: var(--wb-text-main);
 }
 
 .wb-floating-header-actions {
@@ -5546,28 +6964,53 @@ onUnmounted(() => {
 }
 
 .wb-status {
-  border: 1px solid #334155;
   border-radius: 10px;
-  background: rgba(15, 23, 42, 0.52);
-  padding: 8px;
+  background: var(--wb-bg-panel);
+  padding: 10px 12px;
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  color: #cbd5e1;
+  color: var(--wb-text-main);
   flex-wrap: wrap;
+  transition: all 0.3s ease;
+}
+
+@keyframes wb-status-pulse {
+  0% { opacity: 0.8; box-shadow: 0 0 0 rgba(250, 204, 21, 0); }
+  50% { opacity: 1; color: #facc15; box-shadow: 0 0 12px rgba(250, 204, 21, 0.2); }
+  100% { opacity: 0.8; box-shadow: 0 0 0 rgba(250, 204, 21, 0); }
+}
+
+.wb-status.has-unsaved {
+  animation: wb-status-pulse 2s infinite ease-in-out;
+  border: 1px solid rgba(250, 204, 21, 0.4);
 }
 
 .btn {
-  border: 1px solid #475569;
-  background: #1e293b;
-  color: #f8fafc;
+  border: 1px solid var(--wb-border-main);
+  background: var(--wb-bg-panel);
+  color: var(--wb-text-main);
   border-radius: 7px;
   padding: 5px 10px;
   cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+@keyframes wb-btn-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.4); border-color: rgba(52, 211, 153, 0.6); }
+  70% { box-shadow: 0 0 0 4px rgba(52, 211, 153, 0); border-color: rgba(52, 211, 153, 1); }
+  100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); border-color: rgba(52, 211, 153, 0.6); }
+}
+
+.btn.glow-pulse {
+  animation: wb-btn-pulse 2s infinite ease-out;
+  border-color: #34d399;
+  color: #34d399;
+  font-weight: 500;
 }
 
 .btn:hover:not(:disabled) {
-  border-color: #38bdf8;
+  border-color: var(--wb-primary-light);
 }
 
 .btn:disabled {
@@ -5576,13 +7019,14 @@ onUnmounted(() => {
 }
 
 .btn.primary {
-  background: #0c4a6e;
-  border-color: #0284c7;
+  background: var(--wb-primary-soft);
+  border-color: var(--wb-primary);
 }
 
 .btn.danger {
-  background: #4c0519;
+  background: rgba(225, 29, 72, 0.12);
   border-color: #e11d48;
+  color: #e11d48;
 }
 
 .btn.mini {
@@ -5592,13 +7036,13 @@ onUnmounted(() => {
 
 .empty-note,
 .empty-block {
-  color: #94a3b8;
+  color: var(--wb-text-muted);
   font-size: 12px;
 }
 
 .empty-block {
   padding: 14px;
-  border: 1px dashed #475569;
+  border: 1px dashed var(--wb-border-main);
   border-radius: 8px;
 }
 
@@ -5609,24 +7053,26 @@ onUnmounted(() => {
 .wb-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(2, 6, 23, 0.72);
+  background: rgba(0, 0, 0, 0.55);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 10020;
   padding: 14px;
+  box-sizing: border-box;
 }
 
 .wb-history-modal {
   width: min(1260px, 100%);
-  height: min(88vh, 940px);
-  border: 1px solid #334155;
+  max-height: min(88vh, 940px);
+  border: 1px solid var(--wb-border-main);
   border-radius: 12px;
-  background: linear-gradient(155deg, #0b1325, #020617);
-  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.55);
+  background: var(--wb-bg-root);
+  box-shadow: var(--wb-shadow-main);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .wb-history-modal-header {
@@ -5635,8 +7081,8 @@ onUnmounted(() => {
   gap: 8px;
   align-items: center;
   padding: 10px 12px;
-  border-bottom: 1px solid #334155;
-  background: rgba(15, 23, 42, 0.85);
+  border-bottom: 1px solid var(--wb-border-main);
+  background: var(--wb-bg-panel);
 }
 
 .wb-history-modal-header strong {
@@ -5645,7 +7091,7 @@ onUnmounted(() => {
 }
 
 .wb-history-modal-header span {
-  color: #94a3b8;
+  color: var(--wb-text-muted);
   font-size: 11px;
 }
 
@@ -5664,8 +7110,8 @@ onUnmounted(() => {
 }
 
 .wb-history-versions {
-  border-right: 1px solid #334155;
-  background: rgba(15, 23, 42, 0.8);
+  border-right: 1px solid var(--wb-border-main);
+  background: var(--wb-bg-panel);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -5674,8 +7120,8 @@ onUnmounted(() => {
 .wb-history-versions-title {
   padding: 8px 10px;
   font-size: 11px;
-  color: #94a3b8;
-  border-bottom: 1px solid #334155;
+  color: var(--wb-text-muted);
+  border-bottom: 1px solid var(--wb-border-main);
 }
 
 .wb-history-versions-scroll {
@@ -5689,12 +7135,12 @@ onUnmounted(() => {
 }
 
 .wb-history-version-item {
-  border: 1px solid #334155;
+  border: 1px solid var(--wb-border-main);
   border-radius: 8px;
   padding: 6px;
   display: grid;
   gap: 4px;
-  background: rgba(15, 23, 42, 0.56);
+  background: var(--wb-bg-panel);
 }
 
 .wb-history-version-line {
@@ -5706,12 +7152,12 @@ onUnmounted(() => {
 
 .wb-history-version-line strong {
   font-size: 11px;
-  color: #cbd5e1;
+  color: var(--wb-text-main);
 }
 
 .wb-history-version-item span {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--wb-text-muted);
   word-break: break-all;
 }
 
@@ -5721,9 +7167,9 @@ onUnmounted(() => {
 }
 
 .mini-lr {
-  border: 1px solid #475569;
-  background: #0f172a;
-  color: #94a3b8;
+  border: 1px solid var(--wb-border-main);
+  background: var(--wb-input-bg);
+  color: var(--wb-text-muted);
   border-radius: 6px;
   min-width: 24px;
   font-size: 10px;
@@ -5737,20 +7183,22 @@ onUnmounted(() => {
 
 .wb-history-diff-wrap {
   min-height: 0;
+  flex: 1;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .wb-history-diff-head {
-  border-bottom: 1px solid #334155;
-  background: rgba(15, 23, 42, 0.58);
+  border-bottom: 1px solid var(--wb-border-main);
+  background: var(--wb-bg-panel);
   padding: 8px 10px;
   display: flex;
   justify-content: space-between;
   gap: 8px;
   align-items: center;
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--wb-text-muted);
 }
 
 .wb-history-diff-grid {
@@ -5762,19 +7210,21 @@ onUnmounted(() => {
 
 .wb-history-diff-grid > div {
   min-height: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .wb-history-diff-grid > div + div {
-  border-left: 1px solid #334155;
+  border-left: 1px solid var(--wb-border-main);
 }
 
 .wb-history-diff-title {
   padding: 8px 10px;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid var(--wb-border-main);
   font-size: 11px;
-  color: #93c5fd;
+  color: var(--wb-primary-light);
 }
 
 .wb-history-diff-body {
@@ -5783,20 +7233,22 @@ onUnmounted(() => {
   overflow: auto;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
   font-size: 11px;
-  background: rgba(2, 6, 23, 0.9);
+  background: var(--wb-input-bg-focus);
+  word-break: break-all;
+  overflow-wrap: break-word;
 }
 
 .diff-row {
   display: grid;
   grid-template-columns: 54px 1fr;
   align-items: start;
-  border-bottom: 1px solid rgba(51, 65, 85, 0.25);
+  border-bottom: 1px solid var(--wb-border-subtle);
 }
 
 .line-no {
-  color: #64748b;
+  color: var(--wb-text-muted);
   padding: 2px 8px;
-  border-right: 1px solid rgba(51, 65, 85, 0.35);
+  border-right: 1px solid var(--wb-border-subtle);
   user-select: none;
 }
 
@@ -5804,7 +7256,7 @@ onUnmounted(() => {
   white-space: pre-wrap;
   word-break: break-word;
   padding: 2px 8px;
-  color: #cbd5e1;
+  color: var(--wb-text-main);
 }
 
 .diff-row.add {
@@ -5835,8 +7287,92 @@ onUnmounted(() => {
 
   .wb-history-versions {
     border-right: none;
-    border-bottom: 1px solid #334155;
-    max-height: 240px;
+    border-bottom: 1px solid var(--wb-border-main);
+    max-height: 120px;
+  }
+
+  .wb-modal-backdrop {
+    padding: 2px;
+  }
+
+  .wb-history-modal {
+    width: 100%;
+    max-height: calc(100vh - 4px);
+    height: calc(100vh - 4px);
+    border-radius: 6px;
+  }
+
+  .wb-history-modal-header {
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 6px 8px;
+    flex-shrink: 0;
+  }
+
+  .wb-history-modal-header strong {
+    font-size: 12px;
+  }
+
+  .wb-history-modal-header > div:first-child span {
+    display: none;
+  }
+
+  .wb-history-modal-actions {
+    gap: 4px;
+  }
+
+  .wb-history-modal-actions .btn {
+    font-size: 10px;
+    padding: 3px 6px;
+  }
+
+  .wb-history-modal-main {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .wb-history-diff-wrap {
+    overflow-y: auto;
+    min-height: 0;
+  }
+
+  .wb-history-diff-grid {
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
+
+  .wb-history-diff-grid > div {
+    max-height: 30vh;
+    overflow: auto;
+  }
+
+  .wb-history-diff-grid > div + div {
+    border-left: none;
+    border-top: 1px solid var(--wb-border-main);
+  }
+
+  .diff-row {
+    grid-template-columns: 1fr;
+  }
+
+  .line-no {
+    display: none;
+  }
+
+  .wb-history-diff-body {
+    font-size: 10px;
+  }
+
+  .wb-history-diff-head {
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 6px 8px;
+  }
+
+  .wb-history-diff-head > div {
+    font-size: 10px;
   }
 }
 
@@ -5881,12 +7417,13 @@ onUnmounted(() => {
 
   .wb-history-diff-grid > div + div {
     border-left: none;
-    border-top: 1px solid #334155;
+    border-top: 1px solid var(--wb-border-main);
   }
 
   .wb-status {
     flex-direction: column;
   }
+
 
   .wb-floating-window {
     width: calc(100vw - 16px) !important;
@@ -5894,4 +7431,783 @@ onUnmounted(() => {
     right: 8px;
   }
 }
+
+.editor-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  margin: 0 0 8px 0;
+  background: var(--wb-bg-panel);
+  border: none;
+  border-radius: 6px;
+  color: var(--wb-primary);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.editor-back-btn:hover {
+  background: var(--wb-primary-hover);
+}
+
+/* ═══ Mobile Tab View ═══ */
+.mobile-tab-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.mobile-tab-content {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.mobile-pane {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  padding: 8px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mobile-entry-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mobile-ai-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.mobile-ai-panel .ai-chat-area {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mobile-danger-zone {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--wb-border);
+}
+
+.mobile-danger-zone .btn {
+  flex: 1;
+}
+
+.mobile-tab-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 10100;
+  display: flex;
+  border-top: 1px solid var(--wb-border);
+  background: var(--wb-bg-secondary);
+  height: 52px;
+}
+
+.mobile-tab-bar button {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: none;
+  background: transparent;
+  color: var(--wb-text-dim);
+  font-size: 10px;
+  padding: 4px 0;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-tab-bar button.active {
+  color: var(--wb-accent);
+  background: color-mix(in srgb, var(--wb-accent) 8%, transparent);
+}
+
+.mobile-tab-bar .tab-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.mobile-tab-bar .tab-label {
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .wb-assistant-root {
+    padding: 6px;
+    gap: 8px;
+  }
+
+  .wb-header,
+  .wb-bindings,
+  .global-mode-panel,
+  .wb-toolbar {
+    padding: 6px;
+    gap: 6px;
+  }
+
+  .toolbar-label {
+    min-width: 100%;
+  }
+
+  .toolbar-select {
+    width: 100%;
+  }
+
+  .worldbook-picker-trigger {
+    white-space: normal;
+  }
+
+  .wb-main-layout {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .wb-entry-list,
+  .wb-editor,
+  .wb-editor-shell,
+  .editor-side {
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    border: none !important;
+    padding: 0 !important;
+  }
+
+  .wb-entry-list {
+    max-height: 80vh !important;
+    overflow-y: auto;
+  }
+
+  .wb-editor-shell {
+    display: block !important;
+  }
+
+  .list-scroll {
+    max-height: 60vh;
+  }
+
+  .wb-floating-window {
+    left: 8px !important;
+    right: 8px !important;
+    width: auto !important;
+    max-width: none !important;
+  }
+}
+
+.list-actions {
+  padding: 0 8px;
+}
+
+/* ─────────────────────────────────────────────────
+   Override: Force theme colors on native form elements
+   This beats SillyTavern global dark CSS which sets
+   background/color on textarea, input, select, etc.
+   ───────────────────────────────────────────────── */
+.wb-assistant-root input,
+.wb-assistant-root textarea,
+.wb-assistant-root select,
+.wb-assistant-root option,
+.wb-assistant-root button {
+  color: var(--wb-text-main) !important;
+}
+
+.wb-assistant-root input[type="text"],
+.wb-assistant-root input[type="number"],
+.wb-assistant-root textarea,
+.wb-assistant-root select {
+  background: var(--wb-input-bg) !important;
+  border-color: transparent !important;
+}
+
+.wb-assistant-root input[type="text"]:hover,
+.wb-assistant-root input[type="number"]:hover,
+.wb-assistant-root textarea:hover,
+.wb-assistant-root select:hover {
+  background: var(--wb-input-bg-hover) !important;
+}
+
+.wb-assistant-root input[type="text"]:focus,
+.wb-assistant-root input[type="number"]:focus,
+.wb-assistant-root textarea:focus,
+.wb-assistant-root select:focus {
+  background: var(--wb-input-bg-focus) !important;
+  border-color: var(--wb-primary-glow) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px var(--wb-primary-soft) !important;
+}
+/* ═════════════════════════════════════════════════
+   AI Generator Panel
+   ═════════════════════════════════════════════════ */
+.ai-generator-panel {
+  display: flex;
+  gap: 0;
+  flex: 1;
+  min-height: 0;
+  border-radius: var(--wb-radius);
+  overflow: hidden;
+  background: var(--wb-bg-secondary);
+}
+
+/* ── Sidebar ── */
+.ai-sidebar {
+  width: 220px;
+  min-width: 180px;
+  border-right: 1px solid var(--wb-border);
+  display: flex;
+  flex-direction: column;
+  background: var(--wb-bg-main);
+}
+
+.ai-sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--wb-border);
+}
+
+.ai-sidebar-title {
+  font-weight: 600;
+  font-size: 0.9em;
+  color: var(--wb-text-main);
+}
+
+.ai-session-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.ai-session-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  width: 100%;
+  padding: 8px 10px;
+  margin-bottom: 2px;
+  border: none;
+  border-radius: var(--wb-radius-sm, 6px);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+  position: relative;
+}
+
+.ai-session-item:hover {
+  background: var(--wb-bg-highlight);
+}
+
+.ai-session-item.active {
+  background: var(--wb-primary-soft);
+}
+
+.ai-session-title {
+  flex: 1;
+  font-size: 0.85em;
+  color: var(--wb-text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ai-session-meta {
+  font-size: 0.72em;
+  color: var(--wb-text-dim);
+  width: 100%;
+  margin-top: 2px;
+}
+
+.ai-session-delete {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--wb-text-dim);
+  font-size: 1em;
+  cursor: pointer;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.ai-session-item:hover .ai-session-delete {
+  opacity: 1;
+}
+
+.ai-session-delete:hover {
+  background: var(--wb-danger, #e74c3c);
+  color: #fff;
+}
+
+/* ── Chat Area ── */
+.ai-chat-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ai-chat-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--wb-text-dim);
+}
+
+.ai-chat-empty-icon {
+  font-size: 3em;
+  opacity: 0.5;
+}
+
+.ai-chat-empty-text {
+  font-size: 0.95em;
+}
+
+.ai-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Chat bubbles ── */
+.ai-chat-bubble {
+  max-width: 85%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ai-chat-bubble.user {
+  align-self: flex-end;
+  background: var(--wb-primary-soft);
+  border-bottom-right-radius: 4px;
+}
+
+.ai-chat-bubble.assistant {
+  align-self: flex-start;
+  background: var(--wb-bg-main);
+  border: 1px solid var(--wb-border);
+  border-bottom-left-radius: 4px;
+}
+
+.ai-chat-bubble-role {
+  font-size: 0.72em;
+  font-weight: 600;
+  color: var(--wb-text-dim);
+  margin-bottom: 4px;
+}
+
+.ai-chat-bubble-content {
+  font-size: 0.88em;
+  color: var(--wb-text-main);
+}
+
+.ai-cursor {
+  animation: ai-blink 0.7s infinite;
+  color: var(--wb-primary);
+}
+
+@keyframes ai-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.ai-thinking {
+  color: var(--wb-text-dim);
+  font-style: italic;
+}
+
+/* ── Input bar ── */
+.ai-chat-input-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--wb-border);
+  background: var(--wb-bg-main);
+  align-items: flex-end;
+}
+
+.ai-context-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78em;
+  color: var(--wb-text-dim);
+  cursor: pointer;
+  user-select: none;
+}
+
+.ai-context-toggle input {
+  margin: 0;
+}
+
+.ai-context-toggle span {
+  white-space: nowrap;
+}
+
+.ai-chat-input {
+  flex: 1;
+  resize: vertical;
+  min-height: 40px;
+  max-height: 140px;
+  font-size: 0.88em;
+}
+
+.ai-send-btn,
+.ai-stop-btn {
+  min-width: 64px;
+  height: 40px;
+}
+
+/* ═════════════════════════════════════════════════
+   Tag Review Modal
+   ═════════════════════════════════════════════════ */
+.ai-tag-review-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ai-tag-review-modal {
+  background: var(--wb-bg-main);
+  border-radius: var(--wb-radius);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  width: 580px;
+  max-width: 92vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ai-tag-review-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--wb-border);
+}
+
+.ai-tag-review-title {
+  font-weight: 600;
+  font-size: 1em;
+  color: var(--wb-text-main);
+}
+
+.ai-tag-review-close {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--wb-text-dim);
+  font-size: 1.2em;
+  cursor: pointer;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ai-tag-review-close:hover {
+  background: var(--wb-bg-highlight);
+}
+
+.ai-tag-review-target {
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--wb-border);
+}
+
+.ai-tag-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 18px;
+}
+
+.ai-tag-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--wb-border);
+  cursor: pointer;
+}
+
+.ai-tag-item:last-child {
+  border-bottom: none;
+}
+
+.ai-tag-item input[type="checkbox"] {
+  margin-top: 3px;
+}
+
+.ai-tag-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ai-tag-name {
+  font-weight: 600;
+  font-size: 0.9em;
+  color: var(--wb-primary);
+}
+
+.ai-tag-preview {
+  font-size: 0.8em;
+  color: var(--wb-text-dim);
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+.ai-tag-review-actions {
+  display: flex;
+  gap: 8px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--wb-border);
+  justify-content: flex-end;
+}
+
+.btn.primary {
+  background: var(--wb-primary);
+  color: #fff;
+  border-color: var(--wb-primary);
+}
+
+.btn.primary:hover {
+  filter: brightness(1.1);
+}
+
+.btn.primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ═════════════════════════════════════════════════
+   Mobile Responsive
+   ═════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .wb-assistant-root {
+    padding: 6px;
+    gap: 6px;
+    border-radius: 0;
+  }
+
+  /* ── Toolbar ── */
+  .toolbar-label {
+    min-width: unset;
+    width: 100%;
+  }
+
+  .toolbar-label select {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .toolbar-btns {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .toolbar-btns .btn {
+    font-size: 0.78em;
+    padding: 4px 8px;
+  }
+
+  /* ── Bindings bar ── */
+  .wb-bindings {
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 6px 8px;
+    font-size: 0.78em;
+  }
+
+  /* ── Main layout ── */
+  .wb-main-layout {
+    display: block !important;
+    overflow: visible;
+    flex: none;
+  }
+
+  .wb-resize-handle {
+    display: none !important;
+  }
+
+  .wb-entry-list,
+  .wb-editor {
+    min-height: 0;
+    max-height: none;
+  }
+
+  /* ── AI Generator Panel ── */
+  .ai-generator-panel {
+    flex-direction: column;
+  }
+
+  .ai-sidebar {
+    width: 100%;
+    min-width: unset;
+    max-height: 110px;
+    border-right: none;
+    border-bottom: 1px solid var(--wb-border);
+  }
+
+  .ai-sidebar-head {
+    padding: 6px 10px;
+  }
+
+  .ai-session-list {
+    overflow-x: auto;
+    overflow-y: hidden;
+    display: flex;
+    flex-direction: row;
+    gap: 4px;
+    padding: 4px 8px;
+  }
+
+  .ai-session-item {
+    flex-shrink: 0;
+    min-width: 140px;
+    max-width: 200px;
+  }
+
+  .ai-chat-messages {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .ai-chat-bubble {
+    max-width: 95%;
+  }
+
+  .ai-chat-input-bar {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+
+  .ai-chat-input {
+    min-height: 36px;
+    font-size: 0.85em;
+  }
+
+  /* ── Tag review modal ── */
+  .ai-tag-review-modal {
+    width: 95vw;
+    max-height: 85vh;
+  }
+
+  .ai-tag-review-actions {
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 12px;
+  }
+
+  .ai-tag-review-actions .btn {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.82em;
+  }
+
+  /* ── Status footer ── */
+  .wb-status {
+    font-size: 0.72em;
+    padding: 4px 8px;
+    gap: 6px;
+  }
+
+  /* ── Editor content area ── */
+  .editor-content-area {
+    flex: 1;
+    min-height: 40vh;
+  }
+
+  .content-resize-handle {
+    display: flex;
+    height: 28px;
+  }
+
+  .editor-content-block {
+    position: relative;
+    z-index: 10;
+    background: var(--wb-bg-root);
+  }
+
+  .content-top-drag-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 22px;
+    cursor: ns-resize;
+    background: var(--wb-bg-panel);
+    border-radius: 8px 8px 0 0;
+    touch-action: none;
+    user-select: none;
+  }
+
+  .content-top-drag-grip {
+    font-size: 12px;
+    color: var(--wb-text-dim);
+    letter-spacing: 3px;
+    line-height: 1;
+  }
+
+  .text-area.compact {
+    min-height: 60px;
+  }
+
+  .editor-center {
+    padding: 8px;
+  }
+
+  .editor-side {
+    padding: 8px;
+  }
+
+  .editor-grid.two-cols {
+    grid-template-columns: 1fr;
+  }
+}
 </style>
+
