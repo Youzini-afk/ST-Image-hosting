@@ -729,10 +729,9 @@ function createFab(): void {
   if (doc.getElementById(FAB_ID)) return;
   if (!isFabVisible()) return;
 
-  // Mobile SillyTavern clips position:fixed elements via body{position:fixed;overflow:hidden}.
-  // Skip FAB on mobile — users open panel via the extensions (wand) menu instead.
+  // On mobile SillyTavern, body has position:fixed which clips position:fixed children.
+  // Append FAB to documentElement (<html>) instead to avoid clipping.
   const isMobile = window.matchMedia('(max-width: 1000px)').matches;
-  if (isMobile) return;
 
   const fab = doc.createElement('div');
   fab.id = FAB_ID;
@@ -805,7 +804,9 @@ function createFab(): void {
     togglePanel();
   });
 
-  doc.body.appendChild(fab);
+  // On mobile, body has position:fixed which clips fixed children — use <html> instead
+  const fabParent = isMobile ? doc.documentElement : doc.body;
+  fabParent.appendChild(fab);
 }
 
 function init(): void {
