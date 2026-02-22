@@ -3611,7 +3611,7 @@ const STRATEGY_TYPE_LABELS: Record<string, string> = {
 };
 
 function buildConfigSystemPrompt(entries: WorldbookEntry[]): string {
-  const names = entries.map((e, i) => `${i + 1}."${e.name}"`).join(' ');
+  const names = entries.map(e => `"${e.name}"`).join(', ');
 
   return `你是世界书配置助手。将用户的自然语言指令转为JSON。只输出修改项，name必填且须精确匹配条目列表中的名称。
 如果用户在条目名后写了新名字（如"条目A: 新名字"），用new_name字段重命名。
