@@ -5857,7 +5857,6 @@ function onPanelDiscard(): void {
 }
 
 const rootRef = ref<HTMLElement | null>(null);
-let _rootResizeObserver: ResizeObserver | null = null;
 let _mobileResizeHandler: (() => void) | null = null;
 
 onMounted(() => {
@@ -5868,12 +5867,6 @@ onMounted(() => {
 
     const syncHeight = () => {
       if (!el) return;
-      // Skip height recalculation when virtual keyboard is open
-      // (keyboard triggers resize, but we don't want to shrink the panel)
-      const focused = document.activeElement as HTMLElement | null;
-      if (focused && (focused.tagName === 'INPUT' || focused.tagName === 'TEXTAREA' || focused.isContentEditable)) {
-        return;
-      }
       const rect = el.getBoundingClientRect();
       const vh = hostWin.innerHeight || window.innerHeight || 0;
       const available = vh - rect.top;
@@ -5890,16 +5883,10 @@ onMounted(() => {
     setTimeout(syncHeight, 100);
     setTimeout(syncHeight, 500);
 
-    // Respond to resize
-    _mobileResizeHandler = syncHeight;
-    hostWin.addEventListener('resize', syncHeight);
-
-    // Also observe parent just in case
-    const parent = el.parentElement;
-    if (parent) {
-      _rootResizeObserver = new ResizeObserver(syncHeight);
-      _rootResizeObserver.observe(parent);
-    }
+    // Only recalculate on orientation change (screen rotation),
+    // NOT on resize (keyboard open/close triggers resize and would compress the panel)
+    _mobileResizeHandler = () => setTimeout(syncHeight, 300);
+    hostWin.addEventListener('orientationchange', _mobileResizeHandler);
   }
   persistedState.value = readPersistedState();
   syncSelectedGlobalPresetFromState();
@@ -5947,10 +5934,8 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  _rootResizeObserver?.disconnect();
-  _rootResizeObserver = null;
   if (_mobileResizeHandler) {
-    try { (window.parent || window).removeEventListener('resize', _mobileResizeHandler); } catch { /* ignore */ }
+    try { (window.parent || window).removeEventListener('orientationchange', _mobileResizeHandler); } catch { /* ignore */ }
     _mobileResizeHandler = null;
   }
   const target = window as unknown as Record<string, unknown>;
