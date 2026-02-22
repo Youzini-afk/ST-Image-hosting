@@ -3671,7 +3671,7 @@ async function aiConfigGenerate(): Promise<void> {
   const input = aiConfigInput.value.trim();
   const targetName = aiConfigTargetWorldbook.value;
   if (!input || !targetName) {
-    toastr.warning('请输入配置指令并选择目标世界书');
+    toastr.warning('请先选择目标世界书并输入配置指令');
     return;
   }
   aiConfigGenerating.value = true;
@@ -3706,7 +3706,7 @@ async function aiConfigGenerate(): Promise<void> {
           jsonStr = arrayMatch[0];
         } else {
           console.error('[AI Config] No JSON found in response:\n', result);
-          toastr.error('AI 返回中未找到配置 JSON，请重试');
+          toastr.error(`① AI 未返回有效 JSON。AI 响应长度: ${result.length} 字符。请检查 API 设置或重试`);
           return;
         }
       }
@@ -3723,11 +3723,11 @@ async function aiConfigGenerate(): Promise<void> {
       configs = JSON.parse(jsonStr);
     } catch (parseErr) {
       console.error('[AI Config] JSON parse error:', parseErr, '\nCleaned JSON:', jsonStr, '\nFull response:\n', result);
-      toastr.error(`JSON 解析失败: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`);
+      toastr.error(`② JSON 格式错误: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}\n请在控制台(F12)查看 [AI Config] 了解详情`);
       return;
     }
     if (!Array.isArray(configs) || configs.length === 0) {
-      toastr.warning('AI 未返回任何配置变更');
+      toastr.info('AI 返回的配置与当前一致，无需变更（AI 可能未理解指令，可尝试更明确的描述）');
       return;
     }
 
@@ -3814,7 +3814,7 @@ async function aiConfigGenerate(): Promise<void> {
     }
 
     if (changes.length === 0) {
-      toastr.info('AI 返回的配置与当前一致，无需变更');
+      toastr.info('③ 解析完成但无实际变更 — AI 返回的配置与当前完全一致');
       return;
     }
 
@@ -3823,7 +3823,11 @@ async function aiConfigGenerate(): Promise<void> {
     toastr.success(`解析到 ${changes.length} 项变更`);
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    toastr.error(`AI 配置生成失败: ${msg}`);
+    console.error('[AI Config] Generation failed:', error);
+    toastr.error(`AI 生成失败: ${msg}`);
+    if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed')) {
+      toastr.warning('可能是网络问题或 API 配置有误，请检查 ⚙️ API 设置');
+    }
   } finally {
     aiConfigGenerating.value = false;
   }
