@@ -3627,17 +3627,45 @@ function buildConfigSystemPrompt(entries: WorldbookEntry[], forceDefault = false
   }
   const names = entries.map(e => `"${e.name}"`).join(', ');
 
-  return `你是世界书配置助手。将用户的自然语言指令转为JSON。只输出修改项，name必填且须精确匹配条目列表中的名称。
-如果用户在条目名后写了新名字（如"条目A: 新名字"），用new_name字段重命名。
+  return `你是世界书条目配置助手。根据用户的自然语言指令，输出对应的JSON配置。
 
-条目: ${names || '无'}
+## 可用条目
+${names || '无'}
 
-字段: name(必填,匹配现有条目名) new_name(重命名为新名字) enabled(bool) strategy_type("constant"蓝灯/"selective"绿灯) keys(string[]) keys_secondary(string[]) keys_secondary_logic("and_any"/"and_all"/"not_all"/"not_any") scan_depth(number/"same_as_global") position_type("before_character_definition"角色定义前/"after_character_definition"/"before_example_messages"/"after_example_messages"/"before_author_note"/"after_author_note"/"at_depth") position_order(number) position_depth(number,at_depth时) position_role("system"/"assistant"/"user") prevent_incoming(bool,不可递归) prevent_outgoing(bool,防递归) probability(0-100) sticky(number|null) cooldown(number|null)
+## JSON Schema
+每个配置对象的可用字段如下（只包含需要修改的字段，name必填）：
+{
+  "name": "str! 必须精确匹配上方条目名",
+  "new_name": "str 重命名条目",
+  "enabled": "bool",
+  "strategy_type": "constant(蓝灯常驻) | selective(绿灯关键词)",
+  "keys": ["str 主要关键词"],
+  "keys_secondary": ["str 次要关键词"],
+  "keys_secondary_logic": "and_any | and_all | not_all | not_any",
+  "scan_depth": "int | 'same_as_global'",
+  "position_type": "before_character_definition(角色定义前) | after_character_definition | before_example_messages | after_example_messages | before_author_note | after_author_note | at_depth(指定深度)",
+  "position_order": "int 排序顺序",
+  "position_depth": "int 深度(at_depth时)",
+  "position_role": "system | assistant | user",
+  "prevent_incoming": "bool 不可递归",
+  "prevent_outgoing": "bool 防止进一步递归",
+  "probability": "int 0-100",
+  "sticky": "int|null 黏性",
+  "cooldown": "int|null 冷却"
+}
 
-输出纯JSON数组，包裹在<worldbook_config></worldbook_config>中，无注释无markdown。
+## 思考步骤
+收到用户指令后，请按以下步骤思考：
+1. 识别用户提到了哪些条目（精确匹配"可用条目"中的名称）
+2. 识别每个条目需要修改什么设置（蓝灯/绿灯、位置、顺序、递归等）
+3. 如果用户给条目起了新名字，使用new_name字段
+4. 只输出有变更的字段，不要输出未提及的字段
+
+## 输出格式
+将结果包裹在 <worldbook_config></worldbook_config> 中，内容为纯JSON数组，无注释无markdown。
 
 <worldbook_config>
-[{"name":"old_name","new_name":"世界观设定","strategy_type":"constant","position_order":1,"prevent_incoming":true}]
+[{"name":"现有条目名","new_name":"新名字","strategy_type":"constant","position_type":"before_character_definition","position_order":1,"prevent_incoming":true,"prevent_outgoing":true}]
 </worldbook_config>`;
 }
 
