@@ -3689,19 +3689,27 @@ async function aiConfigGenerate(): Promise<void> {
       ...buildCustomApiForGenerate(),
     });
 
-    // Parse <worldbook_config> tag
+    // Strip AI thinking/reasoning blocks that may contain false tag matches
+    const cleaned = result
+      .replace(/<(?:thinking|Think)>[\s\S]*?<\/(?:thinking|Think)>/gi, '')
+      .replace(/<!--[\s\S]*?-->/g, '');
+
+    // Parse <worldbook_config> tag — use lastIndexOf to find the LAST tag pair
     let jsonStr = '';
-    const match = result.match(/<worldbook_config>\s*([\s\S]*?)\s*<\/worldbook_config>/);
-    if (match) {
-      jsonStr = match[1];
+    const startTag = '<worldbook_config>';
+    const endTag = '</worldbook_config>';
+    const lastStart = cleaned.lastIndexOf(startTag);
+    const lastEnd = cleaned.lastIndexOf(endTag);
+    if (lastStart !== -1 && lastEnd !== -1 && lastEnd > lastStart) {
+      jsonStr = cleaned.substring(lastStart + startTag.length, lastEnd).trim();
     } else {
       // Fallback 1: look for JSON array inside markdown code block
-      const codeBlockMatch = result.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/);
+      const codeBlockMatch = cleaned.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/);
       if (codeBlockMatch) {
         jsonStr = codeBlockMatch[1];
       } else {
         // Fallback 2: find a JSON array that contains "name" (to avoid false matches)
-        const arrayMatch = result.match(/\[\s*\{[^[\]]*"name"[^[\]]*\}(?:\s*,\s*\{[^[\]]*\})*\s*\]/);
+        const arrayMatch = cleaned.match(/\[\s*\{[^[\]]*"name"[^[\]]*\}(?:\s*,\s*\{[^[\]]*\})*\s*\]/);
         if (arrayMatch) {
           jsonStr = arrayMatch[0];
         } else {
