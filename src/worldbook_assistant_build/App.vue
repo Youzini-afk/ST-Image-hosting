@@ -1563,9 +1563,9 @@ const THEMES: Record<ThemeKey, { name: string; label: string; colors: Record<str
       '--wb-primary-hover': 'rgba(56, 189, 248, 0.15)',
       '--wb-primary-soft': 'rgba(14, 165, 233, 0.15)',
       '--wb-primary-glow': 'rgba(14, 165, 233, 0.4)',
-      '--wb-input-bg': 'rgba(0, 0, 0, 0.25)',
-      '--wb-input-bg-hover': 'rgba(0, 0, 0, 0.35)',
-      '--wb-input-bg-focus': 'rgba(0, 0, 0, 0.45)',
+      '--wb-input-bg': 'rgba(0, 0, 0, 0.45)',
+      '--wb-input-bg-hover': 'rgba(0, 0, 0, 0.55)',
+      '--wb-input-bg-focus': 'rgba(0, 0, 0, 0.6)',
       '--wb-border-subtle': 'rgba(255, 255, 255, 0.08)',
       '--wb-border-main': 'rgba(255, 255, 255, 0.12)',
       '--wb-shadow-main': '0 12px 28px rgba(0, 0, 0, 0.5)',
@@ -1585,9 +1585,9 @@ const THEMES: Record<ThemeKey, { name: string; label: string; colors: Record<str
       '--wb-primary-hover': 'rgba(192, 132, 252, 0.15)',
       '--wb-primary-soft': 'rgba(168, 85, 247, 0.15)',
       '--wb-primary-glow': 'rgba(192, 132, 252, 0.4)',
-      '--wb-input-bg': 'rgba(0, 0, 0, 0.25)',
-      '--wb-input-bg-hover': 'rgba(0, 0, 0, 0.35)',
-      '--wb-input-bg-focus': 'rgba(0, 0, 0, 0.45)',
+      '--wb-input-bg': 'rgba(0, 0, 0, 0.45)',
+      '--wb-input-bg-hover': 'rgba(0, 0, 0, 0.55)',
+      '--wb-input-bg-focus': 'rgba(0, 0, 0, 0.6)',
       '--wb-border-subtle': 'rgba(255, 255, 255, 0.08)',
       '--wb-border-main': 'rgba(255, 255, 255, 0.12)',
       '--wb-shadow-main': '0 12px 28px rgba(0, 0, 0, 0.5)',
@@ -1607,9 +1607,9 @@ const THEMES: Record<ThemeKey, { name: string; label: string; colors: Record<str
       '--wb-primary-hover': 'rgba(16, 185, 129, 0.15)',
       '--wb-primary-soft': 'rgba(5, 150, 105, 0.15)',
       '--wb-primary-glow': 'rgba(16, 185, 129, 0.4)',
-      '--wb-input-bg': 'rgba(0, 0, 0, 0.25)',
-      '--wb-input-bg-hover': 'rgba(0, 0, 0, 0.35)',
-      '--wb-input-bg-focus': 'rgba(0, 0, 0, 0.45)',
+      '--wb-input-bg': 'rgba(0, 0, 0, 0.45)',
+      '--wb-input-bg-hover': 'rgba(0, 0, 0, 0.55)',
+      '--wb-input-bg-focus': 'rgba(0, 0, 0, 0.6)',
       '--wb-border-subtle': 'rgba(255, 255, 255, 0.08)',
       '--wb-border-main': 'rgba(255, 255, 255, 0.12)',
       '--wb-shadow-main': '0 12px 28px rgba(0, 0, 0, 0.5)',
@@ -1629,9 +1629,9 @@ const THEMES: Record<ThemeKey, { name: string; label: string; colors: Record<str
       '--wb-primary-hover': 'rgba(251, 146, 60, 0.15)',
       '--wb-primary-soft': 'rgba(234, 88, 12, 0.15)',
       '--wb-primary-glow': 'rgba(251, 146, 60, 0.4)',
-      '--wb-input-bg': 'rgba(0, 0, 0, 0.25)',
-      '--wb-input-bg-hover': 'rgba(0, 0, 0, 0.35)',
-      '--wb-input-bg-focus': 'rgba(0, 0, 0, 0.45)',
+      '--wb-input-bg': 'rgba(0, 0, 0, 0.45)',
+      '--wb-input-bg-hover': 'rgba(0, 0, 0, 0.55)',
+      '--wb-input-bg-focus': 'rgba(0, 0, 0, 0.6)',
       '--wb-border-subtle': 'rgba(255, 255, 255, 0.08)',
       '--wb-border-main': 'rgba(255, 255, 255, 0.12)',
       '--wb-shadow-main': '0 12px 28px rgba(0, 0, 0, 0.5)',
@@ -1651,9 +1651,9 @@ const THEMES: Record<ThemeKey, { name: string; label: string; colors: Record<str
       '--wb-primary-hover': 'rgba(251, 191, 36, 0.15)',
       '--wb-primary-soft': 'rgba(217, 119, 6, 0.15)',
       '--wb-primary-glow': 'rgba(251, 191, 36, 0.4)',
-      '--wb-input-bg': 'rgba(0, 0, 0, 0.25)',
-      '--wb-input-bg-hover': 'rgba(0, 0, 0, 0.35)',
-      '--wb-input-bg-focus': 'rgba(0, 0, 0, 0.45)',
+      '--wb-input-bg': 'rgba(0, 0, 0, 0.45)',
+      '--wb-input-bg-hover': 'rgba(0, 0, 0, 0.55)',
+      '--wb-input-bg-focus': 'rgba(0, 0, 0, 0.6)',
       '--wb-border-subtle': 'rgba(255, 255, 255, 0.08)',
       '--wb-border-main': 'rgba(255, 255, 255, 0.12)',
       '--wb-shadow-main': '0 12px 28px rgba(0, 0, 0, 0.5)',
@@ -1717,9 +1717,9 @@ const THEMES: Record<ThemeKey, { name: string; label: string; colors: Record<str
       '--wb-primary-hover': 'rgba(245, 166, 35, 0.15)',
       '--wb-primary-soft': 'rgba(212, 160, 23, 0.15)',
       '--wb-primary-glow': 'rgba(245, 166, 35, 0.4)',
-      '--wb-input-bg': 'rgba(255, 255, 255, 0.06)',
-      '--wb-input-bg-hover': 'rgba(255, 255, 255, 0.1)',
-      '--wb-input-bg-focus': 'rgba(255, 255, 255, 0.14)',
+      '--wb-input-bg': 'rgba(255, 255, 255, 0.1)',
+      '--wb-input-bg-hover': 'rgba(255, 255, 255, 0.15)',
+      '--wb-input-bg-focus': 'rgba(255, 255, 255, 0.2)',
       '--wb-border-subtle': 'rgba(245, 166, 35, 0.12)',
       '--wb-border-main': 'rgba(245, 166, 35, 0.22)',
       '--wb-shadow-main': '0 12px 28px rgba(0, 0, 0, 0.6)',
@@ -6103,7 +6103,7 @@ watch(hasUnsavedChanges, (val) => {
   border: 1px solid transparent;
   border-radius: 8px;
   padding: 8px 10px;
-  background: var(--wb-bg-panel);
+  background: var(--wb-input-bg);
   color: var(--wb-text-main);
   display: flex;
   align-items: center;
@@ -6564,11 +6564,6 @@ watch(hasUnsavedChanges, (val) => {
   gap: 6px;
   padding: 0 8px;
   flex-shrink: 0;
-}
-
-.list-search .text-input {
-  background: var(--wb-bg-panel);
-  border-color: var(--wb-border-main);
 }
 
 .list-summary {
