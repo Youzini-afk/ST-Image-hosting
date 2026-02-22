@@ -3682,16 +3682,33 @@ async function aiConfigGenerate(): Promise<void> {
     });
 
     // Parse <worldbook_config> tag
+    let jsonStr = '';
     const match = result.match(/<worldbook_config>\s*([\s\S]*?)\s*<\/worldbook_config>/);
-    if (!match) {
-      toastr.error('AI 返回中未找到 <worldbook_config> 标签');
-      return;
+    if (match) {
+      jsonStr = match[1];
+    } else {
+      // Fallback: try to find a JSON array in the result
+      const arrayMatch = result.match(/\[\s*\{[\s\S]*?\}\s*\]/);
+      if (arrayMatch) {
+        jsonStr = arrayMatch[0];
+      } else {
+        toastr.error('AI 返回中未找到配置 JSON');
+        return;
+      }
     }
+    // Clean up common AI formatting issues
+    jsonStr = jsonStr
+      .replace(/```(?:json)?\s*/g, '')  // strip markdown code fences
+      .replace(/```\s*/g, '')
+      .replace(/\/\/.*$/gm, '')          // strip single-line comments
+      .replace(/,\s*([}\]])/g, '$1')     // strip trailing commas
+      .trim();
     let configs: any[];
     try {
-      configs = JSON.parse(match[1]);
-    } catch {
-      toastr.error('JSON 解析失败');
+      configs = JSON.parse(jsonStr);
+    } catch (parseErr) {
+      console.error('[AI Config] JSON parse error:', parseErr, '\nRaw JSON:', jsonStr);
+      toastr.error(`JSON 解析失败: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`);
       return;
     }
     if (!Array.isArray(configs) || configs.length === 0) {
