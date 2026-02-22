@@ -341,9 +341,6 @@
           </div>
           </Transition>
 
-        </div>
-      </div>
-
           <!-- Tab: 标签 -->
           <Transition name="mobile-tab">
           <div v-show="mobileTab === 'tags'" class="mobile-pane">
@@ -402,6 +399,9 @@
             </section>
           </div>
           </Transition>
+
+        </div>
+      </div>
 
       <!-- Tab Bar: bottom, direct child of wb-assistant-root via fragment -->
       <div style="display:flex !important;flex-shrink:0;height:52px;background:#1e293b;border-top:1px solid #334155;z-index:99999;">
