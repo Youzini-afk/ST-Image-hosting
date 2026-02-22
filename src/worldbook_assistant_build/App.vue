@@ -3611,59 +3611,18 @@ const STRATEGY_TYPE_LABELS: Record<string, string> = {
 };
 
 function buildConfigSystemPrompt(entries: WorldbookEntry[]): string {
-  const entrySummary = entries.map((e, i) => {
-    const strat = STRATEGY_TYPE_LABELS[e.strategy.type] || e.strategy.type;
-    const pos = POSITION_TYPE_LABELS[e.position.type] || e.position.type;
-    const keys = e.strategy.keys.length ? ` 关键词=[${e.strategy.keys.map(k => String(k)).join(',')}]` : '';
-    const ri = e.recursion.prevent_incoming ? ' 不可递归' : '';
-    const ro = e.recursion.prevent_outgoing ? ' 防递归' : '';
-    return `  ${i + 1}. "${e.name}" | ${strat}${keys} | ${pos} 顺序${e.position.order}${ri}${ro}`;
-  }).join('\n');
+  const names = entries.map((e, i) => `${i + 1}."${e.name}"`).join(' ');
 
-  return `# 世界书配置助手
+  return `你是世界书配置助手。将用户的自然语言指令转为JSON。只输出修改项，name必填且须精确匹配。
 
-你将世界书条目的自然语言配置指令转换为 JSON。
+条目: ${names || '无'}
 
-## 当前条目
-${entrySummary || '（无条目）'}
+字段: name(必填) new_name(重命名) enabled(bool) strategy_type("constant"蓝灯/"selective"绿灯) keys(string[]) keys_secondary(string[]) keys_secondary_logic("and_any"/"and_all"/"not_all"/"not_any") scan_depth(number/"same_as_global") position_type("before_character_definition"角色定义前/"after_character_definition"/"before_example_messages"/"after_example_messages"/"before_author_note"/"after_author_note"/"at_depth") position_order(number) position_depth(number,at_depth时) position_role("system"/"assistant"/"user") prevent_incoming(bool,不可递归) prevent_outgoing(bool,防递归) probability(0-100) sticky(number|null) cooldown(number|null)
 
-## 可用字段（只写需要修改的，name 必填）
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| name | string | **必填**，匹配现有条目名（必须完全一致） |
-| new_name | string | 重命名条目 |
-| enabled | boolean | 启用/禁用 |
-| strategy_type | "constant" \\| "selective" | 蓝灯(常驻) / 绿灯(关键词) |
-| keys | string[] | 主要关键词列表 |
-| keys_secondary | string[] | 次要关键词列表 |
-| keys_secondary_logic | "and_any" \\| "and_all" \\| "not_all" \\| "not_any" | 次要关键词逻辑 |
-| scan_depth | number \\| "same_as_global" | 扫描深度 |
-| position_type | string | 见下方位置枚举 |
-| position_order | number | 排序顺序 |
-| position_depth | number | 深度（仅 at_depth） |
-| position_role | "system" \\| "assistant" \\| "user" | 角色（仅 at_depth） |
-| prevent_incoming | boolean | 不可递归 |
-| prevent_outgoing | boolean | 防止进一步递归 |
-| probability | number | 激活概率 0-100 |
-| sticky | number \\| null | 黏性 |
-| cooldown | number \\| null | 冷却 |
-
-**position_type 枚举**: "before_character_definition", "after_character_definition", "before_example_messages", "after_example_messages", "before_author_note", "after_author_note", "at_depth"
-
-**用户常用别名**: 蓝灯=constant, 绿灯=selective, 角色定义前=before_character_definition, 角色定义后=after_character_definition
-
-## 输出要求
-1. 只输出纯 JSON 数组，不要加注释、不要加 markdown 代码块
-2. 包裹在 <worldbook_config> </worldbook_config> 标签中
-3. 不需要修改的字段不要包含
-
-## 示例
-
-用户: 将"世界观设定"改名为"世界观"，设为蓝灯常驻，角色定义前，顺序1，启用不可递归和防递归。"角色速览"设为蓝灯，顺序2。
+输出纯JSON数组，包裹在<worldbook_config></worldbook_config>中，无注释无markdown。
 
 <worldbook_config>
-[{"name":"世界观设定","new_name":"世界观","strategy_type":"constant","position_type":"before_character_definition","position_order":1,"prevent_incoming":true,"prevent_outgoing":true},{"name":"角色速览","strategy_type":"constant","position_order":2}]
+[{"name":"条目A","strategy_type":"constant","position_order":1,"prevent_incoming":true}]
 </worldbook_config>`;
 }
 
