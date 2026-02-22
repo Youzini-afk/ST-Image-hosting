@@ -19,7 +19,9 @@ let menuObserver: MutationObserver | null = null;
 let menuRetryTimer: number | null = null;
 let isPanelVisible = false;
 let focusinHandler: ((e: Event) => void) | null = null;
-let savedViewportContent: string | null = null;
+let focusoutHandler: ((e: Event) => void) | null = null;
+let orientationHandler: (() => void) | null = null;
+let mobileFullHeight = 0;
 
 function getHostWindow(): Window {
   return window.parent || window;
@@ -831,33 +833,64 @@ function init(): void {
     console.warn('[WB-FAB] createFab error:', e);
   }
 
-  // Mobile keyboard overlay mode:
-  // 1. Patch viewport meta to let keyboard overlay content instead of resizing
+  // Mobile keyboard handling: lock panel height when keyboard opens
   const hostWin = getHostWindow();
-  const metaViewport = doc.querySelector('meta[name="viewport"]') as HTMLMetaElement | null;
-  if (metaViewport) {
-    savedViewportContent = metaViewport.content;
-    if (!metaViewport.content.includes('interactive-widget')) {
-      metaViewport.content += ', interactive-widget=overlays-content';
-    }
-  }
-  // 2. Use VirtualKeyboard API if available (Chrome 94+)
-  if ('virtualKeyboard' in hostWin.navigator) {
-    (hostWin.navigator as any).virtualKeyboard.overlaysContent = true;
-  }
-  // 3. Scroll focused input into view above the keyboard
+  // Capture the full viewport height now (before any keyboard opens)
+  mobileFullHeight = hostWin.innerHeight;
+
+  // Re-capture on orientation change (height changes between portrait/landscape)
+  orientationHandler = () => {
+    setTimeout(() => {
+      // Only update if no input is focused (keyboard not open)
+      if (!doc.activeElement || (doc.activeElement.tagName !== 'INPUT' && doc.activeElement.tagName !== 'TEXTAREA' && !(doc.activeElement as HTMLElement).isContentEditable)) {
+        mobileFullHeight = hostWin.innerHeight;
+      }
+    }, 500);
+  };
+  hostWin.addEventListener('orientationchange', orientationHandler);
+
+  // On focusin: lock panel to saved pixel height so it extends behind keyboard
   focusinHandler = (e: Event) => {
     const target = e.target as HTMLElement;
     if (!target || !isPanelVisible) return;
     if (!hostWin.matchMedia('(orientation: portrait)').matches) return;
     const tag = target.tagName;
     if (tag !== 'INPUT' && tag !== 'TEXTAREA' && !target.isContentEditable) return;
-    // Delay to let the keyboard finish opening
+
+    const panel = doc.getElementById(PANEL_ID) as HTMLDivElement | null;
+    if (!panel) return;
+
+    // Lock height to saved full height (extends behind keyboard)
+    panel.style.height = `${mobileFullHeight}px`;
+    panel.style.top = '0px';
+
+    // Scroll input into view after keyboard animation
     setTimeout(() => {
       target.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    }, 300);
+    }, 350);
   };
   doc.addEventListener('focusin', focusinHandler, true);
+
+  // On focusout: reset height back to CSS-driven 100vh
+  focusoutHandler = () => {
+    if (!isPanelVisible) return;
+    if (!hostWin.matchMedia('(orientation: portrait)').matches) return;
+
+    const panel = doc.getElementById(PANEL_ID) as HTMLDivElement | null;
+    if (!panel) return;
+
+    // Delay to avoid flickering if user taps another input immediately
+    setTimeout(() => {
+      // Check if a new input is focused 
+      const active = doc.activeElement as HTMLElement | null;
+      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) {
+        return; // Don't reset, another input took focus
+      }
+      panel.style.height = '';
+      panel.style.top = '';
+    }, 100);
+  };
+  doc.addEventListener('focusout', focusoutHandler, true);
 
   toastr.success('世界书助手已挂载到魔法棒菜单', 'Worldbook Assistant');
 }
@@ -870,22 +903,18 @@ function cleanup(): void {
   $(doc).off(EVENT_NS);
   doc.removeEventListener('pointerdown', closeThemeDropdownOnOutside, true);
 
-  // Clean up focusin listener
+  // Clean up mobile keyboard handlers
   if (focusinHandler) {
     doc.removeEventListener('focusin', focusinHandler, true);
     focusinHandler = null;
   }
-  // Restore original viewport meta
-  if (savedViewportContent !== null) {
-    const metaViewport = doc.querySelector('meta[name="viewport"]') as HTMLMetaElement | null;
-    if (metaViewport) {
-      metaViewport.content = savedViewportContent;
-    }
-    savedViewportContent = null;
+  if (focusoutHandler) {
+    doc.removeEventListener('focusout', focusoutHandler, true);
+    focusoutHandler = null;
   }
-  // Reset VirtualKeyboard API
-  if ('virtualKeyboard' in hostWin.navigator) {
-    (hostWin.navigator as any).virtualKeyboard.overlaysContent = false;
+  if (orientationHandler) {
+    hostWin.removeEventListener('orientationchange', orientationHandler);
+    orientationHandler = null;
   }
 
   $(`#${MENU_ID}`, doc).remove();
