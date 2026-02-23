@@ -822,8 +822,24 @@ const EXTRACT_MODAL_ID = 'wb-extract-modal';
 const EXTRACT_STYLE_ID = 'wb-extract-style';
 const DEFAULT_IGNORE_TAGS = new Set(['think', 'thinking', 'recap', 'content', 'details', 'summary']);
 const LAST_EXTRACT_WB_KEY = '__WB_EXTRACT_LAST_WB__';
+const FLOOR_BTN_VISIBLE_KEY = '__WB_FLOOR_BTN_VISIBLE__';
 
 let floorEventSubscriptions: { stop: () => void }[] = [];
+let floorBtnToggleHandler: ((e: Event) => void) | null = null;
+
+function isFloorBtnsVisible(): boolean {
+  try { return localStorage.getItem(FLOOR_BTN_VISIBLE_KEY) !== 'false'; } catch { return true; }
+}
+
+function hideAllFloorButtons(): void {
+  const doc = getHostDocument();
+  $(`.${FLOOR_BTN_CLASS}`, doc).remove();
+}
+
+function showAllFloorButtons(): void {
+  hideAllFloorButtons();
+  injectAllFloorButtons();
+}
 
 // ── Tag extraction logic (pure function) ───────────────────────────
 interface ExtractedFloorTag {
@@ -1236,6 +1252,7 @@ function ensureExtractStyle(): void {
 
 // ── Inject extraction button into a single chat floor ──────────────
 function injectButtonToFloor(mesId: number): void {
+  if (!isFloorBtnsVisible()) return;
   const doc = getHostDocument();
   const $mes = $(`#chat > .mes[mesid="${mesId}"]`, doc);
   if (!$mes.length || $mes.find(`.${FLOOR_BTN_CLASS}`).length) return;
@@ -1682,8 +1699,10 @@ function showExtractionModal(tags: ExtractedFloorTag[], mesId: number): void {
 
 // ── Event listeners for floor button injection ─────────────────────
 function startFloorButtonListeners(): void {
-  // Inject into existing floors
-  injectAllFloorButtons();
+  // Inject into existing floors (if visible)
+  if (isFloorBtnsVisible()) {
+    injectAllFloorButtons();
+  }
 
   // Listen for new floors being rendered
   const onCharRendered = (messageId: number) => {
@@ -1694,7 +1713,9 @@ function startFloorButtonListeners(): void {
   };
   const onChatChanged = () => {
     // Small delay to let DOM update
-    setTimeout(injectAllFloorButtons, 300);
+    setTimeout(() => {
+      if (isFloorBtnsVisible()) injectAllFloorButtons();
+    }, 300);
   };
 
   floorEventSubscriptions.push(
@@ -1702,6 +1723,17 @@ function startFloorButtonListeners(): void {
     eventOn(tavern_events.USER_MESSAGE_RENDERED, onUserRendered),
     eventOn(tavern_events.CHAT_CHANGED, onChatChanged),
   );
+
+  // Listen for toggle event from App.vue
+  floorBtnToggleHandler = (e: Event) => {
+    const visible = (e as CustomEvent).detail;
+    if (visible) {
+      showAllFloorButtons();
+    } else {
+      hideAllFloorButtons();
+    }
+  };
+  window.addEventListener('wb-helper:floor-btns-toggle', floorBtnToggleHandler);
 }
 
 function stopFloorButtonListeners(): void {
@@ -1709,6 +1741,10 @@ function stopFloorButtonListeners(): void {
     sub.stop();
   }
   floorEventSubscriptions = [];
+  if (floorBtnToggleHandler) {
+    window.removeEventListener('wb-helper:floor-btns-toggle', floorBtnToggleHandler);
+    floorBtnToggleHandler = null;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════

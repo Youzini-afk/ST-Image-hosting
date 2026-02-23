@@ -1264,6 +1264,11 @@
               <span>显示 AI 对话模块</span>
             </label>
             <div style="font-size:11px;color:var(--wb-text-muted,#64748b);margin-top:4px;">开启后将在工具栏和移动端 Tab 中显示 AI 对话入口</div>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:10px;">
+              <input type="checkbox" :checked="floorBtnVisible" @change="toggleFloorBtns(($event.target as HTMLInputElement).checked)" />
+              <span>显示楼层提取按钮</span>
+            </label>
+            <div style="font-size:11px;color:var(--wb-text-muted,#64748b);margin-top:4px;">关闭后将隐藏聊天楼层上的 📥 提取按钮</div>
           </div>
         </div>
       </div>
@@ -2148,6 +2153,17 @@ const currentTheme = ref<ThemeKey>('ocean');
 const themePickerOpen = ref(false);
 const globalWorldbookMode = ref(false);
 const aiGeneratorMode = ref(false);
+
+// Floor extraction button visibility (synced via localStorage + custom event)
+const FLOOR_BTN_KEY = '__WB_FLOOR_BTN_VISIBLE__';
+const floorBtnVisible = ref((() => {
+  try { return localStorage.getItem(FLOOR_BTN_KEY) !== 'false'; } catch { return true; }
+})());
+function toggleFloorBtns(val: boolean): void {
+  floorBtnVisible.value = val;
+  try { localStorage.setItem(FLOOR_BTN_KEY, String(val)); } catch { /* ignore */ }
+  window.dispatchEvent(new CustomEvent('wb-helper:floor-btns-toggle', { detail: val }));
+}
 const aiIsGenerating = ref(false);
 const aiCurrentGenerationId = ref<string | null>(null);
 const aiStreamingText = ref('');
@@ -6727,7 +6743,7 @@ function updateHostPanelTheme() {
   if (!panel) return;
   const theme = THEMES[currentTheme.value];
   const colors = theme.colors;
-  
+
   panel.style.setProperty('--wb-host-bg', colors['--wb-bg-root']);
   panel.style.setProperty('--wb-host-header-bg', colors['--wb-bg-panel']);
   panel.style.setProperty('--wb-host-border', colors['--wb-border-main']);
