@@ -571,6 +571,15 @@
               >
                 🔧 AI配置
               </button>
+              <button
+                class="btn history-btn utility-btn"
+                type="button"
+                :class="{ active: floorBtnVisible }"
+                @click="toggleFloorBtns(!floorBtnVisible)"
+                :title="floorBtnVisible ? '点击隐藏楼层提取按钮' : '点击显示楼层提取按钮'"
+              >
+                📥 {{ floorBtnVisible ? '楼层提取' : '楼层提取(已关)' }}
+              </button>
             </div>
             <div v-if="globalWorldbookMode" class="global-mode-panel">
               <div class="global-mode-head">
@@ -1264,11 +1273,6 @@
               <span>显示 AI 对话模块</span>
             </label>
             <div style="font-size:11px;color:var(--wb-text-muted,#64748b);margin-top:4px;">开启后将在工具栏和移动端 Tab 中显示 AI 对话入口</div>
-            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:10px;">
-              <input type="checkbox" :checked="floorBtnVisible" @change="toggleFloorBtns(($event.target as HTMLInputElement).checked)" />
-              <span>显示楼层提取按钮</span>
-            </label>
-            <div style="font-size:11px;color:var(--wb-text-muted,#64748b);margin-top:4px;">关闭后将隐藏聊天楼层上的 📥 提取按钮</div>
           </div>
         </div>
       </div>
