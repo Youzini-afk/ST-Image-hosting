@@ -1014,6 +1014,19 @@ function ensureExtractStyle(): void {
 }
 #${EXTRACT_MODAL_ID} .wbex-tag-status.dup { color: #f59e0b; }
 #${EXTRACT_MODAL_ID} .wbex-tag-status.upd { color: #3b82f6; }
+#${EXTRACT_MODAL_ID} .wbex-tag-name-input {
+  background: #1e293b;
+  border: 1px solid #60a5fa;
+  border-radius: 4px;
+  color: #60a5fa;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 2px 6px;
+  outline: none;
+  width: auto;
+  min-width: 60px;
+  max-width: 100%;
+}
 
 #${EXTRACT_MODAL_ID} .wbex-preview {
   font-size: 12px;
@@ -1328,6 +1341,51 @@ function showExtractionModal(tags: ExtractedFloorTag[], mesId: number): void {
       const nameEl = doc.createElement('span');
       nameEl.className = 'wbex-tag-name';
       nameEl.textContent = tag.tag;
+      nameEl.title = '点击重命名';
+      nameEl.style.cursor = 'pointer';
+
+      // Click tag name to rename inline
+      nameEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const input = doc.createElement('input');
+        input.className = 'wbex-tag-name-input';
+        input.type = 'text';
+        input.value = tag.tag;
+        input.size = Math.max(tag.tag.length, 6);
+
+        const confirmRename = () => {
+          const newName = input.value.trim();
+          if (newName) {
+            tag.tag = newName;
+            nameEl.textContent = newName;
+            nameEl.title = '点击重命名';
+          }
+          // Restore status badge
+          if (tag.duplicate) {
+            const s = doc.createElement('span');
+            s.className = 'wbex-tag-status dup';
+            s.textContent = '⚠️ 已存在';
+            nameEl.append(s);
+          } else if (tag.updated) {
+            const s = doc.createElement('span');
+            s.className = 'wbex-tag-status upd';
+            s.textContent = '🔄 内容已更新';
+            nameEl.append(s);
+          }
+        };
+
+        input.addEventListener('blur', confirmRename);
+        input.addEventListener('keydown', (ke) => {
+          if (ke.key === 'Enter') { ke.preventDefault(); input.blur(); }
+          if (ke.key === 'Escape') { input.value = tag.tag; input.blur(); }
+        });
+
+        nameEl.textContent = '';
+        nameEl.append(input);
+        input.focus();
+        input.select();
+      });
+
       if (tag.duplicate) {
         const status = doc.createElement('span');
         status.className = 'wbex-tag-status dup';
