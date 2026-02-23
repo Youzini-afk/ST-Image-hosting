@@ -8706,8 +8706,8 @@ watch(hasUnsavedChanges, (val) => {
   right: 0;
   z-index: 10100;
   display: flex;
-  border-top: 1px solid var(--wb-border);
-  background: var(--wb-bg-secondary);
+  border-top: 1px solid var(--wb-border-main);
+  background: var(--wb-bg-panel);
   height: 52px;
 }
 
@@ -8720,7 +8720,7 @@ watch(hasUnsavedChanges, (val) => {
   gap: 2px;
   border: none;
   background: transparent;
-  color: var(--wb-text-dim);
+  color: var(--wb-text-muted);
   font-size: 10px;
   padding: 4px 0;
   cursor: pointer;
@@ -8729,8 +8729,8 @@ watch(hasUnsavedChanges, (val) => {
 }
 
 .mobile-tab-bar button.active {
-  color: var(--wb-accent);
-  background: color-mix(in srgb, var(--wb-accent) 8%, transparent);
+  color: var(--wb-primary-light);
+  background: var(--wb-primary-soft);
 }
 
 .mobile-tab-bar .tab-icon {
