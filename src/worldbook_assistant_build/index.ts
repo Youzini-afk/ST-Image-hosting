@@ -1023,6 +1023,20 @@ function ensureExtractStyle(): void {
   line-height: 1.5;
   max-height: 60px;
   overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+#${EXTRACT_MODAL_ID} .wbex-item.expanded .wbex-preview {
+  max-height: none;
+}
+#${EXTRACT_MODAL_ID} .wbex-expand-hint {
+  font-size: 11px;
+  color: #475569;
+  cursor: pointer;
+  user-select: none;
+  margin-top: 2px;
+}
+#${EXTRACT_MODAL_ID} .wbex-expand-hint:hover {
+  color: #60a5fa;
 }
 
 #${EXTRACT_MODAL_ID} .wbex-actions {
@@ -1300,7 +1314,7 @@ function showExtractionModal(tags: ExtractedFloorTag[], mesId: number): void {
     }
     for (let i = 0; i < tags.length; i++) {
       const tag = tags[i];
-      const item = doc.createElement('label');
+      const item = doc.createElement('div');
       item.className = 'wbex-item' + (tag.duplicate ? ' duplicate' : '');
 
       const cb = doc.createElement('input');
@@ -1328,9 +1342,27 @@ function showExtractionModal(tags: ExtractedFloorTag[], mesId: number): void {
 
       const preview = doc.createElement('span');
       preview.className = 'wbex-preview';
-      preview.textContent = tag.content.length > 120 ? tag.content.slice(0, 120) + '...' : tag.content;
+      const isLong = tag.content.length > 120;
+      preview.textContent = isLong ? tag.content.slice(0, 120) + '...' : tag.content;
 
-      info.append(nameEl, preview);
+      const expandHint = doc.createElement('span');
+      expandHint.className = 'wbex-expand-hint';
+      expandHint.textContent = isLong ? '▶ 点击查看完整内容' : '';
+
+      // Click info area to expand/collapse
+      info.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const expanded = item.classList.toggle('expanded');
+        if (expanded) {
+          preview.textContent = tag.content;
+          expandHint.textContent = '▼ 收起';
+        } else {
+          preview.textContent = isLong ? tag.content.slice(0, 120) + '...' : tag.content;
+          expandHint.textContent = isLong ? '▶ 点击查看完整内容' : '';
+        }
+      });
+
+      info.append(nameEl, preview, expandHint);
       item.append(cb, info);
       listContainer.append(item);
     }
