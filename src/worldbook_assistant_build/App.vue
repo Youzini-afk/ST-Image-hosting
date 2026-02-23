@@ -6829,8 +6829,10 @@ watch(hasUnsavedChanges, (val) => {
   z-index: 10120;
   border: 1px solid var(--wb-border-subtle);
   border-radius: 8px;
-  background: var(--wb-input-bg-focus);
-  box-shadow: var(--wb-shadow-main);
+  background: rgba(15, 15, 15, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.4);
   padding: 8px;
   display: grid;
   gap: 8px;
@@ -6998,8 +7000,10 @@ watch(hasUnsavedChanges, (val) => {
   z-index: 10130;
   border: 1px solid var(--wb-border-subtle);
   border-radius: 8px;
-  background: var(--wb-input-bg-focus);
-  box-shadow: var(--wb-shadow-main);
+  background: rgba(15, 15, 15, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.4);
   padding: 8px;
   display: grid;
   gap: 8px;
@@ -7984,9 +7988,11 @@ watch(hasUnsavedChanges, (val) => {
   max-width: calc(100vw - 16px);
   max-height: min(74vh, 760px);
   border: 1px solid var(--wb-border-subtle);
-  border-radius: 10px;
-  background: var(--wb-bg-root);
-  box-shadow: var(--wb-shadow-main);
+  border-radius: 12px;
+  background: rgba(20, 20, 20, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 16px 40px rgba(0,0,0,0.5);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -7997,9 +8003,9 @@ watch(hasUnsavedChanges, (val) => {
   justify-content: space-between;
   gap: 8px;
   align-items: center;
-  padding: 8px 10px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--wb-border-subtle);
-  background: var(--wb-bg-panel);
+  background: rgba(0, 0, 0, 0.2);
   cursor: move;
   user-select: none;
   touch-action: none;
@@ -8157,7 +8163,9 @@ watch(hasUnsavedChanges, (val) => {
 .wb-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -8169,10 +8177,12 @@ watch(hasUnsavedChanges, (val) => {
 .wb-history-modal {
   width: min(1260px, 100%);
   max-height: min(88vh, 940px);
-  border: 1px solid var(--wb-border-main);
+  border: 1px solid var(--wb-border-subtle);
   border-radius: 12px;
-  background: var(--wb-bg-root);
-  box-shadow: var(--wb-shadow-main);
+  background: rgba(20, 20, 20, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 16px 40px rgba(0,0,0,0.5);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -8184,9 +8194,9 @@ watch(hasUnsavedChanges, (val) => {
   justify-content: space-between;
   gap: 8px;
   align-items: center;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--wb-border-main);
-  background: var(--wb-bg-panel);
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--wb-border-subtle);
+  background: rgba(0, 0, 0, 0.2);
 }
 
 .wb-history-modal-header strong {
