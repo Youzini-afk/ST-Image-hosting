@@ -883,7 +883,7 @@ function ensureExtractStyle(): void {
   position: fixed;
   inset: 0;
   z-index: 10050;
-  background: rgba(0, 0, 0, 0.55);
+  background: var(--wb-overlay-bg, rgba(0, 0, 0, 0.55));
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   display: flex;
@@ -894,17 +894,19 @@ function ensureExtractStyle(): void {
 }
 
 #${EXTRACT_MODAL_ID} .wbex-modal {
-  background: #1a1f2e;
-  border: 1px solid #334155;
+  background: var(--wb-glass-bg, rgba(20, 20, 20, 0.85));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--wb-border-subtle, rgba(255,255,255,0.05));
   border-radius: 16px;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--wb-shadow-main, 0 16px 48px rgba(0, 0, 0, 0.4));
   width: 580px;
   max-width: 92vw;
   max-height: 80vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  color: #e2e8f0;
+  color: var(--wb-text-main, #e2e8f0);
 }
 
 #${EXTRACT_MODAL_ID} .wbex-head {
@@ -912,22 +914,22 @@ function ensureExtractStyle(): void {
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  border-bottom: 1px solid #334155;
-  background: #111827;
+  border-bottom: 1px solid var(--wb-border-subtle, rgba(255,255,255,0.05));
+  background: var(--wb-glass-header, rgba(0, 0, 0, 0.2));
 }
 
 #${EXTRACT_MODAL_ID} .wbex-title {
   font-weight: 600;
   font-size: 14px;
-  color: #e2e8f0;
+  color: var(--wb-text-main, #e2e8f0);
 }
 
 #${EXTRACT_MODAL_ID} .wbex-close {
   width: 30px;
   height: 30px;
-  border: 1px solid #475569;
-  background: #1f2937;
-  color: #e2e8f0;
+  border: 1px solid var(--wb-border-main, rgba(255,255,255,0.1));
+  background: var(--wb-input-bg, rgba(0,0,0,0.25));
+  color: var(--wb-text-main, #e2e8f0);
   font-size: 1.1em;
   cursor: pointer;
   border-radius: 8px;
@@ -938,16 +940,16 @@ function ensureExtractStyle(): void {
 }
 #${EXTRACT_MODAL_ID} .wbex-close:hover {
   border-color: #f43f5e;
-  background: #374151;
+  background: var(--wb-input-bg-hover, rgba(0,0,0,0.4));
 }
 
 #${EXTRACT_MODAL_ID} .wbex-target {
   padding: 14px 20px;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid var(--wb-border-subtle, rgba(255,255,255,0.05));
 }
 #${EXTRACT_MODAL_ID} .wbex-target > span {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--wb-text-muted, #94a3b8);
   margin-bottom: 4px;
   display: block;
 }
@@ -959,10 +961,10 @@ function ensureExtractStyle(): void {
 #${EXTRACT_MODAL_ID} .wbex-dropdown-trigger {
   width: 100%;
   padding: 7px 32px 7px 10px;
-  border: 1px solid #475569;
+  border: 1px solid var(--wb-border-main, rgba(255,255,255,0.1));
   border-radius: 8px;
-  background: #1e293b;
-  color: #e2e8f0;
+  background: var(--wb-input-bg, rgba(0,0,0,0.25));
+  color: var(--wb-text-main, #e2e8f0);
   font-size: 13px;
   cursor: pointer;
   text-align: left;
@@ -972,16 +974,16 @@ function ensureExtractStyle(): void {
   white-space: nowrap;
 }
 #${EXTRACT_MODAL_ID} .wbex-dropdown-trigger::after {
-  content: '▾';
+  content: '\u25be';
   position: absolute;
   right: 10px;
   top: 50%;
   transform: translateY(-50%);
-  color: #64748b;
+  color: var(--wb-text-muted, #64748b);
   pointer-events: none;
 }
 #${EXTRACT_MODAL_ID} .wbex-dropdown-trigger:hover {
-  border-color: #60a5fa;
+  border-color: var(--wb-primary-light, #60a5fa);
 }
 #${EXTRACT_MODAL_ID} .wbex-dropdown-panel {
   position: absolute;
@@ -989,8 +991,8 @@ function ensureExtractStyle(): void {
   left: 0;
   right: 0;
   z-index: 10;
-  background: #1e293b;
-  border: 1px solid #475569;
+  background: var(--wb-dropdown-bg, var(--wb-glass-bg, rgba(15, 15, 15, 0.95)));
+  border: 1px solid var(--wb-border-main, rgba(255,255,255,0.1));
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.4);
   max-height: 220px;
@@ -1001,15 +1003,15 @@ function ensureExtractStyle(): void {
 #${EXTRACT_MODAL_ID} .wbex-dropdown-search {
   padding: 8px 10px;
   border: none;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid var(--wb-border-subtle, rgba(255,255,255,0.05));
   background: transparent;
-  color: #e2e8f0;
+  color: var(--wb-text-main, #e2e8f0);
   font-size: 13px;
   outline: none;
   flex-shrink: 0;
 }
 #${EXTRACT_MODAL_ID} .wbex-dropdown-search::placeholder {
-  color: #64748b;
+  color: var(--wb-text-muted, #64748b);
 }
 #${EXTRACT_MODAL_ID} .wbex-dropdown-options {
   flex: 1;
@@ -1021,7 +1023,7 @@ function ensureExtractStyle(): void {
   border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
-  color: #e2e8f0;
+  color: var(--wb-text-main, #e2e8f0);
   transition: background 0.1s ease;
   white-space: nowrap;
   overflow: hidden;
@@ -1029,15 +1031,15 @@ function ensureExtractStyle(): void {
 }
 #${EXTRACT_MODAL_ID} .wbex-dropdown-opt:hover,
 #${EXTRACT_MODAL_ID} .wbex-dropdown-opt.highlight {
-  background: rgba(96, 165, 250, 0.15);
+  background: var(--wb-primary-hover, rgba(96, 165, 250, 0.15));
 }
 #${EXTRACT_MODAL_ID} .wbex-dropdown-opt.selected {
-  background: rgba(96, 165, 250, 0.25);
-  color: #60a5fa;
+  background: var(--wb-primary-soft, rgba(96, 165, 250, 0.1));
+  color: var(--wb-primary-light, #60a5fa);
 }
 #${EXTRACT_MODAL_ID} .wbex-dropdown-empty {
   padding: 12px 10px;
-  color: #64748b;
+  color: var(--wb-text-muted, #64748b);
   font-size: 12px;
   text-align: center;
 }
@@ -1053,7 +1055,7 @@ function ensureExtractStyle(): void {
   align-items: flex-start;
   gap: 12px;
   padding: 12px 0;
-  border-bottom: 1px solid #1e293b;
+  border-bottom: 1px solid var(--wb-border-subtle, rgba(255,255,255,0.05));
   cursor: pointer;
   transition: background 0.15s ease;
 }
@@ -1061,7 +1063,7 @@ function ensureExtractStyle(): void {
   border-bottom: none;
 }
 #${EXTRACT_MODAL_ID} .wbex-item:hover {
-  background: rgba(96, 165, 250, 0.08);
+  background: var(--wb-primary-hover, rgba(96, 165, 250, 0.08));
   border-radius: 8px;
   margin: 0 -8px;
   padding: 12px 8px;
@@ -1084,19 +1086,19 @@ function ensureExtractStyle(): void {
 #${EXTRACT_MODAL_ID} .wbex-tag-name {
   font-weight: 600;
   font-size: 13px;
-  color: #60a5fa;
+  color: var(--wb-primary-light, #60a5fa);
 }
 #${EXTRACT_MODAL_ID} .wbex-tag-status {
   font-size: 0.85em;
   margin-left: 6px;
 }
 #${EXTRACT_MODAL_ID} .wbex-tag-status.dup { color: #f59e0b; }
-#${EXTRACT_MODAL_ID} .wbex-tag-status.upd { color: #3b82f6; }
+#${EXTRACT_MODAL_ID} .wbex-tag-status.upd { color: var(--wb-primary, #3b82f6); }
 #${EXTRACT_MODAL_ID} .wbex-tag-name-input {
-  background: #1e293b;
-  border: 1px solid #60a5fa;
+  background: var(--wb-input-bg, rgba(0,0,0,0.25));
+  border: 1px solid var(--wb-primary-light, #60a5fa);
   border-radius: 4px;
-  color: #60a5fa;
+  color: var(--wb-primary-light, #60a5fa);
   font-weight: 600;
   font-size: 13px;
   padding: 2px 6px;
@@ -1108,7 +1110,7 @@ function ensureExtractStyle(): void {
 
 #${EXTRACT_MODAL_ID} .wbex-preview {
   font-size: 12px;
-  color: #64748b;
+  color: var(--wb-text-muted, #64748b);
   white-space: pre-wrap;
   word-break: break-all;
   line-height: 1.5;
@@ -1121,45 +1123,45 @@ function ensureExtractStyle(): void {
 }
 #${EXTRACT_MODAL_ID} .wbex-expand-hint {
   font-size: 11px;
-  color: #475569;
+  color: var(--wb-text-muted, #475569);
   cursor: pointer;
   user-select: none;
   margin-top: 2px;
 }
 #${EXTRACT_MODAL_ID} .wbex-expand-hint:hover {
-  color: #60a5fa;
+  color: var(--wb-primary-light, #60a5fa);
 }
 
 #${EXTRACT_MODAL_ID} .wbex-actions {
   display: flex;
   gap: 8px;
   padding: 14px 20px;
-  border-top: 1px solid #334155;
+  border-top: 1px solid var(--wb-border-subtle, rgba(255,255,255,0.05));
   justify-content: flex-end;
-  background: #111827;
+  background: var(--wb-glass-header, rgba(0, 0, 0, 0.2));
 }
 
 #${EXTRACT_MODAL_ID} .wbex-btn {
   padding: 7px 16px;
-  border: 1px solid #475569;
+  border: 1px solid var(--wb-border-main, rgba(255,255,255,0.1));
   border-radius: 8px;
-  background: #1f2937;
-  color: #e2e8f0;
+  background: var(--wb-input-bg, rgba(0,0,0,0.25));
+  color: var(--wb-text-main, #e2e8f0);
   font-size: 13px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 #${EXTRACT_MODAL_ID} .wbex-btn:hover {
-  border-color: #60a5fa;
-  background: #374151;
+  border-color: var(--wb-primary-light, #60a5fa);
+  background: var(--wb-input-bg-hover, rgba(0,0,0,0.4));
 }
 #${EXTRACT_MODAL_ID} .wbex-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
 #${EXTRACT_MODAL_ID} .wbex-btn.primary {
-  background: #3b82f6;
-  border-color: #3b82f6;
+  background: var(--wb-primary, #3b82f6);
+  border-color: var(--wb-primary, #3b82f6);
   color: #fff;
 }
 #${EXTRACT_MODAL_ID} .wbex-btn.primary:hover {
@@ -1169,7 +1171,7 @@ function ensureExtractStyle(): void {
 #${EXTRACT_MODAL_ID} .wbex-empty {
   padding: 40px 20px;
   text-align: center;
-  color: #64748b;
+  color: var(--wb-text-muted, #64748b);
   font-size: 14px;
 }
 
@@ -1656,6 +1658,24 @@ function showExtractionModal(tags: ExtractedFloorTag[], mesId: number): void {
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) closeExtractionModal();
   });
+
+  // ── Sync theme variables from Vue panel root to modal
+  const panelBody = doc.getElementById(PANEL_ID);
+  const vueRoot = panelBody?.querySelector('.wb-assistant-root') as HTMLElement | null;
+  if (vueRoot) {
+    const cs = getComputedStyle(vueRoot);
+    const vars = [
+      '--wb-bg-root', '--wb-bg-panel', '--wb-text-main', '--wb-text-muted',
+      '--wb-primary', '--wb-primary-light', '--wb-primary-hover', '--wb-primary-soft',
+      '--wb-primary-glow', '--wb-input-bg', '--wb-input-bg-hover', '--wb-input-bg-focus',
+      '--wb-border-subtle', '--wb-border-main', '--wb-shadow-main',
+      '--wb-glass-bg', '--wb-glass-header', '--wb-overlay-bg', '--wb-dropdown-bg',
+    ];
+    for (const v of vars) {
+      const val = cs.getPropertyValue(v);
+      if (val) overlay.style.setProperty(v, val);
+    }
+  }
 
   doc.body.append(overlay);
 }
