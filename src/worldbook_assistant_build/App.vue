@@ -4070,20 +4070,22 @@ async function markDuplicatesInTags(): Promise<void> {
   }
   try {
     const existing = await getWorldbook(targetName);
-    // Build a map: lowercase name → content
+    // Build a map: lowercase name → normalized content
+    const norm = (s: string) => s.replace(/\s+/g, ' ').trim();
     const existingMap = new Map<string, string>();
     for (const e of existing) {
-      existingMap.set(e.name.toLowerCase(), e.content);
+      existingMap.set(e.name.toLowerCase(), norm(e.content));
     }
     for (const tag of aiExtractedTags.value) {
       const key = tag.tag.toLowerCase();
-      const existingContent = existingMap.get(key);
-      if (existingContent === undefined) {
+      const existingNorm = existingMap.get(key);
+      const tagNorm = norm(tag.content);
+      if (existingNorm === undefined) {
         // Not in worldbook
         tag.duplicate = false;
         tag.updated = false;
-      } else if (existingContent === tag.content) {
-        // Same name + same content → true duplicate
+      } else if (existingNorm === tagNorm) {
+        // Same name + same content (after normalization) → true duplicate
         tag.duplicate = true;
         tag.updated = false;
         tag.selected = false;
@@ -4122,19 +4124,18 @@ async function extractFromChat(): Promise<void> {
       return;
     }
 
-    // Deduplicate by tag + content
-    const seen = new Set<string>();
-    const unique = allTags.filter(t => {
-      const key = `${t.tag}::${t.content}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+    // Dedup by tag name: keep the LAST occurrence (most recent message wins)
+    const tagNameMap = new Map<string, ExtractedTag>();
+    for (const t of allTags) {
+      tagNameMap.set(t.tag.toLowerCase(), t);
+    }
+    const byName = [...tagNameMap.values()];
 
-    // Also deduplicate by content only (different tag name, same content)
+    // Also dedup by normalized content (different tag name, same content)
+    const norm = (s: string) => s.replace(/\s+/g, ' ').trim();
     const seenContent = new Set<string>();
-    const deduped = unique.filter(t => {
-      const contentKey = t.content.trim();
+    const deduped = byName.filter(t => {
+      const contentKey = norm(t.content);
       if (seenContent.has(contentKey)) return false;
       seenContent.add(contentKey);
       return true;
