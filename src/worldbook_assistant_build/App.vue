@@ -3293,7 +3293,7 @@ function createDefaultPersistedState(): PersistedState {
     theme: 'ocean',
     ai_chat: { sessions: [], activeSessionId: null },
     worldbook_tags: { definitions: [], assignments: {} },
-    extract_ignore_tags: ['thinking', 'recap', 'content', 'details', 'summary'],
+    extract_ignore_tags: ['think', 'thinking', 'recap', 'content', 'details', 'summary'],
     ai_api_config: {
       mode: 'tavern',
       use_main_api: true,
