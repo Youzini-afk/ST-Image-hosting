@@ -432,7 +432,7 @@
     <section v-if="!isDesktopFocusMode" class="wb-toolbar">
             <label class="toolbar-label">
               <span>世界书</span>
-              <div ref="worldbookPickerRef" class="worldbook-picker" data-focus-hero="worldbook_picker">
+              <div ref="worldbookPickerRef" class="worldbook-picker">
                 <button class="worldbook-picker-trigger" type="button" @click="toggleWorldbookPicker">
                   <span class="worldbook-picker-trigger-text" :title="selectedWorldbookName || '请选择世界书'">
                     {{ selectedWorldbookName || '请选择世界书' }}
@@ -497,7 +497,7 @@
               <div class="wb-focus-core-group">
                 <label class="toolbar-label focus-toolbar-label">
                   <span class="focus-toolbar-label-text">世界书</span>
-                  <div ref="worldbookPickerRef" class="worldbook-picker" data-focus-hero="worldbook_picker">
+                  <div ref="worldbookPickerRef" class="worldbook-picker">
                     <button class="worldbook-picker-trigger" type="button" @click="toggleWorldbookPicker">
                       <span class="worldbook-picker-trigger-text" :title="selectedWorldbookName || '请选择世界书'">
                         {{ selectedWorldbookName || '请选择世界书' }}
@@ -2418,7 +2418,8 @@ const TAG_COLORS = [
 ];
 const FOCUS_CINE_DURATION = 1400;
 const FOCUS_CINE_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
-const FOCUS_CINE_STAGGER = 60;
+const FOCUS_CINE_STAGGER = 28;
+const FOCUS_CINE_MAX_STAGGER_STEPS = 8;
 const FOCUS_FALLBACK_PRIORITY: FocusHeroKey[] = [
   'focus_toggle',
   'find_btn',
@@ -6875,7 +6876,7 @@ function mountFocusCineGhosts(
     const dy = endRect.top - startRect.top;
     const scaleX = clampNumber(endWidth / startWidth, 0.72, 1.42);
     const scaleY = clampNumber(endHeight / startHeight, 0.72, 1.42);
-    const arcYOffset = key === 'worldbook_picker' ? 0 : -20;
+    const arcYOffset = -14;
 
     ghost.style.left = `${startRect.left}px`;
     ghost.style.top = `${startRect.top}px`;
@@ -6890,7 +6891,8 @@ function mountFocusCineGhosts(
     ghost.style.setProperty('--cine-to-opacity', targetSelf ? '1' : '0');
     ghost.style.animationDuration = `${FOCUS_CINE_DURATION}ms`;
     ghost.style.animationTimingFunction = FOCUS_CINE_EASE;
-    ghost.style.animationDelay = `${index * FOCUS_CINE_STAGGER}ms`;
+    const delaySteps = Math.min(index, FOCUS_CINE_MAX_STAGGER_STEPS);
+    ghost.style.animationDelay = `${delaySteps * FOCUS_CINE_STAGGER}ms`;
 
     overlay.appendChild(ghost);
     focusCineGhostNodes.push(ghost);
@@ -6941,7 +6943,8 @@ async function runFocusCinematicTransition(nextFocus: boolean): Promise<void> {
     }
 
     focusCinePhase.value = 'running';
-    const totalDuration = FOCUS_CINE_DURATION + Math.max(0, ghostCount - 1) * FOCUS_CINE_STAGGER + 160;
+    const staggerTail = Math.min(Math.max(ghostCount - 1, 0), FOCUS_CINE_MAX_STAGGER_STEPS) * FOCUS_CINE_STAGGER;
+    const totalDuration = FOCUS_CINE_DURATION + staggerTail + 40;
     await waitForDuration(totalDuration);
     if (token !== focusCineToken) {
       return;
@@ -6952,7 +6955,6 @@ async function runFocusCinematicTransition(nextFocus: boolean): Promise<void> {
     await nextTick();
     clampPaneWidths();
     persistLayoutState();
-    await waitForDuration(120);
   } catch (error) {
     console.error('[focus-cine] transition failed', error);
     await nextTick();
@@ -8682,7 +8684,7 @@ watch(hasUnsavedChanges, (val) => {
   transition: grid-template-columns 240ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.wb-assistant-root.focus-cine-running .wb-main-layout {
+.wb-assistant-root.focus-cine-locked .wb-main-layout {
   transition-duration: 1400ms;
   transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -8908,7 +8910,7 @@ watch(hasUnsavedChanges, (val) => {
   transition: grid-template-columns 240ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.wb-assistant-root.focus-cine-running .wb-editor-shell {
+.wb-assistant-root.focus-cine-locked .wb-editor-shell {
   transition-duration: 1400ms;
   transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -8933,46 +8935,46 @@ watch(hasUnsavedChanges, (val) => {
 
 @keyframes focus-cine-left-pane {
   0% {
-    transform: translate3d(0, 0, 0) scale(1);
-    filter: blur(0);
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
   }
   45% {
-    transform: translate3d(-12px, 0, 0) scale(0.93);
-    filter: blur(0.35px);
+    transform: translate3d(-6px, 0, 0);
+    opacity: 0.96;
   }
   100% {
-    transform: translate3d(0, 0, 0) scale(1);
-    filter: blur(0);
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
   }
 }
 
 @keyframes focus-cine-center-pane {
   0% {
-    transform: translate3d(0, 0, 0) scale(1);
-    filter: blur(0);
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
   }
   45% {
-    transform: translate3d(0, -2px, 0) scale(1.025);
-    filter: blur(0.2px);
+    transform: translate3d(0, -3px, 0);
+    opacity: 1;
   }
   100% {
-    transform: translate3d(0, 0, 0) scale(1);
-    filter: blur(0);
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
   }
 }
 
 @keyframes focus-cine-right-pane {
   0% {
-    transform: translate3d(0, 0, 0) scale(1);
-    filter: blur(0);
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
   }
   45% {
-    transform: translate3d(12px, 0, 0) scale(0.935);
-    filter: blur(0.35px);
+    transform: translate3d(6px, 0, 0);
+    opacity: 0.96;
   }
   100% {
-    transform: translate3d(0, 0, 0) scale(1);
-    filter: blur(0);
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
   }
 }
 
