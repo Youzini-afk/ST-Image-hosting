@@ -58,9 +58,8 @@
                 <button class="btn" type="button" :disabled="!selectedWorldbookName" @click="exportCurrentWorldbook" style="padding:8px 14px;font-size:13px;">📤 导出</button>
                 <button class="btn" type="button" @click="toggleGlobalMode" :style="{ padding:'8px 14px', fontSize:'13px', background: globalWorldbookMode ? 'var(--wb-primary)' : '', color: globalWorldbookMode ? '#fff' : '' }">🌐 全局</button>
                 <button class="btn" type="button" @click="extractFromChat" style="padding:8px 14px;font-size:13px;">📥 提取</button>
-                <button class="btn" type="button" @click="showApiSettings = true" style="padding:8px 14px;font-size:13px;">⚙️ API</button>
+                <button class="btn" type="button" @click="showApiSettings = true" style="padding:8px 14px;font-size:13px;">⚙️ 设置</button>
                 <button class="btn" type="button" @click="aiConfigPreview = false; aiConfigChanges = []; aiConfigTargetWorldbook = selectedWorldbookName || ''" style="padding:8px 14px;font-size:13px;">🔧 AI配置</button>
-                <button class="btn" type="button" :style="{ padding:'8px 14px', fontSize:'13px', background: floorBtnVisible ? 'var(--wb-primary)' : '', color: floorBtnVisible ? '#fff' : '' }" @click="toggleFloorBtns(!floorBtnVisible)">📥 {{ floorBtnVisible ? '楼层提取开启' : '楼层提取关闭' }}</button>
               </div>
             </section>
             <div class="wb-bindings" v-if="bindings.global.length || bindings.charPrimary || bindings.charAdditional.length || bindings.chat">
@@ -563,7 +562,7 @@
                 type="button"
                 @click="showApiSettings = true"
               >
-                ⚙️ API设置
+                ⚙️ 设置
               </button>
               <button
                 class="btn history-btn utility-btn"
@@ -571,15 +570,6 @@
                 @click="aiConfigPreview = false; aiConfigChanges = []; aiConfigTargetWorldbook = selectedWorldbookName || ''"
               >
                 🔧 AI配置
-              </button>
-              <button
-                class="btn history-btn utility-btn"
-                type="button"
-                :class="{ active: floorBtnVisible }"
-                :title="floorBtnVisible ? '点击隐藏楼层提取按钮' : '点击显示楼层提取按钮'"
-                @click="toggleFloorBtns(!floorBtnVisible)"
-              >
-                📥 {{ floorBtnVisible ? '楼层提取开启' : '楼层提取关闭' }}
               </button>
             </div>
             <div v-if="globalWorldbookMode" class="global-mode-panel">
@@ -1209,14 +1199,39 @@
     <!-- ═══ End Desktop Layout ═══ -->
 
     <!-- ═══ Shared Modals (both mobile & desktop) ═══ -->
-    <!-- API设置弹窗 -->
+    <!-- 设置弹窗 -->
     <div v-if="showApiSettings" class="ai-tag-review-overlay" @click.self="showApiSettings = false">
       <div class="ai-tag-review-modal" style="max-width:520px;">
         <div class="ai-tag-review-head">
-          <span class="ai-tag-review-title">⚙️ API 设置</span>
+          <span class="ai-tag-review-title">⚙️ 设置中心</span>
           <button class="ai-tag-review-close" type="button" @click="showApiSettings = false">×</button>
         </div>
         <div style="padding:16px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;max-height:60vh;">
+          <div style="border:1px solid var(--wb-border-subtle,#334155);border-radius:8px;padding:10px;">
+            <div style="font-size:13px;font-weight:600;margin-bottom:8px;">体验设置</div>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:6px;">
+              <input type="checkbox" :checked="fabVisible" @change="setFabVisible(($event.target as HTMLInputElement).checked)" />
+              <span>显示悬浮按钮（📖）</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:6px;">
+              <input type="checkbox" :checked="floorBtnVisible" @change="toggleFloorBtns(($event.target as HTMLInputElement).checked)" />
+              <span>显示楼层提取按钮</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" :checked="persistedState.show_ai_chat" @change="updatePersistedState(s => s.show_ai_chat = ($event.target as HTMLInputElement).checked)" />
+              <span>显示 AI 对话模块</span>
+            </label>
+            <div style="font-size:11px;color:var(--wb-text-muted,#64748b);margin-top:4px;">开启后将在工具栏和移动端 Tab 中显示 AI 对话入口</div>
+            <label class="field" style="margin-top:8px;">
+              <span>主题</span>
+              <select class="text-input" :value="currentTheme" @change="setTheme(($event.target as HTMLSelectElement).value as ThemeKey)">
+                <option v-for="item in themeOptions" :key="`setting-theme-${item.key}`" :value="item.key">{{ item.label }}</option>
+              </select>
+            </label>
+          </div>
+          <div style="border-top:1px solid var(--wb-border-subtle,#334155);padding-top:10px;">
+            <div style="font-size:13px;font-weight:600;margin-bottom:8px;">API 设置</div>
+          </div>
           <div style="display:flex;gap:12px;align-items:center;">
             <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
               <input type="radio" value="custom" :checked="persistedState.ai_api_config.mode === 'custom'" @change="updateApiConfig({ mode: 'custom', use_main_api: false })" />
@@ -1270,13 +1285,6 @@
           </template>
           <div v-if="persistedState.ai_api_config.mode === 'tavern'" style="font-size:12px;color:var(--wb-text-muted);padding:8px 0;">
             将直接使用酒馆当前启用的预设和API配置进行生成。
-          </div>
-          <div style="border-top:1px solid var(--wb-border-subtle,#334155);padding-top:12px;margin-top:8px;">
-            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-              <input type="checkbox" :checked="persistedState.show_ai_chat" @change="updatePersistedState(s => s.show_ai_chat = ($event.target as HTMLInputElement).checked)" />
-              <span>显示 AI 对话模块</span>
-            </label>
-            <div style="font-size:11px;color:var(--wb-text-muted,#64748b);margin-top:4px;">开启后将在工具栏和移动端 Tab 中显示 AI 对话入口</div>
           </div>
         </div>
       </div>
@@ -2177,10 +2185,33 @@ const globalWorldbookMode = ref(false);
 const aiGeneratorMode = ref(false);
 
 // Floor extraction button visibility (synced via localStorage + custom event)
+const FAB_VISIBLE_KEY = '__WB_FAB_VISIBLE__';
+const FAB_VISIBLE_SET_EVENT = 'wb-helper:set-fab-visible';
+const FAB_VISIBLE_CHANGED_EVENT = 'wb-helper:fab-visible-changed';
 const FLOOR_BTN_KEY = '__WB_FLOOR_BTN_VISIBLE__';
+const fabVisible = ref((() => {
+  try { return localStorage.getItem(FAB_VISIBLE_KEY) !== 'false'; } catch { return true; }
+})());
 const floorBtnVisible = ref((() => {
   try { return localStorage.getItem(FLOOR_BTN_KEY) !== 'false'; } catch { return true; }
 })());
+function setFabVisible(val: boolean): void {
+  fabVisible.value = val;
+  try { localStorage.setItem(FAB_VISIBLE_KEY, String(val)); } catch { /* ignore */ }
+  window.dispatchEvent(new CustomEvent(FAB_VISIBLE_SET_EVENT, { detail: val }));
+}
+function onFabVisibleChanged(event: Event): void {
+  const detail = (event as CustomEvent).detail;
+  if (typeof detail === 'boolean') {
+    fabVisible.value = detail;
+    return;
+  }
+  try {
+    fabVisible.value = localStorage.getItem(FAB_VISIBLE_KEY) !== 'false';
+  } catch {
+    fabVisible.value = true;
+  }
+}
 function toggleFloorBtns(val: boolean): void {
   floorBtnVisible.value = val;
   try { localStorage.setItem(FLOOR_BTN_KEY, String(val)); } catch { /* ignore */ }
@@ -2393,6 +2424,13 @@ const editorShellStyle = computed<Record<string, string> | undefined>(() => {
 
 const themeStyles = computed(() => {
   return THEMES[currentTheme.value].colors;
+});
+
+const themeOptions = computed(() => {
+  return Object.entries(THEMES).map(([key, item]) => ({
+    key: key as ThemeKey,
+    label: item.label,
+  }));
 });
 
 const selectableWorldbookNames = computed(() => {
@@ -6875,6 +6913,8 @@ onMounted(() => {
   window.addEventListener('wb-helper:discard', onPanelDiscard);
   window.addEventListener('wb-helper:toggle-theme', toggleTheme);
   window.addEventListener('wb-helper:set-theme', onSetThemeEvent);
+  window.addEventListener(FAB_VISIBLE_CHANGED_EVENT, onFabVisibleChanged);
+  window.dispatchEvent(new CustomEvent(FAB_VISIBLE_SET_EVENT, { detail: fabVisible.value }));
   hostResizeWindow.value = resolveHostWindow();
   const hostDoc = hostResizeWindow.value.document;
   hostDoc.addEventListener('pointerdown', onHostPointerDownForWorldbookPicker, true);
@@ -6915,6 +6955,7 @@ onUnmounted(() => {
   window.removeEventListener('wb-helper:discard', onPanelDiscard);
   window.removeEventListener('wb-helper:toggle-theme', toggleTheme);
   window.removeEventListener('wb-helper:set-theme', onSetThemeEvent);
+  window.removeEventListener(FAB_VISIBLE_CHANGED_EVENT, onFabVisibleChanged);
   hostResizeWindow.value?.document.removeEventListener('pointerdown', onHostPointerDownForWorldbookPicker, true);
   hostResizeWindow.value?.document.removeEventListener('keydown', onHostKeyDownForWorldbookPicker, true);
   hostResizeWindow.value?.removeEventListener('resize', handleFloatingWindowResize);

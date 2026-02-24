@@ -7,6 +7,8 @@ const PANEL_ID = 'wb-assistant-panel';
 const FAB_ID = 'wb-assistant-fab';
 const FAB_POS_KEY = '__WB_FAB_POS__';
 const FAB_VISIBLE_KEY = '__WB_FAB_VISIBLE__';
+const FAB_VISIBLE_SET_EVENT = 'wb-helper:set-fab-visible';
+const FAB_VISIBLE_CHANGED_EVENT = 'wb-helper:fab-visible-changed';
 const PANEL_STYLE_ID = 'wb-assistant-panel-style';
 const PANEL_BODY_ID = 'wb-assistant-panel-body';
 const EVENT_NS = '.wbAssistantMenu';
@@ -34,6 +36,7 @@ let isPanelVisible = false;
 let fabViewportSyncScrollHandler: (() => void) | null = null;
 let fabViewportSyncResizeHandler: (() => void) | null = null;
 let fabViewportSyncRaf: number | null = null;
+let fabVisibilitySetHandler: ((event: Event) => void) | null = null;
 
 function getHostWindow(): Window {
   return window.parent || window;
@@ -792,6 +795,10 @@ function syncFabToggleButton(): void {
   }
 }
 
+function notifyFabVisibilityChanged(visible: boolean): void {
+  window.dispatchEvent(new CustomEvent(FAB_VISIBLE_CHANGED_EVENT, { detail: visible }));
+}
+
 function detachFabViewportSync(): void {
   const hostWin = getHostWindow();
   if (fabViewportSyncScrollHandler) {
@@ -808,10 +815,9 @@ function detachFabViewportSync(): void {
   }
 }
 
-function toggleFabVisibility(): void {
+function setFabVisibility(visible: boolean): void {
   const doc = getHostDocument();
   const fab = doc.getElementById(FAB_ID);
-  const visible = !isFabVisible();
   try { localStorage.setItem(FAB_VISIBLE_KEY, String(visible)); } catch { /* ignore */ }
   if (visible) {
     if (!fab) createFab();
@@ -820,6 +826,11 @@ function toggleFabVisibility(): void {
     fab?.remove();
   }
   syncFabToggleButton();
+  notifyFabVisibilityChanged(visible);
+}
+
+function toggleFabVisibility(): void {
+  setFabVisibility(!isFabVisible());
 }
 
 function createFab(): void {
@@ -1915,6 +1926,18 @@ function init(): void {
   // 不使用聊天框上方脚本按钮
   replaceScriptButtons([]);
 
+  if (!fabVisibilitySetHandler) {
+    fabVisibilitySetHandler = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      if (typeof detail !== 'boolean') {
+        return;
+      }
+      setFabVisibility(detail);
+    };
+  }
+  window.addEventListener(FAB_VISIBLE_SET_EVENT, fabVisibilitySetHandler);
+  notifyFabVisibilityChanged(isFabVisible());
+
   const doc = getHostDocument();
   $(doc).off(`click${EVENT_NS}`, `#${MENU_ID}`).on(`click${EVENT_NS}`, `#${MENU_ID}`, event => {
     event.preventDefault();
@@ -1947,6 +1970,9 @@ function cleanup(): void {
   stopMenuRetry();
   stopMenuObserver();
   stopFloorButtonListeners();
+  if (fabVisibilitySetHandler) {
+    window.removeEventListener(FAB_VISIBLE_SET_EVENT, fabVisibilitySetHandler);
+  }
   detachFabViewportSync();
   $(doc).off(EVENT_NS);
   doc.removeEventListener('pointerdown', closeThemeDropdownOnOutside, true);
