@@ -474,17 +474,17 @@
                 </div>
               </div>
             </label>
-            <button class="btn" type="button" @click="createNewWorldbook">新建</button>
-            <button class="btn" type="button" :disabled="!selectedWorldbookName" @click="duplicateWorldbook">
+            <button class="btn" data-focus-hero="wb_new" type="button" @click="createNewWorldbook">新建</button>
+            <button class="btn" data-focus-hero="wb_duplicate" type="button" :disabled="!selectedWorldbookName" @click="duplicateWorldbook">
               另存为
             </button>
-            <button class="btn danger" type="button" :disabled="!selectedWorldbookName" @click="deleteCurrentWorldbook">
+            <button class="btn danger" data-focus-hero="wb_delete" type="button" :disabled="!selectedWorldbookName" @click="deleteCurrentWorldbook">
               删除
             </button>
-            <button class="btn" type="button" :disabled="!selectedWorldbookName" @click="exportCurrentWorldbook">
+            <button class="btn" data-focus-hero="wb_export" type="button" :disabled="!selectedWorldbookName" @click="exportCurrentWorldbook">
               导出
             </button>
-            <button class="btn" type="button" @click="triggerImport">导入</button>
+            <button class="btn" data-focus-hero="wb_import" type="button" @click="triggerImport">导入</button>
             <div class="focus-cine-sink-row" aria-hidden="true">
               <span class="focus-cine-sink" data-focus-sink="save_btn"></span>
               <span class="focus-cine-sink" data-focus-sink="more_btn"></span>
@@ -549,6 +549,13 @@
                   <button class="btn utility-btn" data-focus-hero="more_btn" type="button" :disabled="focusCineLocked" @click="toggleFocusWorldbookMenu">
                     {{ isFocusToolbarCompact ? '⋯' : '更多' }}
                   </button>
+                  <div class="focus-cine-sink-cluster menu" aria-hidden="true">
+                    <span class="focus-cine-sink" data-focus-sink="wb_new"></span>
+                    <span class="focus-cine-sink" data-focus-sink="wb_duplicate"></span>
+                    <span class="focus-cine-sink" data-focus-sink="wb_delete"></span>
+                    <span class="focus-cine-sink" data-focus-sink="wb_export"></span>
+                    <span class="focus-cine-sink" data-focus-sink="wb_import"></span>
+                  </div>
                   <Transition name="focus-menu-pop">
                     <div v-if="focusWorldbookMenuOpen" class="focus-menu-panel">
                       <button class="btn mini" type="button" @click="runFocusWorldbookAction('create')">新建</button>
@@ -576,19 +583,30 @@
                     {{ isFocusToolbarCompact ? '工具' : '更多工具' }}
                   </button>
                 </Transition>
+                <div class="focus-cine-sink-cluster tools" aria-hidden="true">
+                  <span class="focus-cine-sink" data-focus-sink="tool_global"></span>
+                  <span class="focus-cine-sink" data-focus-sink="tool_entry_history"></span>
+                  <span class="focus-cine-sink" data-focus-sink="tool_worldbook_history"></span>
+                  <span class="focus-cine-sink" data-focus-sink="tool_activation"></span>
+                  <span class="focus-cine-sink" data-focus-sink="tool_ai_generate"></span>
+                  <span class="focus-cine-sink" data-focus-sink="tool_extract"></span>
+                  <span class="focus-cine-sink" data-focus-sink="tool_tag"></span>
+                  <span class="focus-cine-sink" data-focus-sink="tool_settings"></span>
+                  <span class="focus-cine-sink" data-focus-sink="tool_ai_config"></span>
+                </div>
               </div>
             </div>
             <Transition name="focus-tools-band" @after-leave="onFocusToolsBandAfterLeave">
               <div v-if="focusToolsExpanded" class="wb-focus-tools-band">
-                <button class="btn history-btn utility-btn" type="button" :class="{ active: globalWorldbookMode }" @click="toggleGlobalMode">🌐 全局模式</button>
-                <button class="btn history-btn utility-btn" type="button" :disabled="!selectedEntry" @click="openEntryHistoryModal">🕰️ 条目时光机</button>
-                <button class="btn history-btn utility-btn" type="button" :disabled="!selectedWorldbookName" @click="openWorldbookHistoryModal">⏪ 整本时光机</button>
-                <button class="btn history-btn utility-btn" type="button" :class="{ active: floatingPanels.activation.visible }" @click="toggleFloatingPanel('activation')">📡 激活监控</button>
-                <button v-if="persistedState.show_ai_chat" class="btn history-btn utility-btn" type="button" :class="{ active: aiGeneratorMode }" @click="aiToggleMode">🤖 AI 生成</button>
-                <button class="btn history-btn utility-btn" type="button" @click="extractFromChat">📥 从聊天提取</button>
-                <button class="btn history-btn utility-btn" type="button" :class="{ active: tagEditorMode }" @click="tagToggleMode">🏷️ 标签管理</button>
-                <button class="btn history-btn utility-btn" type="button" @click="showApiSettings = true">⚙️ 设置</button>
-                <button class="btn history-btn utility-btn" type="button" @click="aiConfigPreview = false; aiConfigChanges = []; aiConfigTargetWorldbook = selectedWorldbookName || ''">🔧 AI配置</button>
+                <button class="btn history-btn utility-btn" data-focus-hero="tool_global" type="button" :class="{ active: globalWorldbookMode }" @click="toggleGlobalMode">🌐 全局模式</button>
+                <button class="btn history-btn utility-btn" data-focus-hero="tool_entry_history" type="button" :disabled="!selectedEntry" @click="openEntryHistoryModal">🕰️ 条目时光机</button>
+                <button class="btn history-btn utility-btn" data-focus-hero="tool_worldbook_history" type="button" :disabled="!selectedWorldbookName" @click="openWorldbookHistoryModal">⏪ 整本时光机</button>
+                <button class="btn history-btn utility-btn" data-focus-hero="tool_activation" type="button" :class="{ active: floatingPanels.activation.visible }" @click="toggleFloatingPanel('activation')">📡 激活监控</button>
+                <button v-if="persistedState.show_ai_chat" class="btn history-btn utility-btn" data-focus-hero="tool_ai_generate" type="button" :class="{ active: aiGeneratorMode }" @click="aiToggleMode">🤖 AI 生成</button>
+                <button class="btn history-btn utility-btn" data-focus-hero="tool_extract" type="button" @click="extractFromChat">📥 从聊天提取</button>
+                <button class="btn history-btn utility-btn" data-focus-hero="tool_tag" type="button" :class="{ active: tagEditorMode }" @click="tagToggleMode">🏷️ 标签管理</button>
+                <button class="btn history-btn utility-btn" data-focus-hero="tool_settings" type="button" @click="showApiSettings = true">⚙️ 设置</button>
+                <button class="btn history-btn utility-btn" data-focus-hero="tool_ai_config" type="button" @click="aiConfigPreview = false; aiConfigChanges = []; aiConfigTargetWorldbook = selectedWorldbookName || ''">🔧 AI配置</button>
                 <button class="btn history-btn utility-btn focus-tools-collapse" type="button" @click="closeFocusToolsBand">收起工具</button>
               </div>
             </Transition>
@@ -608,17 +626,19 @@
               <button class="btn history-btn utility-btn" data-focus-hero="focus_toggle" type="button" :disabled="focusCineLocked" @click="toggleFocusEditing">🎯 专注编辑</button>
               <button
                 class="btn history-btn utility-btn"
+                data-focus-hero="tool_global"
                 type="button"
                 :class="{ active: globalWorldbookMode }"
                 @click="toggleGlobalMode"
               >
                 🌐 全局模式
               </button>
-              <button class="btn history-btn" type="button" :disabled="!selectedEntry" @click="openEntryHistoryModal">
+              <button class="btn history-btn" data-focus-hero="tool_entry_history" type="button" :disabled="!selectedEntry" @click="openEntryHistoryModal">
                 🕰️ 条目时光机
               </button>
               <button
                 class="btn history-btn"
+                data-focus-hero="tool_worldbook_history"
                 type="button"
                 :disabled="!selectedWorldbookName"
                 @click="openWorldbookHistoryModal"
@@ -637,6 +657,7 @@
               </button>
               <button
                 class="btn history-btn utility-btn"
+                data-focus-hero="tool_activation"
                 type="button"
                 :class="{ active: floatingPanels.activation.visible }"
                 @click="toggleFloatingPanel('activation')"
@@ -646,6 +667,7 @@
               <button
                 v-if="persistedState.show_ai_chat"
                 class="btn history-btn utility-btn"
+                data-focus-hero="tool_ai_generate"
                 type="button"
                 :class="{ active: aiGeneratorMode }"
                 @click="aiToggleMode"
@@ -654,6 +676,7 @@
               </button>
               <button
                 class="btn history-btn utility-btn"
+                data-focus-hero="tool_extract"
                 type="button"
                 @click="extractFromChat"
               >
@@ -661,6 +684,7 @@
               </button>
               <button
                 class="btn history-btn utility-btn"
+                data-focus-hero="tool_tag"
                 type="button"
                 :class="{ active: tagEditorMode }"
                 @click="tagToggleMode"
@@ -669,6 +693,7 @@
               </button>
               <button
                 class="btn history-btn utility-btn"
+                data-focus-hero="tool_settings"
                 type="button"
                 @click="showApiSettings = true"
               >
@@ -676,6 +701,7 @@
               </button>
               <button
                 class="btn history-btn utility-btn"
+                data-focus-hero="tool_ai_config"
                 type="button"
                 @click="aiConfigPreview = false; aiConfigChanges = []; aiConfigTargetWorldbook = selectedWorldbookName || ''"
               >
@@ -1961,7 +1987,7 @@ type FocusSidePanelKey = 'strategy' | 'insertion' | 'recursion';
 type FocusMetaPanelKey = 'comment' | 'keywords';
 type FocusCinePhase = 'idle' | 'prepare' | 'running' | 'settling';
 type FocusCineDirection = 'enter' | 'exit';
-type FocusHeroKey = 'worldbook_picker' | 'focus_toggle' | 'find_btn' | 'save_btn' | 'more_btn' | 'tools_btn';
+type FocusHeroKey = string;
 
 interface WorldbookSwitchOptions {
   source?: SelectionSource;
@@ -2393,8 +2419,7 @@ const TAG_COLORS = [
 const FOCUS_CINE_DURATION = 1400;
 const FOCUS_CINE_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
 const FOCUS_CINE_STAGGER = 60;
-const FOCUS_HERO_KEYS: FocusHeroKey[] = [
-  'worldbook_picker',
+const FOCUS_FALLBACK_PRIORITY: FocusHeroKey[] = [
   'focus_toggle',
   'find_btn',
   'save_btn',
@@ -6662,6 +6687,19 @@ function applyFocusEditingState(nextFocus: boolean): void {
   }
 }
 
+function collectFocusAnimatedKeys(root: HTMLElement, attribute: 'data-focus-hero' | 'data-focus-sink'): Set<FocusHeroKey> {
+  const keys = new Set<FocusHeroKey>();
+  const nodes = Array.from(root.querySelectorAll<HTMLElement>(`[${attribute}]`));
+  for (const node of nodes) {
+    const rawKey = node.getAttribute(attribute);
+    const key = rawKey ? rawKey.trim() : '';
+    if (key) {
+      keys.add(key);
+    }
+  }
+  return keys;
+}
+
 function collectFocusHeroSnapshots(): Map<FocusHeroKey, FocusHeroSnapshot> {
   const snapshots = new Map<FocusHeroKey, FocusHeroSnapshot>();
   const root = rootRef.value;
@@ -6669,7 +6707,8 @@ function collectFocusHeroSnapshots(): Map<FocusHeroKey, FocusHeroSnapshot> {
     return snapshots;
   }
 
-  for (const key of FOCUS_HERO_KEYS) {
+  const keys = collectFocusAnimatedKeys(root, 'data-focus-hero');
+  for (const key of keys) {
     const nodes = Array.from(root.querySelectorAll<HTMLElement>(`[data-focus-hero="${key}"]`));
     const element = nodes.find(node => {
       if (!node.isConnected) {
@@ -6701,7 +6740,8 @@ function collectFocusSinkSnapshots(): Map<FocusHeroKey, FocusSinkSnapshot> {
   if (!root) {
     return snapshots;
   }
-  for (const key of FOCUS_HERO_KEYS) {
+  const keys = collectFocusAnimatedKeys(root, 'data-focus-sink');
+  for (const key of keys) {
     const nodes = Array.from(root.querySelectorAll<HTMLElement>(`[data-focus-sink="${key}"]`));
     const element = nodes.find(node => node.isConnected && node.getBoundingClientRect().width > 1 && node.getBoundingClientRect().height > 1) ?? null;
     if (!element) {
@@ -6720,20 +6760,56 @@ function resolveFocusFallbackRect(
   heroMap: Map<FocusHeroKey, FocusHeroSnapshot>,
   sinkMap: Map<FocusHeroKey, FocusSinkSnapshot>,
 ): DOMRect | null {
-  const priority: FocusHeroKey[] = ['focus_toggle', 'worldbook_picker', 'find_btn', 'save_btn', 'more_btn', 'tools_btn'];
-  for (const key of priority) {
+  for (const key of FOCUS_FALLBACK_PRIORITY) {
     const hero = heroMap.get(key);
     if (hero) {
       return hero.rect;
     }
   }
-  for (const key of priority) {
+  for (const key of FOCUS_FALLBACK_PRIORITY) {
     const sink = sinkMap.get(key);
     if (sink) {
       return sink.rect;
     }
   }
+  for (const hero of heroMap.values()) {
+    return hero.rect;
+  }
+  for (const sink of sinkMap.values()) {
+    return sink.rect;
+  }
   return null;
+}
+
+function buildFocusGhostKeyOrder(
+  sourceMap: Map<FocusHeroKey, FocusHeroSnapshot>,
+  targetMap: Map<FocusHeroKey, FocusHeroSnapshot>,
+  sourceSinkMap: Map<FocusHeroKey, FocusSinkSnapshot>,
+  targetSinkMap: Map<FocusHeroKey, FocusSinkSnapshot>,
+): FocusHeroKey[] {
+  const keySet = new Set<FocusHeroKey>();
+  for (const key of sourceMap.keys()) {
+    keySet.add(key);
+  }
+  for (const key of targetMap.keys()) {
+    keySet.add(key);
+  }
+  for (const key of sourceSinkMap.keys()) {
+    keySet.add(key);
+  }
+  for (const key of targetSinkMap.keys()) {
+    keySet.add(key);
+  }
+
+  const ordered: FocusHeroKey[] = [];
+  for (const key of FOCUS_FALLBACK_PRIORITY) {
+    if (keySet.delete(key)) {
+      ordered.push(key);
+    }
+  }
+  const remaining = Array.from(keySet).sort((a, b) => a.localeCompare(b));
+  ordered.push(...remaining);
+  return ordered;
 }
 
 function clearFocusCineArtifacts(): void {
@@ -6763,9 +6839,10 @@ function mountFocusCineGhosts(
   const targetFallbackRect = resolveFocusFallbackRect(targetMap, targetSinkMap);
   const sourceElementFallback = sourceMap.get('focus_toggle')?.element ?? targetMap.get('focus_toggle')?.element ?? null;
   const hiddenTargets = new Set<HTMLElement>();
+  const orderedKeys = buildFocusGhostKeyOrder(sourceMap, targetMap, sourceSinkMap, targetSinkMap);
   let index = 0;
 
-  for (const key of FOCUS_HERO_KEYS) {
+  for (const key of orderedKeys) {
     const sourceSelf = sourceMap.get(key) ?? null;
     const targetSelf = targetMap.get(key) ?? null;
     const sourceSink = sourceSinkMap.get(key) ?? null;
@@ -6798,6 +6875,7 @@ function mountFocusCineGhosts(
     const dy = endRect.top - startRect.top;
     const scaleX = clampNumber(endWidth / startWidth, 0.72, 1.42);
     const scaleY = clampNumber(endHeight / startHeight, 0.72, 1.42);
+    const arcYOffset = key === 'worldbook_picker' ? 0 : -20;
 
     ghost.style.left = `${startRect.left}px`;
     ghost.style.top = `${startRect.top}px`;
@@ -6807,6 +6885,7 @@ function mountFocusCineGhosts(
     ghost.style.setProperty('--cine-dy', `${dy}px`);
     ghost.style.setProperty('--cine-scale-x', `${scaleX}`);
     ghost.style.setProperty('--cine-scale-y', `${scaleY}`);
+    ghost.style.setProperty('--cine-arc-y', `${arcYOffset}px`);
     ghost.style.setProperty('--cine-from-opacity', sourceSelf ? '1' : '0');
     ghost.style.setProperty('--cine-to-opacity', targetSelf ? '1' : '0');
     ghost.style.animationDuration = `${FOCUS_CINE_DURATION}ms`;
@@ -7853,7 +7932,7 @@ watch(hasUnsavedChanges, (val) => {
   }
   60% {
     opacity: 1;
-    transform: translate3d(calc(var(--cine-dx, 0px) * 0.6), calc(var(--cine-dy, 0px) * 0.6 - 20px), 0)
+    transform: translate3d(calc(var(--cine-dx, 0px) * 0.6), calc(var(--cine-dy, 0px) * 0.6 + var(--cine-arc-y, -20px)), 0)
       scale(calc(var(--cine-scale-x, 1) * 1.04), calc(var(--cine-scale-y, 1) * 1.04));
   }
   100% {
@@ -7974,6 +8053,10 @@ watch(hasUnsavedChanges, (val) => {
   flex: 1 1 auto;
 }
 
+.wb-focus-tool-entry {
+  position: relative;
+}
+
 .focus-toolbar-label {
   min-width: 220px;
   flex: 1 1 auto;
@@ -7994,6 +8077,24 @@ watch(hasUnsavedChanges, (val) => {
 
 .focus-menu-wrap {
   position: relative;
+}
+
+.focus-cine-sink-cluster {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.focus-cine-sink-cluster .focus-cine-sink {
+  position: absolute;
+  right: 0;
+  top: 0;
+  transform: translateY(-50%);
 }
 
 .focus-menu-panel {
