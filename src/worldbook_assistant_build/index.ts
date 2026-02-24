@@ -893,22 +893,6 @@ function ensureExtractStyle(): void {
 .${FLOOR_BTN_CLASS}:active {
   transform: scale(0.95);
 }
-/* Mobile: floating corner placement inside mes_block */
-.mes_block > .${FLOOR_BTN_CLASS} {
-  position: absolute;
-  bottom: 4px;
-  right: 4px;
-  font-size: 0.85em;
-  opacity: 0.45;
-  z-index: 1;
-  padding: 4px;
-  border-radius: 6px;
-  background: rgba(0,0,0,0.15);
-}
-.mes_block > .${FLOOR_BTN_CLASS}:active {
-  opacity: 1;
-  transform: scale(0.95);
-}
 
 /* ── Extraction modal (standalone) ── */
 #${EXTRACT_MODAL_ID} {
@@ -1273,30 +1257,29 @@ function injectButtonToFloor(mesId: number): void {
   const $mes = $(`#chat > .mes[mesid="${mesId}"]`, doc);
   if (!$mes.length || $mes.find(`.${FLOOR_BTN_CLASS}`).length) return;
 
-  const isMobile = window.innerWidth <= 768;
-
-  // On mobile, inject into mes_block (always visible).
-  // On desktop, inject into extraMesButtons / mes_buttons.
-  let $target: JQuery;
-  if (isMobile) {
-    $target = $mes.find('.mes_block');
-    // Ensure mes_block has position:relative for the absolute-positioned button
-    $target.css('position', 'relative');
-  } else {
-    $target = $mes.find('.extraMesButtons, .mes_buttons');
-  }
-  if (!$target.length) return;
+  const $extraBtns = $mes.find('.extraMesButtons, .mes_buttons');
+  if (!$extraBtns.length) return;
 
   const btn = doc.createElement('div');
   btn.className = FLOOR_BTN_CLASS;
   btn.textContent = '📥';
   btn.title = '提取世界书条目';
-  btn.addEventListener('click', (e) => {
+
+  // Use both pointerup + click to cover mobile & desktop.
+  // Mobile: SillyTavern may swallow click but pointerup still fires.
+  // Desktop: click always works. Guard against double-fire.
+  let handled = false;
+  const handler = (e: Event) => {
     e.stopPropagation();
     e.preventDefault();
+    if (handled) return;
+    handled = true;
+    setTimeout(() => { handled = false; }, 300);
     handleFloorExtract(mesId);
-  });
-  $target.first().append(btn);
+  };
+  btn.addEventListener('pointerup', handler);
+  btn.addEventListener('click', handler);
+  $extraBtns.first().append(btn);
 }
 
 // ── Scan all displayed floors and inject buttons ───────────────────
