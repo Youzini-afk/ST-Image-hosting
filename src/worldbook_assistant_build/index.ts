@@ -731,8 +731,6 @@ function createFab(): void {
   if (doc.getElementById(FAB_ID)) return;
   if (!isFabVisible()) return;
 
-  // On mobile SillyTavern, body has position:fixed which clips position:fixed children.
-  // Append FAB to documentElement (<html>) instead to avoid clipping.
   const isMobile = window.matchMedia('(max-width: 1000px)').matches;
 
   const fab = doc.createElement('div');
@@ -740,20 +738,66 @@ function createFab(): void {
   fab.textContent = '📖';
   fab.title = '世界书助手';
 
+  // On mobile, position:fixed breaks due to CSS transforms.
+  // Use position:absolute on <html> + scroll listener to simulate fixed behavior.
+  if (isMobile) {
+    fab.style.position = 'absolute';
+  }
+
   // Restore saved position or default to bottom-right
   const hostWin = getHostWindow();
-  let savedPos: { x: number; y: number } | null = null;
+
+  // "Desired" viewport-relative position (like fixed would use)
+  let vpX: number | null = null;
+  let vpY: number | null = null;
+
   try {
     const raw = localStorage.getItem(FAB_POS_KEY);
-    if (raw) savedPos = JSON.parse(raw);
+    if (raw) {
+      const savedPos = JSON.parse(raw);
+      vpX = Math.min(savedPos.x, hostWin.innerWidth - 56);
+      vpY = Math.min(savedPos.y, hostWin.innerHeight - 56);
+    }
   } catch { /* ignore */ }
 
-  if (savedPos) {
-    fab.style.left = Math.min(savedPos.x, hostWin.innerWidth - 56) + 'px';
-    fab.style.top = Math.min(savedPos.y, hostWin.innerHeight - 56) + 'px';
+  if (vpX !== null && vpY !== null) {
+    if (isMobile) {
+      fab.style.left = (vpX + hostWin.scrollX) + 'px';
+      fab.style.top = (vpY + hostWin.scrollY) + 'px';
+    } else {
+      fab.style.left = vpX + 'px';
+      fab.style.top = vpY + 'px';
+    }
   } else {
-    fab.style.right = '16px';
-    fab.style.bottom = '80px';
+    // Default: bottom-right
+    vpX = hostWin.innerWidth - 16 - 48;
+    vpY = hostWin.innerHeight - 80 - 48;
+    if (isMobile) {
+      fab.style.left = (vpX + hostWin.scrollX) + 'px';
+      fab.style.top = (vpY + hostWin.scrollY) + 'px';
+    } else {
+      fab.style.right = '16px';
+      fab.style.bottom = '80px';
+    }
+  }
+
+  // Mobile: keep FAB in viewport-relative position on scroll
+  let scrollRaf = 0;
+  if (isMobile) {
+    const syncPosition = () => {
+      scrollRaf = 0;
+      if (!doc.getElementById(FAB_ID)) return; // FAB removed
+      const curVpX = vpX ?? (hostWin.innerWidth - 64);
+      const curVpY = vpY ?? (hostWin.innerHeight - 128);
+      fab.style.left = (curVpX + hostWin.scrollX) + 'px';
+      fab.style.top = (curVpY + hostWin.scrollY) + 'px';
+    };
+    hostWin.addEventListener('scroll', () => {
+      if (!scrollRaf) scrollRaf = requestAnimationFrame(syncPosition);
+    }, { passive: true });
+    hostWin.addEventListener('resize', () => {
+      if (!scrollRaf) scrollRaf = requestAnimationFrame(syncPosition);
+    }, { passive: true });
   }
 
   // Drag support
@@ -787,8 +831,16 @@ function createFab(): void {
     const maxY = hostWin.innerHeight - 56;
     const nx = Math.max(0, Math.min(maxX, fabStartX + dx));
     const ny = Math.max(0, Math.min(maxY, fabStartY + dy));
-    fab.style.left = nx + 'px';
-    fab.style.top = ny + 'px';
+    // Update viewport-relative position
+    vpX = nx;
+    vpY = ny;
+    if (isMobile) {
+      fab.style.left = (nx + hostWin.scrollX) + 'px';
+      fab.style.top = (ny + hostWin.scrollY) + 'px';
+    } else {
+      fab.style.left = nx + 'px';
+      fab.style.top = ny + 'px';
+    }
     fab.style.right = 'auto';
     fab.style.bottom = 'auto';
   });
@@ -797,9 +849,11 @@ function createFab(): void {
     if (!dragging) return;
     dragging = false;
     fab.classList.remove('dragging');
+    // Save viewport-relative position
     try {
-      const rect = fab.getBoundingClientRect();
-      localStorage.setItem(FAB_POS_KEY, JSON.stringify({ x: rect.left, y: rect.top }));
+      if (vpX !== null && vpY !== null) {
+        localStorage.setItem(FAB_POS_KEY, JSON.stringify({ x: vpX, y: vpY }));
+      }
     } catch { /* ignore */ }
   });
 
@@ -808,9 +862,8 @@ function createFab(): void {
     togglePanel();
   });
 
-  // On mobile, body has position:fixed which clips fixed children — use <html> instead
-  const fabParent = isMobile ? doc.documentElement : doc.body;
-  fabParent.appendChild(fab);
+  // Append to <html> to sit above all transformed containers
+  doc.documentElement.appendChild(fab);
 }
 
 // ═══════════════════════════════════════════════════════════════════════
