@@ -11,6 +11,18 @@ const PANEL_STYLE_ID = 'wb-assistant-panel-style';
 const PANEL_BODY_ID = 'wb-assistant-panel-body';
 const EVENT_NS = '.wbAssistantMenu';
 const DIRTY_STATE_KEY = '__WB_ASSISTANT_HAS_UNSAVED_CHANGES__';
+const NO_KEYBOARD_INPUT_TYPES = new Set([
+  'button',
+  'checkbox',
+  'color',
+  'file',
+  'hidden',
+  'image',
+  'radio',
+  'range',
+  'reset',
+  'submit',
+]);
 
 let app: VueApp<Element> | null = null;
 let panelRoot: JQuery<HTMLDivElement> | null = null;
@@ -25,6 +37,66 @@ function getHostWindow(): Window {
 
 function getHostDocument(): Document {
   return getHostWindow().document;
+}
+
+function isTextEntryTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) {
+    return false;
+  }
+
+  const inputLike = target.closest('textarea, select, input, [contenteditable], [contenteditable=""], [contenteditable="true"], [contenteditable="plaintext-only"]');
+  if (!inputLike) {
+    return false;
+  }
+
+  if (inputLike instanceof HTMLTextAreaElement) {
+    return !inputLike.disabled && !inputLike.readOnly;
+  }
+  if (inputLike instanceof HTMLSelectElement) {
+    return !inputLike.disabled;
+  }
+  if (inputLike instanceof HTMLInputElement) {
+    if (inputLike.disabled || inputLike.readOnly) {
+      return false;
+    }
+    return !NO_KEYBOARD_INPUT_TYPES.has(inputLike.type.toLowerCase());
+  }
+
+  return true;
+}
+
+function blurHostActiveInput(panel?: HTMLElement): void {
+  const doc = getHostDocument();
+  const active = doc.activeElement;
+  if (!(active instanceof HTMLElement)) {
+    return;
+  }
+  if (panel && panel.contains(active)) {
+    return;
+  }
+  if (active.matches('input, textarea, select, [contenteditable], [contenteditable=""], [contenteditable="true"], [contenteditable="plaintext-only"]')) {
+    active.blur();
+  }
+}
+
+function bindPanelInteractionShield($panel: JQuery): void {
+  const handleStart = (event: JQuery.Event): void => {
+    event.stopPropagation();
+    const panel = $panel[0] as HTMLDivElement | undefined;
+    if (!panel || isTextEntryTarget(event.target)) {
+      return;
+    }
+    blurHostActiveInput(panel);
+  };
+
+  const handleClick = (event: JQuery.Event): void => {
+    event.stopPropagation();
+  };
+
+  $panel.off(`pointerdown${EVENT_NS}`).on(`pointerdown${EVENT_NS}`, handleStart);
+  $panel.off(`mousedown${EVENT_NS}`).on(`mousedown${EVENT_NS}`, handleStart);
+  $panel.off(`touchstart${EVENT_NS}`).on(`touchstart${EVENT_NS}`, handleStart);
+  $panel.off(`click${EVENT_NS}`).on(`click${EVENT_NS}`, handleClick);
 }
 
 function ensurePanelStyle(): void {
@@ -356,6 +428,7 @@ function ensurePanelElement(): JQuery {
   const doc = getHostDocument();
   let $panel = $(`#${PANEL_ID}`, doc);
   if ($panel.length) {
+    bindPanelInteractionShield($panel);
     return $panel;
   }
 
@@ -401,6 +474,7 @@ function ensurePanelElement(): JQuery {
   });
   // Sync FAB toggle button state
   syncFabToggleButton();
+  bindPanelInteractionShield($panel);
 
   return $panel;
 }
@@ -573,6 +647,7 @@ function showPanel(): void {
   panelElement.style.transition = '';
 
   $panel.addClass('active');
+  blurHostActiveInput(panelElement);
 
   isPanelVisible = true;
   setMenuActive(true);
@@ -821,6 +896,7 @@ function createFab(): void {
     fabStartY = rect.top;
     fab.classList.add('dragging');
     fab.setPointerCapture(e.pointerId);
+    e.stopPropagation();
     e.preventDefault();
   });
 
@@ -859,8 +935,11 @@ function createFab(): void {
     } catch { /* ignore */ }
   });
 
-  fab.addEventListener('click', () => {
+  fab.addEventListener('click', (event: MouseEvent) => {
+    event.stopPropagation();
+    event.preventDefault();
     if (dragMoved) { dragMoved = false; return; }
+    blurHostActiveInput();
     togglePanel();
   });
 
