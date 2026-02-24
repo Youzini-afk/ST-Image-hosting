@@ -1749,7 +1749,7 @@ function normalizeEntry(rawInput: unknown, fallbackUid: number): WorldbookEntry 
     ...base,
     uid,
     name,
-    enabled: raw.enabled === undefined ? !Boolean(raw.disable) : Boolean(raw.enabled),
+    enabled: raw.enabled === undefined ? raw.disable !== true : raw.enabled,
     strategy: {
       type: strategyType,
       keys,

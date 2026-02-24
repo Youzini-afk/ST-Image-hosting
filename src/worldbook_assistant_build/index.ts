@@ -30,6 +30,9 @@ let destroyTeleport: (() => void) | null = null;
 let menuObserver: MutationObserver | null = null;
 let menuRetryTimer: number | null = null;
 let isPanelVisible = false;
+let fabViewportSyncScrollHandler: (() => void) | null = null;
+let fabViewportSyncResizeHandler: (() => void) | null = null;
+let fabViewportSyncRaf: number | null = null;
 
 function getHostWindow(): Window {
   return window.parent || window;
@@ -788,6 +791,22 @@ function syncFabToggleButton(): void {
   }
 }
 
+function detachFabViewportSync(): void {
+  const hostWin = getHostWindow();
+  if (fabViewportSyncScrollHandler) {
+    hostWin.removeEventListener('scroll', fabViewportSyncScrollHandler);
+    fabViewportSyncScrollHandler = null;
+  }
+  if (fabViewportSyncResizeHandler) {
+    hostWin.removeEventListener('resize', fabViewportSyncResizeHandler);
+    fabViewportSyncResizeHandler = null;
+  }
+  if (fabViewportSyncRaf !== null) {
+    cancelAnimationFrame(fabViewportSyncRaf);
+    fabViewportSyncRaf = null;
+  }
+}
+
 function toggleFabVisibility(): void {
   const doc = getHostDocument();
   const fab = doc.getElementById(FAB_ID);
@@ -796,6 +815,7 @@ function toggleFabVisibility(): void {
   if (visible) {
     if (!fab) createFab();
   } else {
+    detachFabViewportSync();
     fab?.remove();
   }
   syncFabToggleButton();
@@ -805,6 +825,7 @@ function createFab(): void {
   const doc = getHostDocument();
   if (doc.getElementById(FAB_ID)) return;
   if (!isFabVisible()) return;
+  detachFabViewportSync();
 
   const isMobile = window.matchMedia('(max-width: 1000px)').matches;
 
@@ -859,22 +880,27 @@ function createFab(): void {
   }
 
   // Mobile: keep FAB in viewport-relative position on scroll
-  let scrollRaf = 0;
   if (isMobile) {
     const syncPosition = () => {
-      scrollRaf = 0;
+      fabViewportSyncRaf = null;
       if (!doc.getElementById(FAB_ID)) return; // FAB removed
       const curVpX = vpX ?? (hostWin.innerWidth - 64);
       const curVpY = vpY ?? (hostWin.innerHeight - 128);
       fab.style.left = (curVpX + hostWin.scrollX) + 'px';
       fab.style.top = (curVpY + hostWin.scrollY) + 'px';
     };
-    hostWin.addEventListener('scroll', () => {
-      if (!scrollRaf) scrollRaf = requestAnimationFrame(syncPosition);
-    }, { passive: true });
-    hostWin.addEventListener('resize', () => {
-      if (!scrollRaf) scrollRaf = requestAnimationFrame(syncPosition);
-    }, { passive: true });
+    fabViewportSyncScrollHandler = () => {
+      if (!fabViewportSyncRaf) {
+        fabViewportSyncRaf = requestAnimationFrame(syncPosition);
+      }
+    };
+    fabViewportSyncResizeHandler = () => {
+      if (!fabViewportSyncRaf) {
+        fabViewportSyncRaf = requestAnimationFrame(syncPosition);
+      }
+    };
+    hostWin.addEventListener('scroll', fabViewportSyncScrollHandler, { passive: true });
+    hostWin.addEventListener('resize', fabViewportSyncResizeHandler, { passive: true });
   }
 
   // Drag support
@@ -1920,6 +1946,7 @@ function cleanup(): void {
   stopMenuRetry();
   stopMenuObserver();
   stopFloorButtonListeners();
+  detachFabViewportSync();
   $(doc).off(EVENT_NS);
   doc.removeEventListener('pointerdown', closeThemeDropdownOnOutside, true);
 

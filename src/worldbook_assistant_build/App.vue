@@ -760,13 +760,16 @@
                 <button class="btn mini" type="button" @click="aiCreateSession">+ 新建</button>
               </div>
               <div class="ai-session-list">
-                <button
+                <div
                   v-for="session in aiSessions"
                   :key="session.id"
                   class="ai-session-item"
                   :class="{ active: session.id === aiActiveSession?.id }"
-                  type="button"
+                  role="button"
+                  tabindex="0"
                   @click="aiSwitchSession(session.id)"
+                  @keydown.enter.prevent="aiSwitchSession(session.id)"
+                  @keydown.space.prevent="aiSwitchSession(session.id)"
                 >
                   <span class="ai-session-title">{{ session.title }}</span>
                   <span class="ai-session-meta">{{ session.messages.length }} 条消息</span>
@@ -776,7 +779,7 @@
                     title="删除对话"
                     @click.stop="aiDeleteSession(session.id)"
                   >×</button>
-                </button>
+                </div>
                 <div v-if="!aiSessions.length" class="empty-note">暂无对话，点击上方新建</div>
               </div>
             </div>
@@ -1744,6 +1747,20 @@ type FloatingPanelKey = 'find' | 'activation';
 type PaneResizeKey = 'main' | 'editor';
 type BatchSearchScope = 'all' | 'current';
 type FindFieldKey = 'name' | 'content' | 'keys';
+type SelectionSource = 'manual' | 'auto';
+
+interface WorldbookSwitchOptions {
+  source?: SelectionSource;
+  reason?: string;
+  allowDirty?: boolean;
+  silentOnCancel?: boolean;
+}
+
+interface HardRefreshOptions {
+  force?: boolean;
+  source?: SelectionSource;
+  reason?: string;
+}
 
 interface FloatingPanelState {
   visible: boolean;
@@ -2207,6 +2224,8 @@ const roleBindingSourceCandidates = ref<PresetRoleBinding[]>([]);
 const originalEntries = ref<WorldbookEntry[]>([]);
 const draftEntries = ref<WorldbookEntry[]>([]);
 const selectedEntryUid = ref<number | null>(null);
+const draftEntriesDigest = ref('[]');
+const originalEntriesDigest = ref('[]');
 
 const searchText = ref('');
 const onlyEnabled = ref(false);
@@ -2216,6 +2235,8 @@ const selectedKeysRaw = ref('');
 const selectedSecondaryKeysRaw = ref('');
 let keysDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 let secondaryKeysDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let worldbookLoadRequestId = 0;
+let pendingWorldbookLoadCount = 0;
 const globalAddSearchText = ref('');
 const globalFilterText = ref('');
 const roleBindSearchText = ref('');
@@ -2342,7 +2363,7 @@ const totalContentChars = computed(() =>
   }, 0),
 );
 
-const hasUnsavedChanges = computed(() => JSON.stringify(draftEntries.value) !== JSON.stringify(originalEntries.value));
+const hasUnsavedChanges = computed(() => draftEntriesDigest.value !== originalEntriesDigest.value);
 const isCompactLayout = computed(() => viewportWidth.value <= 1100);
 
 const mainLayoutStyle = computed<Record<string, string> | undefined>(() => {
@@ -2713,6 +2734,59 @@ const selectedTokenEstimate = computed(() => {
   }
   return Math.max(1, Math.round(chars / 3.6));
 });
+
+function confirmDiscardUnsavedChanges(options: { source?: SelectionSource; reason?: string } = {}): boolean {
+  if (!hasUnsavedChanges.value) {
+    return true;
+  }
+  const sourceLabel = options.source === 'auto' ? '自动操作' : '当前操作';
+  const reasonLabel = options.reason ? `（${options.reason}）` : '';
+  return confirm(`${sourceLabel}${reasonLabel}会覆盖当前未保存草稿，是否继续？`);
+}
+
+function switchWorldbookSelection(nextName: string, options: WorldbookSwitchOptions = {}): boolean {
+  const next = toStringSafe(nextName).trim();
+  const current = selectedWorldbookName.value;
+  if (next === current) {
+    return true;
+  }
+  if (!options.allowDirty && !confirmDiscardUnsavedChanges({ source: options.source, reason: options.reason })) {
+    if (!options.silentOnCancel) {
+      const action = options.source === 'auto' ? '自动切换' : '切换';
+      setStatus(`已取消${action}世界书`);
+    }
+    return false;
+  }
+  selectedWorldbookName.value = next;
+  return true;
+}
+
+function ensureRefreshAllowed(options: HardRefreshOptions = {}): boolean {
+  if (options.force) {
+    return true;
+  }
+  const ok = confirmDiscardUnsavedChanges({ source: options.source, reason: options.reason ?? '刷新数据' });
+  if (!ok) {
+    setStatus(options.source === 'auto' ? '已取消自动刷新，保留未保存修改' : '已取消刷新，保留未保存修改');
+  }
+  return ok;
+}
+
+watch(
+  draftEntries,
+  entries => {
+    draftEntriesDigest.value = JSON.stringify(entries);
+  },
+  { deep: true, immediate: true, flush: 'sync' },
+);
+
+watch(
+  originalEntries,
+  entries => {
+    originalEntriesDigest.value = JSON.stringify(entries);
+  },
+  { deep: true, immediate: true, flush: 'sync' },
+);
 
 watch(selectedWorldbookName, name => {
   closeWorldbookPicker();
@@ -3246,7 +3320,7 @@ function normalizeEntry(rawInput: unknown, fallbackUid: number): WorldbookEntry 
     ...base,
     uid,
     name,
-    enabled: raw.enabled === undefined ? !Boolean(raw.disable) : Boolean(raw.enabled),
+    enabled: raw.enabled === undefined ? raw.disable !== true : raw.enabled,
     strategy: {
       type: strategyType,
       keys,
@@ -5469,7 +5543,10 @@ async function onImportChange(event: Event): Promise<void> {
       return;
     }
     await createOrReplaceWorldbook(newName, payload.entries, { render: 'immediate' });
-    await reloadWorldbookNames(newName);
+    await reloadWorldbookNames(newName, {
+      source: 'manual',
+      reason: '导入后切换到新世界书',
+    });
     await refreshBindings();
     toastr.success(`已导入为新世界书: ${newName}`);
   } catch (error) {
@@ -5482,7 +5559,7 @@ async function onImportChange(event: Event): Promise<void> {
     if (!response.ok) {
       throw new Error(`原生导入失败: HTTP ${response.status}`);
     }
-    await hardRefresh();
+    await hardRefresh({ force: true, source: 'manual', reason: '导入后刷新' });
     toastr.success('已按酒馆原生方式导入');
   } finally {
     if (target) {
@@ -5508,7 +5585,11 @@ async function refreshBindings(): Promise<void> {
     bindings.chat = null;
   }
   if (globalWorldbookMode.value) {
-    ensureSelectionForGlobalMode();
+    ensureSelectionForGlobalMode({
+      source: 'auto',
+      reason: '全局模式同步当前选择',
+      silentOnCancel: true,
+    });
   }
 }
 
@@ -5529,21 +5610,33 @@ function resolveContextWorldbookCandidate(): string | null {
   return charAdditional ?? null;
 }
 
-function ensureSelectionForGlobalMode(): void {
+function ensureSelectionForGlobalMode(options: WorldbookSwitchOptions = {}): boolean {
   if (!globalWorldbookMode.value) {
-    return;
+    return true;
   }
   const globals = selectableWorldbookNames.value;
   if (!globals.length) {
-    selectedWorldbookName.value = '';
-    return;
+    return switchWorldbookSelection('', {
+      source: options.source ?? 'auto',
+      reason: options.reason ?? '全局模式下无可用世界书',
+      allowDirty: options.allowDirty,
+      silentOnCancel: options.silentOnCancel,
+    });
   }
   if (!globals.includes(selectedWorldbookName.value)) {
-    selectedWorldbookName.value = globals[0];
+    return switchWorldbookSelection(globals[0], {
+      source: options.source ?? 'auto',
+      reason: options.reason ?? '全局模式同步当前选择',
+      allowDirty: options.allowDirty,
+      silentOnCancel: options.silentOnCancel,
+    });
   }
+  return true;
 }
 
-function trySelectWorldbookByContext(options: { preferWhenEmptyOnly?: boolean; force?: boolean } = {}): boolean {
+function trySelectWorldbookByContext(
+  options: { preferWhenEmptyOnly?: boolean; force?: boolean; source?: SelectionSource } = {},
+): boolean {
   if (globalWorldbookMode.value) {
     return false;
   }
@@ -5554,11 +5647,16 @@ function trySelectWorldbookByContext(options: { preferWhenEmptyOnly?: boolean; f
   if (!candidate || candidate === selectedWorldbookName.value) {
     return false;
   }
-  if (!options.force && hasUnsavedChanges.value) {
-    setStatus('检测到聊天/角色世界书变更，但当前有未保存修改，已跳过自动切换');
+  const switched = switchWorldbookSelection(candidate, {
+    source: options.source ?? 'auto',
+    reason: '自动定位上下文世界书',
+    allowDirty: options.force,
+    silentOnCancel: true,
+  });
+  if (!switched) {
+    setStatus('检测到上下文世界书变更，但当前有未保存修改，已取消自动切换');
     return false;
   }
-  selectedWorldbookName.value = candidate;
   setStatus(`已自动定位到上下文世界书: ${candidate}`);
   return true;
 }
@@ -5567,12 +5665,21 @@ function toggleGlobalMode(): void {
   globalWorldbookMode.value = !globalWorldbookMode.value;
   if (globalWorldbookMode.value) {
     aiGeneratorMode.value = false;
-    ensureSelectionForGlobalMode();
+    const synced = ensureSelectionForGlobalMode({
+      source: 'manual',
+      reason: '切换到全局模式',
+      silentOnCancel: true,
+    });
+    if (!synced) {
+      globalWorldbookMode.value = false;
+      setStatus('已取消切换到全局世界书模式');
+      return;
+    }
     setStatus('已切换到全局世界书模式');
     return;
   }
   if (!selectedWorldbookName.value) {
-    trySelectWorldbookByContext({ force: true });
+    trySelectWorldbookByContext({ force: true, source: 'manual' });
   }
   setStatus('已切换到上下文世界书模式');
 }
@@ -5584,7 +5691,10 @@ async function applyGlobalWorldbooks(nextGlobal: string[], statusLabel = '已更
   try {
     await rebindGlobalWorldbooks(normalized);
     await refreshBindings();
-    ensureSelectionForGlobalMode();
+    ensureSelectionForGlobalMode({
+      source: 'manual',
+      reason: '更新全局世界书后同步当前选择',
+    });
     setStatus(`${statusLabel}（${normalized.length} 本）`);
     return true;
   } catch (error) {
@@ -6076,8 +6186,13 @@ function selectWorldbookFromPicker(name: string): void {
   if (!name) {
     return;
   }
-  selectedWorldbookName.value = name;
-  closeWorldbookPicker();
+  const switched = switchWorldbookSelection(name, {
+    source: 'manual',
+    reason: '手动切换世界书',
+  });
+  if (switched) {
+    closeWorldbookPicker();
+  }
 }
 
 function bindFirstRoleCandidate(): void {
@@ -6133,33 +6248,54 @@ async function loadWorldbook(name: string): Promise<void> {
   if (!name) {
     return;
   }
+  const requestId = ++worldbookLoadRequestId;
+  pendingWorldbookLoadCount += 1;
   isBusy.value = true;
+  const isStaleRequest = () => requestId !== worldbookLoadRequestId || selectedWorldbookName.value !== name;
   try {
     const rawEntries = await getWorldbook(name);
+    if (isStaleRequest()) {
+      return;
+    }
     const normalized = normalizeEntryList(rawEntries);
     draftEntries.value = klona(normalized);
     originalEntries.value = klona(normalized);
     ensureSelectedEntryExists();
     setStatus(`已加载 "${name}"，条目 ${normalized.length}`);
   } catch (error) {
+    if (isStaleRequest()) {
+      return;
+    }
     const message = error instanceof Error ? error.message : String(error);
     toastr.error(`读取世界书失败: ${message}`);
     setStatus(`读取失败: ${message}`);
   } finally {
-    isBusy.value = false;
+    pendingWorldbookLoadCount = Math.max(0, pendingWorldbookLoadCount - 1);
+    if (pendingWorldbookLoadCount === 0) {
+      isBusy.value = false;
+    }
   }
 }
 
-async function reloadWorldbookNames(preferred?: string): Promise<void> {
+async function reloadWorldbookNames(preferred?: string, switchOptions: WorldbookSwitchOptions = {}): Promise<boolean> {
   const names = [...getWorldbookNames()].sort((left, right) => left.localeCompare(right, 'zh-Hans-CN'));
   worldbookNames.value = names;
 
   if (!names.length) {
-    selectedWorldbookName.value = '';
+    const switched = switchWorldbookSelection('', {
+      source: switchOptions.source ?? 'auto',
+      reason: switchOptions.reason ?? '世界书列表已为空',
+      allowDirty: switchOptions.allowDirty,
+      silentOnCancel: true,
+    });
+    if (!switched) {
+      setStatus('世界书列表已变化，但已保留未保存草稿');
+      return false;
+    }
     draftEntries.value = [];
     originalEntries.value = [];
     selectedEntryUid.value = null;
-    return;
+    return true;
   }
 
   const fallbackName = persistedState.value.last_worldbook;
@@ -6170,19 +6306,36 @@ async function reloadWorldbookNames(preferred?: string): Promise<void> {
     names[0];
 
   if (candidate && selectedWorldbookName.value !== candidate) {
-    selectedWorldbookName.value = candidate;
-    return;
+    return switchWorldbookSelection(candidate, {
+      source: switchOptions.source ?? 'auto',
+      reason: switchOptions.reason ?? '同步世界书选择',
+      allowDirty: switchOptions.allowDirty,
+      silentOnCancel: true,
+    });
   }
 
   if (selectedWorldbookName.value && !draftEntries.value.length) {
     await loadWorldbook(selectedWorldbookName.value);
   }
+  return true;
 }
 
-async function hardRefresh(): Promise<void> {
+async function hardRefresh(options: HardRefreshOptions = {}): Promise<void> {
+  if (!ensureRefreshAllowed(options)) {
+    return;
+  }
+  const allowDirty = options.force || hasUnsavedChanges.value;
   persistedState.value = readPersistedState();
   syncSelectedGlobalPresetFromState();
-  await reloadWorldbookNames(selectedWorldbookName.value || undefined);
+  const reloaded = await reloadWorldbookNames(selectedWorldbookName.value || undefined, {
+    source: options.source ?? 'auto',
+    reason: options.reason ?? '刷新后同步世界书',
+    allowDirty,
+    silentOnCancel: true,
+  });
+  if (!reloaded) {
+    return;
+  }
   // Always re-fetch current worldbook data so external changes are synced
   if (selectedWorldbookName.value) {
     await loadWorldbook(selectedWorldbookName.value);
@@ -6195,9 +6348,14 @@ async function hardRefresh(): Promise<void> {
   refreshCurrentRoleContext();
   await autoApplyRoleBoundPreset();
   if (globalWorldbookMode.value) {
-    ensureSelectionForGlobalMode();
+    ensureSelectionForGlobalMode({
+      source: options.source ?? 'auto',
+      reason: '刷新后同步全局模式选择',
+      allowDirty,
+      silentOnCancel: true,
+    });
   } else {
-    trySelectWorldbookByContext({ preferWhenEmptyOnly: true });
+    trySelectWorldbookByContext({ preferWhenEmptyOnly: true, force: allowDirty, source: options.source ?? 'auto' });
   }
   setStatus('已刷新世界书和绑定信息');
 }
@@ -6239,7 +6397,10 @@ async function createNewWorldbook(): Promise<void> {
   }
   try {
     await createOrReplaceWorldbook(name, [], { render: 'immediate' });
-    await reloadWorldbookNames(name);
+    await reloadWorldbookNames(name, {
+      source: 'manual',
+      reason: '创建世界书后切换',
+    });
     await refreshBindings();
     toastr.success(`已创建世界书: ${name}`);
   } catch (error) {
@@ -6260,7 +6421,10 @@ async function duplicateWorldbook(): Promise<void> {
   }
   try {
     await createOrReplaceWorldbook(newName, klona(draftEntries.value), { render: 'immediate' });
-    await reloadWorldbookNames(newName);
+    await reloadWorldbookNames(newName, {
+      source: 'manual',
+      reason: '复制世界书后切换',
+    });
     await refreshBindings();
     toastr.success(`已复制为: ${newName}`);
   } catch (error) {
@@ -6287,7 +6451,11 @@ async function deleteCurrentWorldbook(): Promise<void> {
       delete state.entry_history[current];
     });
     toastr.success(`已删除: ${current}`);
-    await reloadWorldbookNames();
+    await reloadWorldbookNames(undefined, {
+      source: 'manual',
+      reason: '删除世界书后同步选择',
+      allowDirty: true,
+    });
     await refreshBindings();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -6614,7 +6782,7 @@ function stopPaneResize(): void {
 }
 
 function onPanelRefresh(): void {
-  void hardRefresh();
+  void hardRefresh({ force: true, source: 'manual', reason: '手动刷新' });
 }
 
 function onPanelSave(): void {
@@ -6679,7 +6847,7 @@ onMounted(() => {
   );
   subscriptions.push(
     eventOn(tavern_events.WORLDINFO_UPDATED, () => {
-      void hardRefresh();
+      void hardRefresh({ source: 'auto', reason: '世界书数据已更新' });
     }),
   );
   subscriptions.push(
@@ -6690,10 +6858,14 @@ onMounted(() => {
         refreshCurrentRoleContext();
         await autoApplyRoleBoundPreset();
         if (globalWorldbookMode.value) {
-          ensureSelectionForGlobalMode();
+          ensureSelectionForGlobalMode({
+            source: 'auto',
+            reason: '聊天切换后同步全局模式选择',
+            silentOnCancel: true,
+          });
           return;
         }
-        trySelectWorldbookByContext();
+        trySelectWorldbookByContext({ source: 'auto' });
       })();
     }),
   );
@@ -6711,10 +6883,22 @@ onMounted(() => {
 
   handleFloatingWindowResize();
   updateHostPanelTheme();
-  void hardRefresh();
+  void hardRefresh({ force: true, source: 'manual', reason: '初始化加载' });
 });
 
 onUnmounted(() => {
+  if (keysDebounceTimer) {
+    clearTimeout(keysDebounceTimer);
+    keysDebounceTimer = null;
+  }
+  if (secondaryKeysDebounceTimer) {
+    clearTimeout(secondaryKeysDebounceTimer);
+    secondaryKeysDebounceTimer = null;
+  }
+  aiStreamSubscription?.stop();
+  aiStreamSubscription = null;
+  aiIsGenerating.value = false;
+  aiCurrentGenerationId.value = null;
   if (_mobileResizeHandler) {
     try { (window.parent || window).removeEventListener('orientationchange', _mobileResizeHandler); } catch { /* ignore */ }
     _mobileResizeHandler = null;
@@ -8952,10 +9136,15 @@ watch(hasUnsavedChanges, (val) => {
   text-align: left;
   transition: background 0.15s;
   position: relative;
+  outline: none;
 }
 
 .ai-session-item:hover {
   background: var(--wb-bg-highlight);
+}
+
+.ai-session-item:focus-visible {
+  box-shadow: 0 0 0 2px var(--wb-primary, #38bdf8);
 }
 
 .ai-session-item.active {
@@ -9689,4 +9878,3 @@ watch(hasUnsavedChanges, (val) => {
   opacity: .85;
 }
 </style>
-

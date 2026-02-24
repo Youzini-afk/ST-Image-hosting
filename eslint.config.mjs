@@ -77,5 +77,14 @@ export default [
     },
   },
   eslintConfigPrettier,
-  globalIgnores(['dist/**', 'node_modules/**', 'eslint.config.mjs', 'postcss.config.js', 'webpack.config.ts']),
+  globalIgnores([
+    'dist/**',
+    'node_modules/**',
+    '@types/**',
+    '.tmp_build_*/**',
+    'tavern_sync.mjs',
+    'eslint.config.mjs',
+    'postcss.config.js',
+    'webpack.config.ts',
+  ]),
 ];
