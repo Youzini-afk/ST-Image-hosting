@@ -1279,6 +1279,7 @@ function injectAllFloorButtons(): void {
 
 // ── Handle extraction for a single floor ───────────────────────────
 function handleFloorExtract(mesId: number): void {
+  toastr.info(`提取楼层 #${mesId}...`, '楼层提取', { timeOut: 2000 });
   const messages = getChatMessages(mesId);
   if (!messages.length) {
     toastr.warning('无法读取该楼层消息');
