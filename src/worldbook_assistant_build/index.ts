@@ -908,6 +908,7 @@ function ensureExtractStyle(): void {
   flex-direction: column;
   overflow: hidden;
   color: var(--wb-text-main, #e2e8f0);
+  text-align: left;
 }
 
 #${EXTRACT_MODAL_ID} .wbex-head {
