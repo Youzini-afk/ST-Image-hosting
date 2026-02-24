@@ -1074,8 +1074,10 @@ function ensureExtractStyle(): void {
   border: 1px solid var(--wb-border-subtle, rgba(255,255,255,0.05));
   border-radius: 16px;
   box-shadow: var(--wb-shadow-main, 0 16px 48px rgba(0, 0, 0, 0.4));
-  width: 100%;
+  width: min(100%, 580px);
   max-width: 580px;
+  margin-inline: auto;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1352,6 +1354,7 @@ function ensureExtractStyle(): void {
 /* ── Mobile adaptation ── */
 @media (max-width: 768px), (orientation: portrait) {
   #${EXTRACT_MODAL_ID}.wbex-modal {
+    width: 100%;
     max-width: 100% !important;
     border-radius: 0;
     border: none;
@@ -1841,11 +1844,13 @@ function showExtractionModal(tags: ExtractedFloorTag[], mesId: number): void {
   }
 
   // ── Show via SillyTavern's native Popup API (works on mobile)
+  const hostWindow = getHostWindow();
+  const shouldUseWidePopup = hostWindow.innerWidth <= 900;
   const popup = new SillyTavern.Popup(
     modal,
     SillyTavern.POPUP_TYPE.DISPLAY,
     '',
-    { wide: true, allowVerticalScrolling: true },
+    { wide: shouldUseWidePopup, allowVerticalScrolling: true },
   );
   activeExtractionPopup = popup;
   popup.show();
