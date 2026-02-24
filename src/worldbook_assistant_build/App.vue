@@ -6927,7 +6927,6 @@ async function runFocusCinematicTransition(nextFocus: boolean): Promise<void> {
     await waitForFrame();
     await waitForFrame();
 
-    clampPaneWidths();
     const targetMap = collectFocusHeroSnapshots();
     const targetSinkMap = collectFocusSinkSnapshots();
     const ghostCount = mountFocusCineGhosts(sourceMap, targetMap, sourceSinkMap, targetSinkMap);
@@ -8692,6 +8691,7 @@ watch(hasUnsavedChanges, (val) => {
 .wb-entry-list,
 .wb-editor {
   border-radius: 12px;
+  border: 1px solid transparent;
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -8700,6 +8700,7 @@ watch(hasUnsavedChanges, (val) => {
   min-height: 0;
   height: 100%;
   overflow: hidden;
+  transition: padding 320ms cubic-bezier(0.22, 1, 0.36, 1), background-color 320ms cubic-bezier(0.22, 1, 0.36, 1), border-color 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .list-search {
@@ -8725,6 +8726,7 @@ watch(hasUnsavedChanges, (val) => {
   gap: 6px;
   position: relative;
   padding: 4px 4px 4px 4px;
+  transition: padding 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .entry-item {
@@ -8739,7 +8741,15 @@ watch(hasUnsavedChanges, (val) => {
   display: grid;
   gap: 6px;
   position: relative;
-  transition: background 0.25s ease, transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+  transition:
+    background 0.25s ease,
+    transform 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease,
+    padding 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    margin-bottom 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    gap 320ms cubic-bezier(0.22, 1, 0.36, 1);
   margin-bottom: 6px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
@@ -8828,6 +8838,7 @@ watch(hasUnsavedChanges, (val) => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: font-size 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .entry-item-tags {
@@ -8915,69 +8926,6 @@ watch(hasUnsavedChanges, (val) => {
   transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.wb-assistant-root.focus-cine-running .wb-entry-list {
-  animation: focus-cine-left-pane 1400ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.wb-assistant-root.focus-cine-running .editor-center {
-  animation: focus-cine-center-pane 1400ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.wb-assistant-root.focus-cine-running .editor-side {
-  animation: focus-cine-right-pane 1400ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.wb-assistant-root.focus-cine-running.focus-cine-exit .wb-entry-list,
-.wb-assistant-root.focus-cine-running.focus-cine-exit .editor-center,
-.wb-assistant-root.focus-cine-running.focus-cine-exit .editor-side {
-  animation-direction: reverse;
-}
-
-@keyframes focus-cine-left-pane {
-  0% {
-    transform: translate3d(0, 0, 0);
-    opacity: 1;
-  }
-  45% {
-    transform: translate3d(-6px, 0, 0);
-    opacity: 0.96;
-  }
-  100% {
-    transform: translate3d(0, 0, 0);
-    opacity: 1;
-  }
-}
-
-@keyframes focus-cine-center-pane {
-  0% {
-    transform: translate3d(0, 0, 0);
-    opacity: 1;
-  }
-  45% {
-    transform: translate3d(0, -3px, 0);
-    opacity: 1;
-  }
-  100% {
-    transform: translate3d(0, 0, 0);
-    opacity: 1;
-  }
-}
-
-@keyframes focus-cine-right-pane {
-  0% {
-    transform: translate3d(0, 0, 0);
-    opacity: 1;
-  }
-  45% {
-    transform: translate3d(6px, 0, 0);
-    opacity: 0.96;
-  }
-  100% {
-    transform: translate3d(0, 0, 0);
-    opacity: 1;
-  }
-}
-
 .wb-main-layout.focus-mode .wb-entry-list {
   border: 1px solid var(--wb-border-subtle);
   border-radius: 12px;
@@ -9037,6 +8985,7 @@ watch(hasUnsavedChanges, (val) => {
   height: 100%;
   overflow: auto;
   box-shadow: 0 8px 32px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  transition: padding 320ms cubic-bezier(0.22, 1, 0.36, 1), gap 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .editor-center.focus {
@@ -9050,6 +8999,7 @@ watch(hasUnsavedChanges, (val) => {
   align-items: flex-end;
   border-bottom: 1px solid var(--wb-border-subtle);
   padding-bottom: 16px;
+  transition: gap 320ms cubic-bezier(0.22, 1, 0.36, 1), padding-bottom 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .editor-head.focus {
