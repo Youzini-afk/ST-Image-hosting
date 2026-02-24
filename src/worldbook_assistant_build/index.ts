@@ -10,6 +10,7 @@ const FAB_VISIBLE_KEY = '__WB_FAB_VISIBLE__';
 const PANEL_STYLE_ID = 'wb-assistant-panel-style';
 const PANEL_BODY_ID = 'wb-assistant-panel-body';
 const EVENT_NS = '.wbAssistantMenu';
+const SHIELD_EVENT_NS = '.wbAssistantShield';
 const DIRTY_STATE_KEY = '__WB_ASSISTANT_HAS_UNSAVED_CHANGES__';
 const NO_KEYBOARD_INPUT_TYPES = new Set([
   'button',
@@ -96,10 +97,10 @@ function bindPanelInteractionShield($panel: JQuery): void {
     event.stopPropagation();
   };
 
-  $panel.off(`pointerdown${EVENT_NS}`).on(`pointerdown${EVENT_NS}`, handleStart);
-  $panel.off(`mousedown${EVENT_NS}`).on(`mousedown${EVENT_NS}`, handleStart);
-  $panel.off(`touchstart${EVENT_NS}`).on(`touchstart${EVENT_NS}`, handleStart);
-  $panel.off(`click${EVENT_NS}`).on(`click${EVENT_NS}`, handleClick);
+  $panel.off(`pointerdown${SHIELD_EVENT_NS}`).on(`pointerdown${SHIELD_EVENT_NS}`, handleStart);
+  $panel.off(`mousedown${SHIELD_EVENT_NS}`).on(`mousedown${SHIELD_EVENT_NS}`, handleStart);
+  $panel.off(`touchstart${SHIELD_EVENT_NS}`).on(`touchstart${SHIELD_EVENT_NS}`, handleStart);
+  $panel.off(`click${SHIELD_EVENT_NS}`).on(`click${SHIELD_EVENT_NS}`, handleClick);
 }
 
 function ensurePanelStyle(): void {
