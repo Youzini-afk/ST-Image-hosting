@@ -1,5 +1,5 @@
 <template>
-  <div ref="rootRef" class="wb-assistant-root" :style="themeStyles">
+  <div ref="rootRef" class="wb-assistant-root" :class="focusCineRootClass" :style="themeStyles">
 
     <!-- ═══ Mobile Tab View ═══ -->
     <template v-if="isMobile">
@@ -432,7 +432,7 @@
     <section v-if="!isDesktopFocusMode" class="wb-toolbar">
             <label class="toolbar-label">
               <span>世界书</span>
-              <div ref="worldbookPickerRef" class="worldbook-picker">
+              <div ref="worldbookPickerRef" class="worldbook-picker" data-focus-hero="worldbook_picker">
                 <button class="worldbook-picker-trigger" type="button" @click="toggleWorldbookPicker">
                   <span class="worldbook-picker-trigger-text" :title="selectedWorldbookName || '请选择世界书'">
                     {{ selectedWorldbookName || '请选择世界书' }}
@@ -492,7 +492,7 @@
               <div class="wb-focus-core-group">
                 <label class="toolbar-label focus-toolbar-label">
                   <span class="focus-toolbar-label-text">世界书</span>
-                  <div ref="worldbookPickerRef" class="worldbook-picker">
+                  <div ref="worldbookPickerRef" class="worldbook-picker" data-focus-hero="worldbook_picker">
                     <button class="worldbook-picker-trigger" type="button" @click="toggleWorldbookPicker">
                       <span class="worldbook-picker-trigger-text" :title="selectedWorldbookName || '请选择世界书'">
                         {{ selectedWorldbookName || '请选择世界书' }}
@@ -534,14 +534,14 @@
                     </div>
                   </div>
                 </label>
-                <button class="btn" type="button" :class="{ 'glow-pulse': hasUnsavedChanges }" :disabled="!hasUnsavedChanges" @click="saveCurrentWorldbook">
+                <button class="btn" data-focus-hero="save_btn" type="button" :class="{ 'glow-pulse': hasUnsavedChanges }" :disabled="!hasUnsavedChanges || focusCineLocked" @click="saveCurrentWorldbook">
                   {{ isFocusToolbarCompact ? '💾' : '💾 保存' }}
                 </button>
-                <button class="btn utility-btn" type="button" :class="{ active: isDesktopFocusMode }" @click="toggleFocusEditing">
+                <button class="btn utility-btn" data-focus-hero="focus_toggle" type="button" :class="{ active: isDesktopFocusMode }" :disabled="focusCineLocked" @click="toggleFocusEditing">
                   {{ isFocusToolbarCompact ? '🎯' : '🎯 专注开关' }}
                 </button>
                 <div ref="focusWorldbookMenuRef" class="focus-menu-wrap">
-                  <button class="btn utility-btn" type="button" @click="toggleFocusWorldbookMenu">
+                  <button class="btn utility-btn" data-focus-hero="more_btn" type="button" :disabled="focusCineLocked" @click="toggleFocusWorldbookMenu">
                     {{ isFocusToolbarCompact ? '⋯' : '更多' }}
                   </button>
                   <Transition name="focus-menu-pop">
@@ -558,15 +558,16 @@
               <div class="wb-focus-tool-entry">
                 <button
                   class="btn history-btn utility-btn focus-search-btn"
+                  data-focus-hero="find_btn"
                   type="button"
                   :class="{ active: floatingPanels.find.visible }"
-                  :disabled="!draftEntries.length"
+                  :disabled="!draftEntries.length || focusCineLocked"
                   @click="toggleFloatingPanel('find')"
                 >
                   {{ isFocusToolbarCompact ? '🔎' : '🔎 查找替换' }}
                 </button>
                 <Transition name="focus-tools-trigger">
-                  <button v-if="focusToolsTriggerVisible" class="btn history-btn utility-btn" type="button" :disabled="focusToolsExpanded" @click="openFocusToolsBand">
+                  <button v-if="focusToolsTriggerVisible" class="btn history-btn utility-btn" data-focus-hero="tools_btn" type="button" :disabled="focusToolsExpanded || focusCineLocked" @click="openFocusToolsBand">
                     {{ isFocusToolbarCompact ? '工具' : '更多工具' }}
                   </button>
                 </Transition>
@@ -599,7 +600,7 @@
           <div class="wb-scroll-area">
           <section v-if="!isDesktopFocusMode || globalWorldbookMode" class="wb-bindings" :class="{ 'focus-bindings': isDesktopFocusMode }">
             <div v-if="!isDesktopFocusMode" class="wb-history-shortcuts">
-              <button class="btn history-btn utility-btn" type="button" @click="toggleFocusEditing">🎯 专注编辑</button>
+              <button class="btn history-btn utility-btn" data-focus-hero="focus_toggle" type="button" :disabled="focusCineLocked" @click="toggleFocusEditing">🎯 专注编辑</button>
               <button
                 class="btn history-btn utility-btn"
                 type="button"
@@ -621,9 +622,10 @@
               </button>
               <button
                 class="btn history-btn utility-btn"
+                data-focus-hero="find_btn"
                 type="button"
                 :class="{ active: floatingPanels.find.visible }"
-                :disabled="!draftEntries.length"
+                :disabled="!draftEntries.length || focusCineLocked"
                 @click="toggleFloatingPanel('find')"
               >
                 🔎 查找与替换
@@ -1385,6 +1387,13 @@
     </template>
     <!-- ═══ End Desktop Layout ═══ -->
 
+    <div
+      v-if="focusCinePhase !== 'idle'"
+      ref="focusCineOverlayRef"
+      class="focus-cine-overlay"
+      aria-hidden="true"
+    ></div>
+
     <!-- ═══ Shared Modals (both mobile & desktop) ═══ -->
     <!-- 设置弹窗 -->
     <div v-if="showApiSettings" class="ai-tag-review-overlay" @click.self="showApiSettings = false">
@@ -1945,6 +1954,9 @@ type FindFieldKey = 'name' | 'content' | 'keys';
 type SelectionSource = 'manual' | 'auto';
 type FocusSidePanelKey = 'strategy' | 'insertion' | 'recursion';
 type FocusMetaPanelKey = 'comment' | 'keywords';
+type FocusCinePhase = 'idle' | 'prepare' | 'running' | 'settling';
+type FocusCineDirection = 'enter' | 'exit';
+type FocusHeroKey = 'worldbook_picker' | 'focus_toggle' | 'find_btn' | 'save_btn' | 'more_btn' | 'tools_btn';
 
 interface WorldbookSwitchOptions {
   source?: SelectionSource;
@@ -1972,6 +1984,12 @@ interface PaneResizeState {
   pointerId: number;
   doc: Document;
   win: Window;
+}
+
+interface FocusHeroSnapshot {
+  key: FocusHeroKey;
+  element: HTMLElement;
+  rect: DOMRect;
 }
 
 type ThemeKey = 'ocean' | 'nebula' | 'forest' | 'sunset' | 'coffee' | 'paper' | 'snow' | 'midnight';
@@ -2361,6 +2379,17 @@ const TAG_COLORS = [
   '#f97316', '#eab308', '#22c55e', '#06b6d4',
   '#6366f1', '#14b8a6', '#f43f5e', '#a855f7',
 ];
+const FOCUS_CINE_DURATION = 1400;
+const FOCUS_CINE_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
+const FOCUS_CINE_STAGGER = 60;
+const FOCUS_HERO_KEYS: FocusHeroKey[] = [
+  'worldbook_picker',
+  'focus_toggle',
+  'find_btn',
+  'save_btn',
+  'more_btn',
+  'tools_btn',
+];
 
 const strategyTypeOptions: StrategyType[] = ['constant', 'selective', 'vectorized'];
 const secondaryLogicOptions: SecondaryLogic[] = ['and_any', 'and_all', 'not_all', 'not_any'];
@@ -2393,6 +2422,13 @@ const isFocusEditing = ref(false);
 const focusWorldbookMenuOpen = ref(false);
 const focusToolsExpanded = ref(false);
 const focusToolsTriggerVisible = ref(true);
+const focusCinePhase = ref<FocusCinePhase>('idle');
+const focusCineDirection = ref<FocusCineDirection>('enter');
+const focusCineLocked = ref(false);
+const focusCineOverlayRef = ref<HTMLElement | null>(null);
+let focusCineToken = 0;
+let focusCineGhostNodes: HTMLElement[] = [];
+let focusCineHiddenNodes: HTMLElement[] = [];
 const focusMetaPanel = reactive<Record<FocusMetaPanelKey, boolean>>({
   comment: false,
   keywords: false,
@@ -2400,7 +2436,7 @@ const focusMetaPanel = reactive<Record<FocusMetaPanelKey, boolean>>({
 const focusSidePanelState = reactive<Record<FocusSidePanelKey, boolean>>({
   strategy: true,
   insertion: true,
-  recursion: false,
+  recursion: true,
 });
 
 // Floor extraction button visibility (synced via localStorage + custom event)
@@ -2618,6 +2654,14 @@ const totalContentChars = computed(() =>
 const hasUnsavedChanges = computed(() => draftEntriesDigest.value !== originalEntriesDigest.value);
 const isCompactLayout = computed(() => viewportWidth.value <= 1100);
 const isDesktopFocusMode = computed(() => !isMobile.value && !isCompactLayout.value && isFocusEditing.value);
+const focusCineEnabled = computed(() => !isMobile.value && viewportWidth.value > 1100);
+const isFocusCineRunning = computed(() => focusCinePhase.value === 'running' || focusCinePhase.value === 'settling');
+const focusCineRootClass = computed(() => ({
+  'focus-cine-running': isFocusCineRunning.value,
+  'focus-cine-enter': isFocusCineRunning.value && focusCineDirection.value === 'enter',
+  'focus-cine-exit': isFocusCineRunning.value && focusCineDirection.value === 'exit',
+  'focus-cine-locked': focusCineLocked.value,
+}));
 const isFocusToolbarCompact = computed(() => isDesktopFocusMode.value && viewportWidth.value < 1360);
 const activeMainPaneMin = computed(() => (isDesktopFocusMode.value ? FOCUS_MAIN_PANE_MIN : MAIN_PANE_MIN));
 const activeEditorSideMin = computed(() => (isDesktopFocusMode.value ? FOCUS_EDITOR_SIDE_MIN : EDITOR_SIDE_MIN));
@@ -3119,7 +3163,7 @@ watch(
       focusMetaPanel.keywords = false;
       focusSidePanelState.strategy = true;
       focusSidePanelState.insertion = true;
-      focusSidePanelState.recursion = false;
+      focusSidePanelState.recursion = true;
     }
   },
 );
@@ -6510,7 +6554,7 @@ function resetFocusPanels(): void {
   focusMetaPanel.keywords = false;
   focusSidePanelState.strategy = true;
   focusSidePanelState.insertion = true;
-  focusSidePanelState.recursion = false;
+  focusSidePanelState.recursion = true;
   focusToolsExpanded.value = false;
   focusToolsTriggerVisible.value = true;
   focusWorldbookMenuOpen.value = false;
@@ -6529,6 +6573,9 @@ function closeFocusWorldbookMenu(): void {
 }
 
 function toggleFocusWorldbookMenu(): void {
+  if (focusCineLocked.value) {
+    return;
+  }
   if (!focusWorldbookMenuOpen.value) {
     closeFocusToolsBand();
   }
@@ -6536,6 +6583,9 @@ function toggleFocusWorldbookMenu(): void {
 }
 
 function openFocusToolsBand(): void {
+  if (focusCineLocked.value) {
+    return;
+  }
   if (focusToolsExpanded.value || !focusToolsTriggerVisible.value) {
     return;
   }
@@ -6579,18 +6629,240 @@ function runFocusWorldbookAction(action: 'create' | 'duplicate' | 'delete' | 'ex
   triggerImport();
 }
 
-function toggleFocusEditing(): void {
-  isFocusEditing.value = !isFocusEditing.value;
-  if (isFocusEditing.value) {
+function waitForFrame(): Promise<void> {
+  return new Promise(resolve => {
+    requestAnimationFrame(() => resolve());
+  });
+}
+
+function waitForDuration(ms: number): Promise<void> {
+  return new Promise(resolve => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+function applyFocusEditingState(nextFocus: boolean): void {
+  isFocusEditing.value = nextFocus;
+  if (nextFocus) {
     resetFocusPanels();
   } else {
     closeFocusWorldbookMenu();
     closeFocusToolsBand();
   }
-  void nextTick(() => {
+}
+
+function collectFocusHeroSnapshots(): Map<FocusHeroKey, FocusHeroSnapshot> {
+  const snapshots = new Map<FocusHeroKey, FocusHeroSnapshot>();
+  const root = rootRef.value;
+  if (!root) {
+    return snapshots;
+  }
+
+  for (const key of FOCUS_HERO_KEYS) {
+    const nodes = Array.from(root.querySelectorAll<HTMLElement>(`[data-focus-hero="${key}"]`));
+    const element = nodes.find(node => {
+      if (!node.isConnected) {
+        return false;
+      }
+      const style = window.getComputedStyle(node);
+      if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) <= 0) {
+        return false;
+      }
+      const rect = node.getBoundingClientRect();
+      return rect.width > 1 && rect.height > 1;
+    }) ?? nodes[0];
+    if (!element) {
+      continue;
+    }
+    const rect = element.getBoundingClientRect();
+    if (rect.width <= 1 || rect.height <= 1) {
+      continue;
+    }
+    snapshots.set(key, { key, element, rect });
+  }
+
+  return snapshots;
+}
+
+function pickNearestHeroSnapshot(anchorRect: DOMRect, snapshots: FocusHeroSnapshot[]): FocusHeroSnapshot | null {
+  if (!snapshots.length) {
+    return null;
+  }
+  const anchorX = anchorRect.left + anchorRect.width / 2;
+  const anchorY = anchorRect.top + anchorRect.height / 2;
+  let nearest = snapshots[0];
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  for (const item of snapshots) {
+    const itemX = item.rect.left + item.rect.width / 2;
+    const itemY = item.rect.top + item.rect.height / 2;
+    const distance = Math.hypot(anchorX - itemX, anchorY - itemY);
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearest = item;
+    }
+  }
+  return nearest;
+}
+
+function clearFocusCineArtifacts(): void {
+  for (const node of focusCineGhostNodes) {
+    node.remove();
+  }
+  focusCineGhostNodes = [];
+
+  for (const node of focusCineHiddenNodes) {
+    node.classList.remove('focus-cine-real-hidden');
+  }
+  focusCineHiddenNodes = [];
+}
+
+function mountFocusCineGhosts(
+  sourceMap: Map<FocusHeroKey, FocusHeroSnapshot>,
+  targetMap: Map<FocusHeroKey, FocusHeroSnapshot>,
+): number {
+  clearFocusCineArtifacts();
+  const overlay = focusCineOverlayRef.value;
+  if (!overlay) {
+    return 0;
+  }
+  const sourceList = Array.from(sourceMap.values());
+  const targetList = Array.from(targetMap.values());
+  const hiddenTargets = new Set<HTMLElement>();
+  let index = 0;
+
+  for (const key of FOCUS_HERO_KEYS) {
+    const sourceSelf = sourceMap.get(key) ?? null;
+    const targetSelf = targetMap.get(key) ?? null;
+
+    if (!sourceSelf && !targetSelf) {
+      continue;
+    }
+
+    const sourceAnchor = sourceSelf ?? (targetSelf ? pickNearestHeroSnapshot(targetSelf.rect, sourceList) : null);
+    const targetAnchor = targetSelf ?? (sourceSelf ? pickNearestHeroSnapshot(sourceSelf.rect, targetList) : null);
+    if (!sourceAnchor || !targetAnchor) {
+      continue;
+    }
+
+    const startRect = sourceSelf?.rect ?? sourceAnchor.rect;
+    const endRect = targetSelf?.rect ?? targetAnchor.rect;
+    const sourceElement = sourceSelf?.element ?? sourceAnchor.element;
+    const ghost = sourceElement.cloneNode(true) as HTMLElement;
+    ghost.classList.add('focus-cine-ghost');
+    ghost.removeAttribute('id');
+    ghost.removeAttribute('data-focus-hero');
+    ghost.setAttribute('aria-hidden', 'true');
+
+    const startWidth = Math.max(1, startRect.width);
+    const startHeight = Math.max(1, startRect.height);
+    const endWidth = Math.max(1, endRect.width);
+    const endHeight = Math.max(1, endRect.height);
+    const dx = endRect.left - startRect.left;
+    const dy = endRect.top - startRect.top;
+    const scaleX = clampNumber(endWidth / startWidth, 0.72, 1.42);
+    const scaleY = clampNumber(endHeight / startHeight, 0.72, 1.42);
+
+    ghost.style.left = `${startRect.left}px`;
+    ghost.style.top = `${startRect.top}px`;
+    ghost.style.width = `${startWidth}px`;
+    ghost.style.height = `${startHeight}px`;
+    ghost.style.setProperty('--cine-dx', `${dx}px`);
+    ghost.style.setProperty('--cine-dy', `${dy}px`);
+    ghost.style.setProperty('--cine-scale-x', `${scaleX}`);
+    ghost.style.setProperty('--cine-scale-y', `${scaleY}`);
+    ghost.style.setProperty('--cine-from-opacity', sourceSelf ? '1' : '0');
+    ghost.style.setProperty('--cine-to-opacity', targetSelf ? '1' : '0');
+    ghost.style.animationDuration = `${FOCUS_CINE_DURATION}ms`;
+    ghost.style.animationTimingFunction = FOCUS_CINE_EASE;
+    ghost.style.animationDelay = `${index * FOCUS_CINE_STAGGER}ms`;
+
+    overlay.appendChild(ghost);
+    focusCineGhostNodes.push(ghost);
+
+    if (targetSelf && !hiddenTargets.has(targetSelf.element)) {
+      hiddenTargets.add(targetSelf.element);
+      targetSelf.element.classList.add('focus-cine-real-hidden');
+      focusCineHiddenNodes.push(targetSelf.element);
+    }
+    index += 1;
+  }
+
+  return index;
+}
+
+async function runFocusCinematicTransition(nextFocus: boolean): Promise<void> {
+  if (focusCineLocked.value) {
+    return;
+  }
+  const token = ++focusCineToken;
+  focusCineLocked.value = true;
+  focusCineDirection.value = nextFocus ? 'enter' : 'exit';
+  focusCinePhase.value = 'prepare';
+
+  try {
+    await nextTick();
+    const sourceMap = collectFocusHeroSnapshots();
+
+    applyFocusEditingState(nextFocus);
+    await nextTick();
+    await waitForFrame();
+    await waitForFrame();
+
+    clampPaneWidths();
+    const targetMap = collectFocusHeroSnapshots();
+    const ghostCount = mountFocusCineGhosts(sourceMap, targetMap);
+    if (token !== focusCineToken) {
+      return;
+    }
+    if (ghostCount <= 0) {
+      focusCinePhase.value = 'settling';
+      await nextTick();
+      clampPaneWidths();
+      persistLayoutState();
+      return;
+    }
+
+    focusCinePhase.value = 'running';
+    const totalDuration = FOCUS_CINE_DURATION + Math.max(0, ghostCount - 1) * FOCUS_CINE_STAGGER + 160;
+    await waitForDuration(totalDuration);
+    if (token !== focusCineToken) {
+      return;
+    }
+
+    focusCinePhase.value = 'settling';
+    clearFocusCineArtifacts();
+    await nextTick();
     clampPaneWidths();
     persistLayoutState();
-  });
+    await waitForDuration(120);
+  } catch (error) {
+    console.error('[focus-cine] transition failed', error);
+    await nextTick();
+    clampPaneWidths();
+    persistLayoutState();
+  } finally {
+    if (token === focusCineToken) {
+      clearFocusCineArtifacts();
+      focusCinePhase.value = 'idle';
+      focusCineLocked.value = false;
+    }
+  }
+}
+
+function toggleFocusEditing(): void {
+  if (focusCineLocked.value) {
+    return;
+  }
+  const nextFocus = !isFocusEditing.value;
+  if (!focusCineEnabled.value) {
+    applyFocusEditingState(nextFocus);
+    void nextTick(() => {
+      clampPaneWidths();
+      persistLayoutState();
+    });
+    return;
+  }
+  void runFocusCinematicTransition(nextFocus);
 }
 
 function toggleWorldbookPicker(): void {
@@ -7003,6 +7275,9 @@ function closeFloatingPanel(key: FloatingPanelKey): void {
 }
 
 function toggleFloatingPanel(key: FloatingPanelKey): void {
+  if (focusCineLocked.value) {
+    return;
+  }
   if (floatingPanels[key].visible) {
     closeFloatingPanel(key);
     return;
@@ -7021,6 +7296,9 @@ function getFloatingPanelStyle(key: FloatingPanelKey): Record<string, string> {
 }
 
 function startFloatingDrag(key: FloatingPanelKey, event: PointerEvent): void {
+  if (focusCineLocked.value) {
+    return;
+  }
   if (event.pointerType === 'mouse' && event.button !== 0) {
     return;
   }
@@ -7106,6 +7384,9 @@ function clampPaneWidths(): void {
 }
 
 function startContentResize(e: PointerEvent): void {
+  if (focusCineLocked.value) {
+    return;
+  }
   e.preventDefault();
   const textarea = contentTextareaRef.value;
   if (!textarea) return;
@@ -7152,6 +7433,9 @@ const editorContentBlockRef = ref<HTMLElement | null>(null);
 let contentTopDragOffset = 0;
 
 function startContentTopDrag(e: PointerEvent): void {
+  if (focusCineLocked.value) {
+    return;
+  }
   e.preventDefault();
   const block = editorContentBlockRef.value;
   if (!block) return;
@@ -7190,6 +7474,9 @@ function startContentTopDrag(e: PointerEvent): void {
 }
 
 function startPaneResize(key: PaneResizeKey, event: PointerEvent): void {
+  if (focusCineLocked.value) {
+    return;
+  }
   if (isCompactLayout.value) {
     return;
   }
@@ -7374,6 +7661,10 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  focusCineToken += 1;
+  focusCineLocked.value = false;
+  focusCinePhase.value = 'idle';
+  clearFocusCineArtifacts();
   if (keysDebounceTimer) {
     clearTimeout(keysDebounceTimer);
     keysDebounceTimer = null;
@@ -7453,6 +7744,7 @@ watch(hasUnsavedChanges, (val) => {
 
 <style scoped>
 .wb-assistant-root {
+  position: relative;
   flex: 1;
   min-height: 0;
   width: 100%;
@@ -7467,6 +7759,68 @@ watch(hasUnsavedChanges, (val) => {
   line-height: 1.5;
   border-radius: 12px;
   overflow: hidden;
+}
+
+.focus-cine-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10290;
+  pointer-events: auto;
+  overflow: hidden;
+}
+
+.focus-cine-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 40%, rgba(125, 211, 252, 0.14), rgba(2, 6, 23, 0.42) 72%),
+    radial-gradient(circle at 50% 50%, rgba(2, 6, 23, 0), rgba(2, 6, 23, 0.42) 100%);
+  animation: focus-cine-vignette 1400ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.focus-cine-ghost {
+  position: fixed;
+  z-index: 10305;
+  margin: 0;
+  pointer-events: none;
+  transform-origin: center center;
+  will-change: transform, opacity, filter;
+  filter: drop-shadow(0 10px 20px rgba(2, 6, 23, 0.45));
+  animation-name: focus-cine-hero-flight;
+  animation-fill-mode: forwards;
+}
+
+[data-focus-hero].focus-cine-real-hidden {
+  visibility: hidden !important;
+}
+
+@keyframes focus-cine-vignette {
+  0% {
+    opacity: 0;
+  }
+  35% {
+    opacity: 0.86;
+  }
+  100% {
+    opacity: 0.2;
+  }
+}
+
+@keyframes focus-cine-hero-flight {
+  0% {
+    opacity: var(--cine-from-opacity, 1);
+    transform: translate3d(0, 0, 0) scale(1, 1);
+  }
+  60% {
+    opacity: 1;
+    transform: translate3d(calc(var(--cine-dx, 0px) * 0.6), calc(var(--cine-dy, 0px) * 0.6 - 20px), 0)
+      scale(calc(var(--cine-scale-x, 1) * 1.04), calc(var(--cine-scale-y, 1) * 1.04));
+  }
+  100% {
+    opacity: var(--cine-to-opacity, 1);
+    transform: translate3d(var(--cine-dx, 0px), var(--cine-dy, 0px), 0) scale(var(--cine-scale-x, 1), var(--cine-scale-y, 1));
+  }
 }
 
 
@@ -8170,6 +8524,11 @@ watch(hasUnsavedChanges, (val) => {
   transition: grid-template-columns 240ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+.wb-assistant-root.focus-cine-running .wb-main-layout {
+  transition-duration: 1400ms;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 .wb-entry-list,
 .wb-editor {
   border-radius: 12px;
@@ -8389,6 +8748,74 @@ watch(hasUnsavedChanges, (val) => {
   grid-template-columns: minmax(0, 1fr) 10px 360px;
   gap: 0;
   transition: grid-template-columns 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.wb-assistant-root.focus-cine-running .wb-editor-shell {
+  transition-duration: 1400ms;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.wb-assistant-root.focus-cine-running .wb-entry-list {
+  animation: focus-cine-left-pane 1400ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.wb-assistant-root.focus-cine-running .editor-center {
+  animation: focus-cine-center-pane 1400ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.wb-assistant-root.focus-cine-running .editor-side {
+  animation: focus-cine-right-pane 1400ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.wb-assistant-root.focus-cine-running.focus-cine-exit .wb-entry-list,
+.wb-assistant-root.focus-cine-running.focus-cine-exit .editor-center,
+.wb-assistant-root.focus-cine-running.focus-cine-exit .editor-side {
+  animation-direction: reverse;
+}
+
+@keyframes focus-cine-left-pane {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: blur(0);
+  }
+  45% {
+    transform: translate3d(-12px, 0, 0) scale(0.93);
+    filter: blur(0.35px);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes focus-cine-center-pane {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: blur(0);
+  }
+  45% {
+    transform: translate3d(0, -2px, 0) scale(1.025);
+    filter: blur(0.2px);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes focus-cine-right-pane {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: blur(0);
+  }
+  45% {
+    transform: translate3d(12px, 0, 0) scale(0.935);
+    filter: blur(0.35px);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: blur(0);
+  }
 }
 
 .wb-main-layout.focus-mode .wb-entry-list {
