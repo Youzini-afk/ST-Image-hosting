@@ -60,7 +60,7 @@
                 <button class="btn" type="button" @click="extractFromChat" style="padding:8px 14px;font-size:13px;">📥 提取</button>
                 <button class="btn" type="button" @click="showApiSettings = true" style="padding:8px 14px;font-size:13px;">⚙️ API</button>
                 <button class="btn" type="button" @click="aiConfigPreview = false; aiConfigChanges = []; aiConfigTargetWorldbook = selectedWorldbookName || ''" style="padding:8px 14px;font-size:13px;">🔧 AI配置</button>
-                <button class="btn" type="button" :style="{ padding:'8px 14px', fontSize:'13px', background: floorBtnVisible ? 'var(--wb-primary)' : '', color: floorBtnVisible ? '#fff' : '' }" @click="toggleFloorBtns(!floorBtnVisible)">📥 {{ floorBtnVisible ? '楼层提取' : '楼层提取(关)' }}</button>
+                <button class="btn" type="button" :style="{ padding:'8px 14px', fontSize:'13px', background: floorBtnVisible ? 'var(--wb-primary)' : '', color: floorBtnVisible ? '#fff' : '' }" @click="toggleFloorBtns(!floorBtnVisible)">📥 {{ floorBtnVisible ? '楼层提取开启' : '楼层提取关闭' }}</button>
               </div>
             </section>
             <div class="wb-bindings" v-if="bindings.global.length || bindings.charPrimary || bindings.charAdditional.length || bindings.chat">
@@ -579,7 +579,7 @@
                 :title="floorBtnVisible ? '点击隐藏楼层提取按钮' : '点击显示楼层提取按钮'"
                 @click="toggleFloorBtns(!floorBtnVisible)"
               >
-                📥 {{ floorBtnVisible ? '楼层提取' : '楼层提取(已关)' }}
+                📥 {{ floorBtnVisible ? '楼层提取开启' : '楼层提取关闭' }}
               </button>
             </div>
             <div v-if="globalWorldbookMode" class="global-mode-panel">
