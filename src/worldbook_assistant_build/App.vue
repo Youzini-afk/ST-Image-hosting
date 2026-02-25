@@ -161,7 +161,7 @@
                   {{ entry.strategy.keys.join(', ') }}
                 </div>
                 <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;font-size:10px;opacity:0.8;">
-                  <span style="background:var(--wb-input-bg);padding:2px 6px;border-radius:4px;">📍 {{ getPositionTypeLabel(entry.position.type) }}</span>
+                  <span style="background:var(--wb-input-bg);padding:2px 6px;border-radius:4px;">📍 {{ getPositionTypeLabel(entry.position.type, entry.position.role) }}</span>
                   <span style="background:var(--wb-input-bg);padding:2px 6px;border-radius:4px;">⚖️ #{{ entry.position.order }}</span>
                   <span v-if="entry.recursion.prevent_incoming" style="background:var(--wb-input-bg);padding:2px 6px;border-radius:4px;color:#f59e0b;">🚫入</span>
                   <span v-if="entry.recursion.prevent_outgoing" style="background:var(--wb-input-bg);padding:2px 6px;border-radius:4px;color:#f59e0b;">🚫出</span>
@@ -254,8 +254,8 @@
                 <h4>插入设置 (INSERTION)</h4>
                 <label class="field">
                   <span>位置 (Position)</span>
-                  <select v-model="selectedEntry.position.type" class="text-input" @change="handleSelectedPositionTypeChanged">
-                    <option v-for="item in positionTypeOptions" :key="`mp-${item}`" :value="item">{{ getPositionTypeLabel(item) }}</option>
+                  <select v-model="selectedPositionSelectValue" class="text-input">
+                    <option v-for="item in positionSelectOptions" :key="`mp-${item.value}`" :value="item.value">{{ item.label }}</option>
                   </select>
                 </label>
                 <label class="field">
@@ -1685,12 +1685,11 @@
                         <label class="field">
                           <span>位置 (Position)</span>
                           <select
-                            v-model="selectedEntry.position.type"
+                            v-model="selectedPositionSelectValue"
                             class="text-input"
-                            @change="handleSelectedPositionTypeChanged"
                           >
-                            <option v-for="item in positionTypeOptions" :key="item" :value="item">
-                              {{ getPositionTypeLabel(item) }}
+                            <option v-for="item in positionSelectOptions" :key="item.value" :value="item.value">
+                              {{ item.label }}
                             </option>
                           </select>
                         </label>
@@ -2704,6 +2703,7 @@ import { klona } from 'klona';
 type StrategyType = WorldbookEntry['strategy']['type'];
 type SecondaryLogic = WorldbookEntry['strategy']['keys_secondary']['logic'];
 type PositionType = WorldbookEntry['position']['type'];
+type PositionSelectValue = PositionType | 'at_depth_as_system' | 'at_depth_as_assistant' | 'at_depth_as_user';
 type RoleType = WorldbookEntry['position']['role'];
 type EntryVisualStatus = 'constant' | 'vector' | 'normal' | 'disabled';
 type FloatingPanelKey = 'find' | 'activation';
@@ -3289,6 +3289,22 @@ const positionTypeOptions: PositionType[] = [
   'after_author_note',
   'at_depth',
 ];
+const positionSelectOptions: Array<{
+  value: PositionSelectValue;
+  type: PositionType;
+  role?: RoleType;
+  label: string;
+}> = [
+  { value: 'before_character_definition', type: 'before_character_definition', label: '角色定义之前' },
+  { value: 'after_character_definition', type: 'after_character_definition', label: '角色定义之后' },
+  { value: 'before_example_messages', type: 'before_example_messages', label: '示例消息前（↑EM）' },
+  { value: 'after_example_messages', type: 'after_example_messages', label: '示例消息后（↓EM）' },
+  { value: 'before_author_note', type: 'before_author_note', label: '作者注释之前' },
+  { value: 'after_author_note', type: 'after_author_note', label: '作者注释之后' },
+  { value: 'at_depth_as_system', type: 'at_depth', role: 'system', label: '@D ⚙ [系统]在深度' },
+  { value: 'at_depth_as_user', type: 'at_depth', role: 'user', label: '@D 👤 [用户]在深度' },
+  { value: 'at_depth_as_assistant', type: 'at_depth', role: 'assistant', label: '@D 🤖 [AI]在深度' },
+];
 
 const worldbookNames = ref<string[]>([]);
 const selectedWorldbookName = ref('');
@@ -3551,6 +3567,20 @@ const selectedEntryIndex = computed(() => {
 
 const selectedEntryUidSet = computed(() => new Set(selectedEntryUids.value));
 const selectedEntryCount = computed(() => selectedEntryUids.value.length);
+const selectedPositionSelectValue = computed<PositionSelectValue>({
+  get() {
+    if (!selectedEntry.value) {
+      return 'before_character_definition';
+    }
+    if (selectedEntry.value.position.type === 'at_depth') {
+      return `at_depth_as_${selectedEntry.value.position.role}` as PositionSelectValue;
+    }
+    return selectedEntry.value.position.type;
+  },
+  set(value) {
+    applySelectedPositionSelectValue(value);
+  },
+});
 
 const filteredEntries = computed(() => {
   const keyword = searchText.value.trim().toLowerCase();
@@ -4317,7 +4347,7 @@ const focusInsertionSummary = computed(() => {
   if (!selectedEntry.value) {
     return '-';
   }
-  return `${getPositionTypeLabel(selectedEntry.value.position.type)} · #${selectedEntry.value.position.order}`;
+  return `${getPositionTypeLabel(selectedEntry.value.position.type, selectedEntry.value.position.role)} · #${selectedEntry.value.position.order}`;
 });
 
 const focusRecursionSummary = computed(() => {
@@ -4772,17 +4802,56 @@ function getSecondaryLogicLabel(logic: SecondaryLogic): string {
   return map[logic];
 }
 
-function getPositionTypeLabel(type: PositionType): string {
-  const map: Record<PositionType, string> = {
-    before_character_definition: '角色设定前',
-    after_character_definition: '角色设定后',
-    before_example_messages: '示例消息前',
-    after_example_messages: '示例消息后',
-    before_author_note: '作者注释前',
-    after_author_note: '作者注释后',
-    at_depth: '指定深度插入',
+function getPositionTypeLabel(type: PositionType, role: RoleType = 'system'): string {
+  return getPositionTypeLabelWithRole(type, role);
+}
+
+function getPositionTypeLabelWithRole(type: PositionType, role: RoleType): string {
+  const map: Record<Exclude<PositionType, 'at_depth'>, string> = {
+    before_character_definition: '角色定义之前',
+    after_character_definition: '角色定义之后',
+    before_example_messages: '示例消息前（↑EM）',
+    after_example_messages: '示例消息后（↓EM）',
+    before_author_note: '作者注释之前',
+    after_author_note: '作者注释之后',
   };
-  return map[type];
+  if (type !== 'at_depth') {
+    return map[type];
+  }
+  if (role === 'assistant') {
+    return '@D 🤖 [AI]在深度';
+  }
+  if (role === 'user') {
+    return '@D 👤 [用户]在深度';
+  }
+  return '@D ⚙ [系统]在深度';
+}
+
+function parseAtDepthRoleFromPositionValue(value: unknown): RoleType | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const depthMatch = value.match(/^at_depth_as_(system|assistant|user)$/);
+  if (!depthMatch) {
+    return null;
+  }
+  return depthMatch[1] as RoleType;
+}
+
+function applySelectedPositionSelectValue(value: PositionSelectValue): void {
+  if (!selectedEntry.value) {
+    return;
+  }
+  const depthRole = parseAtDepthRoleFromPositionValue(value);
+  if (depthRole) {
+    selectedEntry.value.position.type = 'at_depth';
+    selectedEntry.value.position.role = depthRole;
+    selectedEntry.value.position.depth = Math.max(1, Math.floor(toNumberSafe(selectedEntry.value.position.depth, 4)));
+    return;
+  }
+  selectedEntry.value.position.type = value as PositionType;
+  selectedEntry.value.position.role = 'system';
+  selectedEntry.value.position.depth = 4;
 }
 
 function getEntryVisualStatus(entry: WorldbookEntry): EntryVisualStatus {
@@ -4859,8 +4928,7 @@ function normalizePositionType(value: unknown): PositionType {
     if (positionTypeOptions.includes(value as PositionType)) {
       return value as PositionType;
     }
-    const depthMatch = value.match(/^at_depth_as_(system|assistant|user)$/);
-    if (depthMatch) {
+    if (parseAtDepthRoleFromPositionValue(value)) {
       return 'at_depth';
     }
   }
@@ -4874,9 +4942,9 @@ function normalizePositionType(value: unknown): PositionType {
       5: 'after_author_note',
       6: 'at_depth',
     };
-    return map[value] ?? 'after_character_definition';
+    return map[value] ?? 'before_character_definition';
   }
-  return 'after_character_definition';
+  return 'before_character_definition';
 }
 
 function normalizeRole(value: unknown): RoleType {
@@ -4928,7 +4996,7 @@ function createDefaultEntry(uid: number): WorldbookEntry {
       scan_depth: 'same_as_global',
     },
     position: {
-      type: 'after_character_definition',
+      type: 'before_character_definition',
       role: 'system',
       depth: 4,
       order: 100,
@@ -5016,8 +5084,10 @@ function normalizeEntry(rawInput: unknown, fallbackUid: number): WorldbookEntry 
     secondaryRecord?.keys ?? raw.secondary_keys ?? raw.keysecondary ?? raw.filters,
   );
   const secondaryLogic = normalizeSecondaryLogic(secondaryRecord?.logic ?? raw.logic ?? raw.selectiveLogic);
-  const positionType = normalizePositionType(positionRecord?.type ?? raw.position);
-  const role = normalizeRole(positionRecord?.role ?? raw.role);
+  const rawPositionType = positionRecord?.type ?? raw.position;
+  const inferredDepthRole = parseAtDepthRoleFromPositionValue(rawPositionType);
+  const positionType = normalizePositionType(rawPositionType);
+  const role = normalizeRole(positionRecord?.role ?? raw.role ?? inferredDepthRole);
   const depth = Math.max(1, Math.floor(toNumberSafe(positionRecord?.depth ?? raw.depth, 4)));
   const order = Math.floor(toNumberSafe(positionRecord?.order ?? raw.insertion_order ?? raw.order, 100));
   const probability = clampNumber(toNumberSafe(raw.probability, 100), 0, 100);
@@ -5580,13 +5650,13 @@ function buildCustomApiForGenerate(): { custom_api?: CustomApiConfig } {
 
 // ── AI: Worldbook Config ────────────────────────────────────────────
 const POSITION_TYPE_LABELS: Record<string, string> = {
-  before_character_definition: '角色定义前',
-  after_character_definition: '角色定义后',
-  before_example_messages: '示例消息前',
-  after_example_messages: '示例消息后',
-  before_author_note: '作者注释前',
-  after_author_note: '作者注释后',
-  at_depth: '指定深度',
+  before_character_definition: '角色定义之前',
+  after_character_definition: '角色定义之后',
+  before_example_messages: '示例消息前（↑EM）',
+  after_example_messages: '示例消息后（↓EM）',
+  before_author_note: '作者注释之前',
+  after_author_note: '作者注释之后',
+  at_depth: '@D 在深度',
 };
 
 const STRATEGY_TYPE_LABELS: Record<string, string> = {
@@ -5617,7 +5687,7 @@ ${names || '无'}
   "keys_secondary": ["str 次要关键词"],
   "keys_secondary_logic": "and_any | and_all | not_all | not_any",
   "scan_depth": "int | 'same_as_global'",
-  "position_type": "before_character_definition(角色定义前) | after_character_definition | before_example_messages | after_example_messages | before_author_note | after_author_note | at_depth(指定深度)",
+  "position_type": "before_character_definition(角色定义之前) | after_character_definition(角色定义之后) | before_example_messages(示例消息前) | after_example_messages(示例消息后) | before_author_note(作者注释之前) | after_author_note(作者注释之后) | at_depth(指定深度)",
   "position_order": "int 排序顺序",
   "position_depth": "int 深度(at_depth时)",
   "position_role": "system | assistant | user",
@@ -6259,7 +6329,7 @@ function getCrossCopyEntryProfile(entry: WorldbookEntry): string {
   return [
     getEntryStatusLabel(entry),
     `Keys ${entry.strategy.keys.length}/${entry.strategy.keys_secondary.keys.length}`,
-    `${getPositionTypeLabel(entry.position.type)} #${entry.position.order}`,
+    `${getPositionTypeLabel(entry.position.type, entry.position.role)} #${entry.position.order}`,
     `${entry.recursion.prevent_incoming ? '🚫入' : '入✓'} ${entry.recursion.prevent_outgoing ? '🚫出' : '出✓'}`,
     `p:${entry.probability}`,
   ].join(' · ');
@@ -6356,7 +6426,12 @@ function buildEntryFieldDiffRows(
     leftEntry ? getSecondaryLogicLabel(leftEntry.strategy.keys_secondary.logic) : leftFallback,
     rightEntry ? getSecondaryLogicLabel(rightEntry.strategy.keys_secondary.logic) : rightFallback,
   );
-  pushRow('position_type', '插入位置', leftEntry ? getPositionTypeLabel(leftEntry.position.type) : leftFallback, rightEntry ? getPositionTypeLabel(rightEntry.position.type) : rightFallback);
+  pushRow(
+    'position_type',
+    '插入位置',
+    leftEntry ? getPositionTypeLabel(leftEntry.position.type, leftEntry.position.role) : leftFallback,
+    rightEntry ? getPositionTypeLabel(rightEntry.position.type, rightEntry.position.role) : rightFallback,
+  );
   pushRow('position_order', '插入权重', leftEntry ? String(leftEntry.position.order) : leftFallback, rightEntry ? String(rightEntry.position.order) : rightFallback);
   pushRow(
     'at_depth_role',
@@ -8139,16 +8214,6 @@ function clearCurrentEntrySnapshots(): void {
     delete byWorldbook[uidKey];
     state.entry_history[worldbookName] = byWorldbook;
   });
-}
-
-function handleSelectedPositionTypeChanged(): void {
-  if (!selectedEntry.value) {
-    return;
-  }
-  if (selectedEntry.value.position.type !== 'at_depth') {
-    selectedEntry.value.position.role = 'system';
-    selectedEntry.value.position.depth = 4;
-  }
 }
 
 function applyExtraJson(): void {
