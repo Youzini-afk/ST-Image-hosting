@@ -2122,70 +2122,94 @@
                     </button>
                   </div>
                   <div class="wb-history-visual-main">
-                    <div class="cross-copy-preview-grid cross-copy-preview-grid-modal wb-history-version-preview">
-                      <div class="cross-copy-preview-card">
-                        <strong>Left 版本</strong>
-                        <span class="name">{{ selectedEntryHistoryLeft ? selectedEntryHistoryLeft.name || `条目 ${selectedEntryHistoryLeft.entry.uid}` : '-' }}</span>
-                        <span class="meta">{{ selectedEntryHistoryLeft ? getCrossCopyEntryProfile(selectedEntryHistoryLeft.entry) : '-' }}</span>
-                        <p>{{ getEntryVersionPreview(selectedEntryHistoryLeft) || '-' }}</p>
+                    <div ref="entryHistoryLayoutRef" class="wb-history-resizable-layout">
+                      <div class="wb-history-pane-section" :style="getHistorySectionStyle('entry', 0)">
+                        <div class="cross-copy-preview-grid cross-copy-preview-grid-modal wb-history-version-preview">
+                          <div class="cross-copy-preview-card">
+                            <strong>Left 版本</strong>
+                            <span class="name">{{ selectedEntryHistoryLeft ? selectedEntryHistoryLeft.name || `条目 ${selectedEntryHistoryLeft.entry.uid}` : '-' }}</span>
+                            <span class="meta">{{ selectedEntryHistoryLeft ? getCrossCopyEntryProfile(selectedEntryHistoryLeft.entry) : '-' }}</span>
+                            <p>{{ getEntryVersionPreview(selectedEntryHistoryLeft) || '-' }}</p>
+                          </div>
+                          <div class="cross-copy-preview-card">
+                            <strong>Right 版本</strong>
+                            <span class="name">{{ selectedEntryHistoryRight ? selectedEntryHistoryRight.name || `条目 ${selectedEntryHistoryRight.entry.uid}` : '-' }}</span>
+                            <span class="meta">{{ selectedEntryHistoryRight ? getCrossCopyEntryProfile(selectedEntryHistoryRight.entry) : '-' }}</span>
+                            <p>{{ getEntryVersionPreview(selectedEntryHistoryRight) || '-' }}</p>
+                          </div>
+                        </div>
                       </div>
-                      <div class="cross-copy-preview-card">
-                        <strong>Right 版本</strong>
-                        <span class="name">{{ selectedEntryHistoryRight ? selectedEntryHistoryRight.name || `条目 ${selectedEntryHistoryRight.entry.uid}` : '-' }}</span>
-                        <span class="meta">{{ selectedEntryHistoryRight ? getCrossCopyEntryProfile(selectedEntryHistoryRight.entry) : '-' }}</span>
-                        <p>{{ getEntryVersionPreview(selectedEntryHistoryRight) || '-' }}</p>
+
+                      <div
+                        v-if="canResizeHistorySections"
+                        class="wb-history-pane-splitter"
+                        @pointerdown="startHistorySectionResize('entry', 0, $event)"
+                      >
+                        <span class="wb-history-pane-splitter-grip">⋯⋯⋯</span>
+                      </div>
+
+                      <div class="wb-history-pane-section" :style="getHistorySectionStyle('entry', 1)">
+                        <section class="cross-copy-visual-section">
+                          <div class="cross-copy-visual-head">
+                            <strong>字段对比</strong>
+                            <span>{{ entryHistoryFieldDiffSummary }}</span>
+                          </div>
+                          <div class="cross-copy-field-table">
+                            <div class="cross-copy-field-row cross-copy-field-header">
+                              <span>字段</span>
+                              <span>Left</span>
+                              <span>Right</span>
+                              <span>状态</span>
+                            </div>
+                            <div v-for="field in entryHistoryFieldDiffRows" :key="field.key" class="cross-copy-field-row" :class="{ changed: field.changed }">
+                              <span class="cross-copy-field-label">{{ field.label }}</span>
+                              <span class="cross-copy-field-value left">{{ field.left }}</span>
+                              <span class="cross-copy-field-value right">{{ field.right }}</span>
+                              <span class="cross-copy-field-state" :class="{ changed: field.changed, same: !field.changed }">
+                                {{ field.changed ? '不同' : '一致' }}
+                              </span>
+                            </div>
+                          </div>
+                        </section>
+                      </div>
+
+                      <div
+                        v-if="canResizeHistorySections"
+                        class="wb-history-pane-splitter"
+                        @pointerdown="startHistorySectionResize('entry', 1, $event)"
+                      >
+                        <span class="wb-history-pane-splitter-grip">⋯⋯⋯</span>
+                      </div>
+
+                      <div class="wb-history-pane-section" :style="getHistorySectionStyle('entry', 2)">
+                        <section class="cross-copy-visual-section">
+                          <div class="cross-copy-visual-head">
+                            <strong>内容差异</strong>
+                            <span>{{ entryHistoryContentDiffSummary }}</span>
+                          </div>
+                          <div class="cross-copy-content-grid">
+                            <div class="cross-copy-content-col">
+                              <div class="wb-history-diff-title">Left / 条目内容</div>
+                              <div class="cross-copy-content-body">
+                                <div v-for="(line, idx) in entryHistoryContentDiff.left" :key="`eh-left-${idx}`" class="cross-copy-content-line" :class="line.type">
+                                  <span class="line-no">{{ line.line_no ?? '' }}</span>
+                                  <span class="line-text">{{ line.text || ' ' }}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div class="cross-copy-content-col">
+                              <div class="wb-history-diff-title">Right / 条目内容</div>
+                              <div class="cross-copy-content-body">
+                                <div v-for="(line, idx) in entryHistoryContentDiff.right" :key="`eh-right-${idx}`" class="cross-copy-content-line" :class="line.type">
+                                  <span class="line-no">{{ line.line_no ?? '' }}</span>
+                                  <span class="line-text">{{ line.text || ' ' }}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </section>
                       </div>
                     </div>
-
-                    <section class="cross-copy-visual-section">
-                      <div class="cross-copy-visual-head">
-                        <strong>字段对比</strong>
-                        <span>{{ entryHistoryFieldDiffSummary }}</span>
-                      </div>
-                      <div class="cross-copy-field-table">
-                        <div class="cross-copy-field-row cross-copy-field-header">
-                          <span>字段</span>
-                          <span>Left</span>
-                          <span>Right</span>
-                          <span>状态</span>
-                        </div>
-                        <div v-for="field in entryHistoryFieldDiffRows" :key="field.key" class="cross-copy-field-row" :class="{ changed: field.changed }">
-                          <span class="cross-copy-field-label">{{ field.label }}</span>
-                          <span class="cross-copy-field-value left">{{ field.left }}</span>
-                          <span class="cross-copy-field-value right">{{ field.right }}</span>
-                          <span class="cross-copy-field-state" :class="{ changed: field.changed, same: !field.changed }">
-                            {{ field.changed ? '不同' : '一致' }}
-                          </span>
-                        </div>
-                      </div>
-                    </section>
-
-                    <section class="cross-copy-visual-section">
-                      <div class="cross-copy-visual-head">
-                        <strong>内容差异</strong>
-                        <span>{{ entryHistoryContentDiffSummary }}</span>
-                      </div>
-                      <div class="cross-copy-content-grid">
-                        <div class="cross-copy-content-col">
-                          <div class="wb-history-diff-title">Left / 条目内容</div>
-                          <div class="cross-copy-content-body">
-                            <div v-for="(line, idx) in entryHistoryContentDiff.left" :key="`eh-left-${idx}`" class="cross-copy-content-line" :class="line.type">
-                              <span class="line-no">{{ line.line_no ?? '' }}</span>
-                              <span class="line-text">{{ line.text || ' ' }}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div class="cross-copy-content-col">
-                          <div class="wb-history-diff-title">Right / 条目内容</div>
-                          <div class="cross-copy-content-body">
-                            <div v-for="(line, idx) in entryHistoryContentDiff.right" :key="`eh-right-${idx}`" class="cross-copy-content-line" :class="line.type">
-                              <span class="line-no">{{ line.line_no ?? '' }}</span>
-                              <span class="line-text">{{ line.text || ' ' }}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </section>
                   </div>
                 </section>
               </div>
@@ -2292,80 +2316,104 @@
                     </section>
 
                     <template v-if="worldbookHistoryActiveRow">
-                      <div class="cross-copy-preview-grid cross-copy-preview-grid-modal">
-                        <div class="cross-copy-preview-card">
-                          <strong>Left 条目</strong>
-                          <template v-if="worldbookHistoryActiveRow.left_entry">
-                            <span class="name">{{ worldbookHistoryActiveRow.left_entry.name || `条目 ${worldbookHistoryActiveRow.left_entry.uid}` }}</span>
-                            <span class="meta">{{ getCrossCopyEntryProfile(worldbookHistoryActiveRow.left_entry) }}</span>
-                            <p>{{ getCrossCopyPreviewText(worldbookHistoryActiveRow.left_entry.content, 260) }}</p>
-                          </template>
-                          <template v-else>
-                            <span class="meta">该条目在 Left 版本不存在</span>
-                          </template>
+                      <div ref="worldbookHistoryLayoutRef" class="wb-history-resizable-layout wb-history-resizable-layout-detail">
+                        <div class="wb-history-pane-section" :style="getHistorySectionStyle('worldbook', 0)">
+                          <div class="cross-copy-preview-grid cross-copy-preview-grid-modal">
+                            <div class="cross-copy-preview-card">
+                              <strong>Left 条目</strong>
+                              <template v-if="worldbookHistoryActiveRow.left_entry">
+                                <span class="name">{{ worldbookHistoryActiveRow.left_entry.name || `条目 ${worldbookHistoryActiveRow.left_entry.uid}` }}</span>
+                                <span class="meta">{{ getCrossCopyEntryProfile(worldbookHistoryActiveRow.left_entry) }}</span>
+                                <p>{{ getCrossCopyPreviewText(worldbookHistoryActiveRow.left_entry.content, 260) }}</p>
+                              </template>
+                              <template v-else>
+                                <span class="meta">该条目在 Left 版本不存在</span>
+                              </template>
+                            </div>
+                            <div class="cross-copy-preview-card">
+                              <strong>Right 条目</strong>
+                              <template v-if="worldbookHistoryActiveRow.right_entry">
+                                <span class="name">{{ worldbookHistoryActiveRow.right_entry.name || `条目 ${worldbookHistoryActiveRow.right_entry.uid}` }}</span>
+                                <span class="meta">{{ getCrossCopyEntryProfile(worldbookHistoryActiveRow.right_entry) }}</span>
+                                <p>{{ getCrossCopyPreviewText(worldbookHistoryActiveRow.right_entry.content, 260) }}</p>
+                              </template>
+                              <template v-else>
+                                <span class="meta">该条目在 Right 版本不存在</span>
+                              </template>
+                            </div>
+                          </div>
                         </div>
-                        <div class="cross-copy-preview-card">
-                          <strong>Right 条目</strong>
-                          <template v-if="worldbookHistoryActiveRow.right_entry">
-                            <span class="name">{{ worldbookHistoryActiveRow.right_entry.name || `条目 ${worldbookHistoryActiveRow.right_entry.uid}` }}</span>
-                            <span class="meta">{{ getCrossCopyEntryProfile(worldbookHistoryActiveRow.right_entry) }}</span>
-                            <p>{{ getCrossCopyPreviewText(worldbookHistoryActiveRow.right_entry.content, 260) }}</p>
-                          </template>
-                          <template v-else>
-                            <span class="meta">该条目在 Right 版本不存在</span>
-                          </template>
+
+                        <div
+                          v-if="canResizeHistorySections"
+                          class="wb-history-pane-splitter"
+                          @pointerdown="startHistorySectionResize('worldbook', 0, $event)"
+                        >
+                          <span class="wb-history-pane-splitter-grip">⋯⋯⋯</span>
+                        </div>
+
+                        <div class="wb-history-pane-section" :style="getHistorySectionStyle('worldbook', 1)">
+                          <section class="cross-copy-visual-section">
+                            <div class="cross-copy-visual-head">
+                              <strong>字段对比</strong>
+                              <span>{{ worldbookHistoryFieldDiffSummary }}</span>
+                            </div>
+                            <div class="cross-copy-field-table">
+                              <div class="cross-copy-field-row cross-copy-field-header">
+                                <span>字段</span>
+                                <span>Left</span>
+                                <span>Right</span>
+                                <span>状态</span>
+                              </div>
+                              <div v-for="field in worldbookHistoryFieldDiffRows" :key="field.key" class="cross-copy-field-row" :class="{ changed: field.changed }">
+                                <span class="cross-copy-field-label">{{ field.label }}</span>
+                                <span class="cross-copy-field-value left">{{ field.left }}</span>
+                                <span class="cross-copy-field-value right">{{ field.right }}</span>
+                                <span class="cross-copy-field-state" :class="{ changed: field.changed, same: !field.changed }">
+                                  {{ field.changed ? '不同' : '一致' }}
+                                </span>
+                              </div>
+                            </div>
+                          </section>
+                        </div>
+
+                        <div
+                          v-if="canResizeHistorySections"
+                          class="wb-history-pane-splitter"
+                          @pointerdown="startHistorySectionResize('worldbook', 1, $event)"
+                        >
+                          <span class="wb-history-pane-splitter-grip">⋯⋯⋯</span>
+                        </div>
+
+                        <div class="wb-history-pane-section" :style="getHistorySectionStyle('worldbook', 2)">
+                          <section class="cross-copy-visual-section">
+                            <div class="cross-copy-visual-head">
+                              <strong>内容差异</strong>
+                              <span>{{ worldbookHistoryContentDiffSummary }}</span>
+                            </div>
+                            <div class="cross-copy-content-grid">
+                              <div class="cross-copy-content-col">
+                                <div class="wb-history-diff-title">Left / 条目内容</div>
+                                <div class="cross-copy-content-body">
+                                  <div v-for="(line, idx) in worldbookHistoryContentDiff.left" :key="`wh-left-${idx}`" class="cross-copy-content-line" :class="line.type">
+                                    <span class="line-no">{{ line.line_no ?? '' }}</span>
+                                    <span class="line-text">{{ line.text || ' ' }}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div class="cross-copy-content-col">
+                                <div class="wb-history-diff-title">Right / 条目内容</div>
+                                <div class="cross-copy-content-body">
+                                  <div v-for="(line, idx) in worldbookHistoryContentDiff.right" :key="`wh-right-${idx}`" class="cross-copy-content-line" :class="line.type">
+                                    <span class="line-no">{{ line.line_no ?? '' }}</span>
+                                    <span class="line-text">{{ line.text || ' ' }}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </section>
                         </div>
                       </div>
-
-                      <section class="cross-copy-visual-section">
-                        <div class="cross-copy-visual-head">
-                          <strong>字段对比</strong>
-                          <span>{{ worldbookHistoryFieldDiffSummary }}</span>
-                        </div>
-                        <div class="cross-copy-field-table">
-                          <div class="cross-copy-field-row cross-copy-field-header">
-                            <span>字段</span>
-                            <span>Left</span>
-                            <span>Right</span>
-                            <span>状态</span>
-                          </div>
-                          <div v-for="field in worldbookHistoryFieldDiffRows" :key="field.key" class="cross-copy-field-row" :class="{ changed: field.changed }">
-                            <span class="cross-copy-field-label">{{ field.label }}</span>
-                            <span class="cross-copy-field-value left">{{ field.left }}</span>
-                            <span class="cross-copy-field-value right">{{ field.right }}</span>
-                            <span class="cross-copy-field-state" :class="{ changed: field.changed, same: !field.changed }">
-                              {{ field.changed ? '不同' : '一致' }}
-                            </span>
-                          </div>
-                        </div>
-                      </section>
-
-                      <section class="cross-copy-visual-section">
-                        <div class="cross-copy-visual-head">
-                          <strong>内容差异</strong>
-                          <span>{{ worldbookHistoryContentDiffSummary }}</span>
-                        </div>
-                        <div class="cross-copy-content-grid">
-                          <div class="cross-copy-content-col">
-                            <div class="wb-history-diff-title">Left / 条目内容</div>
-                            <div class="cross-copy-content-body">
-                              <div v-for="(line, idx) in worldbookHistoryContentDiff.left" :key="`wh-left-${idx}`" class="cross-copy-content-line" :class="line.type">
-                                <span class="line-no">{{ line.line_no ?? '' }}</span>
-                                <span class="line-text">{{ line.text || ' ' }}</span>
-                              </div>
-                            </div>
-                          </div>
-                          <div class="cross-copy-content-col">
-                            <div class="wb-history-diff-title">Right / 条目内容</div>
-                            <div class="cross-copy-content-body">
-                              <div v-for="(line, idx) in worldbookHistoryContentDiff.right" :key="`wh-right-${idx}`" class="cross-copy-content-line" :class="line.type">
-                                <span class="line-no">{{ line.line_no ?? '' }}</span>
-                                <span class="line-text">{{ line.text || ' ' }}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </section>
                     </template>
                     <div v-else class="empty-note wb-worldbook-detail-empty">请选择一条变化记录查看详细对比</div>
                   </div>
@@ -2554,6 +2602,7 @@ type RoleType = WorldbookEntry['position']['role'];
 type EntryVisualStatus = 'constant' | 'vector' | 'normal' | 'disabled';
 type FloatingPanelKey = 'find' | 'activation';
 type PaneResizeKey = 'main' | 'editor';
+type HistoryResizeTarget = 'entry' | 'worldbook';
 type BatchSearchScope = 'all' | 'current';
 type FindFieldKey = 'name' | 'content' | 'keys';
 type SelectionSource = 'manual' | 'auto';
@@ -2661,6 +2710,17 @@ interface FloatingPanelState {
 interface PaneResizeState {
   key: PaneResizeKey;
   pointerId: number;
+  doc: Document;
+  win: Window;
+}
+
+interface HistorySectionResizeState {
+  target: HistoryResizeTarget;
+  handleIndex: 0 | 1;
+  pointerId: number;
+  startY: number;
+  containerHeight: number;
+  startRatios: [number, number, number];
   doc: Document;
   win: Window;
 }
@@ -3279,6 +3339,11 @@ const entryHistoryRightId = ref('');
 const worldbookHistoryLeftId = ref('');
 const worldbookHistoryRightId = ref('');
 const worldbookHistoryActiveRowKey = ref('');
+const entryHistoryLayoutRef = ref<HTMLElement | null>(null);
+const worldbookHistoryLayoutRef = ref<HTMLElement | null>(null);
+const entryHistorySectionRatios = ref<[number, number, number]>([24, 34, 42]);
+const worldbookHistorySectionRatios = ref<[number, number, number]>([24, 32, 44]);
+const historySectionResizeState = ref<HistorySectionResizeState | null>(null);
 const floatingZCounter = ref(10005);
 const floatingPanels = reactive<Record<FloatingPanelKey, FloatingPanelState>>({
   find: { visible: false, x: 420, y: 170, z: 10006, width: 500 },
@@ -3389,6 +3454,7 @@ const totalContentChars = computed(() =>
 const hasUnsavedChanges = computed(() => draftEntriesDigest.value !== originalEntriesDigest.value);
 const isCompactLayout = computed(() => viewportWidth.value <= 1100);
 const isDesktopFocusMode = computed(() => !isMobile.value && !isCompactLayout.value && isFocusEditing.value);
+const canResizeHistorySections = computed(() => !isMobile.value && viewportWidth.value > 1380);
 const focusCineEnabled = computed(() => !isMobile.value && viewportWidth.value > 1100);
 const isFocusCineRunning = computed(() => focusCinePhase.value === 'running' || focusCinePhase.value === 'settling');
 const focusCineRootClass = computed(() => ({
@@ -3840,6 +3906,104 @@ const worldbookHistoryContentDiffSummary = computed(() => {
   return `新增行 ${result.added} / 修改行 ${result.changed} / 删除行 ${result.removed}`;
 });
 
+function getHistorySectionRatios(target: HistoryResizeTarget): [number, number, number] {
+  return target === 'entry' ? entryHistorySectionRatios.value : worldbookHistorySectionRatios.value;
+}
+
+function setHistorySectionRatios(target: HistoryResizeTarget, next: [number, number, number]): void {
+  const normalized: [number, number, number] = [
+    Number(next[0].toFixed(2)),
+    Number(next[1].toFixed(2)),
+    Number(next[2].toFixed(2)),
+  ];
+  const delta = Number((100 - (normalized[0] + normalized[1] + normalized[2])).toFixed(2));
+  normalized[2] = Number((normalized[2] + delta).toFixed(2));
+  if (target === 'entry') {
+    entryHistorySectionRatios.value = normalized;
+    return;
+  }
+  worldbookHistorySectionRatios.value = normalized;
+}
+
+function getHistorySectionStyle(target: HistoryResizeTarget, sectionIndex: 0 | 1 | 2): Record<string, string> | undefined {
+  if (!canResizeHistorySections.value) {
+    return undefined;
+  }
+  const ratios = getHistorySectionRatios(target);
+  return {
+    flex: `0 0 ${ratios[sectionIndex]}%`,
+  };
+}
+
+function startHistorySectionResize(target: HistoryResizeTarget, handleIndex: 0 | 1, event: PointerEvent): void {
+  if (!canResizeHistorySections.value) {
+    return;
+  }
+  if (event.pointerType === 'mouse' && event.button !== 0) {
+    return;
+  }
+
+  const container = target === 'entry' ? entryHistoryLayoutRef.value : worldbookHistoryLayoutRef.value;
+  const containerHeight = container?.getBoundingClientRect().height ?? 0;
+  if (!container || containerHeight < 120) {
+    return;
+  }
+
+  const trigger = event.currentTarget as HTMLElement | null;
+  const hostDoc = trigger?.ownerDocument ?? document;
+  const hostWin = hostDoc.defaultView ?? window;
+  historySectionResizeState.value = {
+    target,
+    handleIndex,
+    pointerId: event.pointerId,
+    startY: event.clientY,
+    containerHeight,
+    startRatios: [...getHistorySectionRatios(target)] as [number, number, number],
+    doc: hostDoc,
+    win: hostWin,
+  };
+
+  trigger?.setPointerCapture?.(event.pointerId);
+  hostDoc.addEventListener('pointermove', onHistorySectionResizeMove);
+  hostDoc.addEventListener('pointerup', stopHistorySectionResize);
+  hostDoc.addEventListener('pointercancel', stopHistorySectionResize);
+  hostWin.addEventListener('blur', stopHistorySectionResize);
+  event.preventDefault();
+}
+
+function onHistorySectionResizeMove(event: PointerEvent): void {
+  const state = historySectionResizeState.value;
+  if (!state || state.pointerId !== event.pointerId) {
+    return;
+  }
+  const deltaPercent = ((event.clientY - state.startY) / state.containerHeight) * 100;
+  const minPercent = 14;
+  const [a, b, c] = state.startRatios;
+
+  if (state.handleIndex === 0) {
+    const nextA = clampNumber(a + deltaPercent, minPercent, 100 - minPercent - c);
+    const nextB = 100 - nextA - c;
+    setHistorySectionRatios(state.target, [nextA, nextB, c]);
+    return;
+  }
+
+  const nextB = clampNumber(b + deltaPercent, minPercent, 100 - minPercent - a);
+  const nextC = 100 - a - nextB;
+  setHistorySectionRatios(state.target, [a, nextB, nextC]);
+}
+
+function stopHistorySectionResize(): void {
+  const state = historySectionResizeState.value;
+  if (!state) {
+    return;
+  }
+  state.doc.removeEventListener('pointermove', onHistorySectionResizeMove);
+  state.doc.removeEventListener('pointerup', stopHistorySectionResize);
+  state.doc.removeEventListener('pointercancel', stopHistorySectionResize);
+  state.win.removeEventListener('blur', stopHistorySectionResize);
+  historySectionResizeState.value = null;
+}
+
 const batchExcludeTokensPreview = computed(() => parseBatchExcludeTokens(batchExcludeText.value));
 
 const activeFindHit = computed(() => {
@@ -4241,6 +4405,12 @@ watch(
   },
   { immediate: true },
 );
+
+watch(canResizeHistorySections, enabled => {
+  if (!enabled) {
+    stopHistorySectionResize();
+  }
+});
 
 watch(
   () => selectedEntry.value?.position.type,
@@ -9850,6 +10020,7 @@ onUnmounted(() => {
   });
   stopFloatingDrag();
   stopPaneResize();
+  stopHistorySectionResize();
   window.removeEventListener('wb-helper:refresh', onPanelRefresh);
   window.removeEventListener('wb-helper:save', onPanelSave);
   window.removeEventListener('wb-helper:discard', onPanelDiscard);
@@ -12632,7 +12803,7 @@ watch(hasUnsavedChanges, (val) => {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  overflow: auto;
+  overflow: hidden;
   padding: 10px;
 }
 
@@ -12643,6 +12814,86 @@ watch(hasUnsavedChanges, (val) => {
 .wb-worldbook-compare-list-section {
   min-height: 0;
   flex: 0 0 auto;
+}
+
+.wb-history-resizable-layout {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.wb-history-resizable-layout-detail {
+  margin-top: 2px;
+}
+
+.wb-history-pane-section {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.wb-history-pane-section > .cross-copy-preview-grid,
+.wb-history-pane-section > .cross-copy-visual-section {
+  min-height: 0;
+  height: 100%;
+  margin-top: 0;
+}
+
+.wb-history-pane-section > .cross-copy-preview-grid {
+  overflow: auto;
+}
+
+.wb-history-pane-section .cross-copy-field-table,
+.wb-history-pane-section .cross-copy-content-grid {
+  min-height: 0;
+  flex: 1;
+}
+
+.wb-history-pane-section .cross-copy-field-row {
+  line-height: 1.35;
+}
+
+.wb-history-pane-splitter {
+  position: relative;
+  flex: 0 0 10px;
+  height: 10px;
+  cursor: row-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  touch-action: none;
+}
+
+.wb-history-pane-splitter::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 50%;
+  height: 1px;
+  background: var(--wb-border-main);
+  transform: translateY(-50%);
+}
+
+.wb-history-pane-splitter-grip {
+  position: relative;
+  z-index: 1;
+  font-size: 10px;
+  color: var(--wb-text-muted);
+  letter-spacing: 1px;
+  background: var(--wb-bg-panel);
+  border-radius: 999px;
+  padding: 0 6px;
+  border: 1px solid var(--wb-border-subtle);
+}
+
+.wb-history-pane-splitter:hover .wb-history-pane-splitter-grip {
+  color: var(--wb-primary-light);
+  border-color: var(--wb-primary);
 }
 
 .wb-history-diff-title {
@@ -12776,8 +13027,28 @@ watch(hasUnsavedChanges, (val) => {
   }
 
   .wb-history-visual-main {
+    overflow: auto;
     gap: 8px;
     padding: 8px;
+  }
+
+  .wb-history-resizable-layout {
+    overflow: visible;
+    gap: 8px;
+  }
+
+  .wb-history-pane-section {
+    overflow: visible;
+    flex: 0 0 auto !important;
+  }
+
+  .wb-history-pane-section > .cross-copy-preview-grid,
+  .wb-history-pane-section > .cross-copy-visual-section {
+    height: auto;
+  }
+
+  .wb-history-pane-splitter {
+    display: none;
   }
 
   .wb-history-version-preview {
