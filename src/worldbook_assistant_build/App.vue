@@ -314,61 +314,94 @@
             <section class="cross-copy-panel mobile">
               <div class="cross-copy-head">
                 <strong>📚 跨世界书复制</strong>
-                <span>{{ crossCopyHasCompared ? `上次比较：${formatDateTime(crossCopyLastComparedAt)}` : '尚未比较' }}</span>
+                <span>{{ crossCopyWorkspaceComparedText }}</span>
               </div>
-
-              <div class="cross-copy-controls">
-                <label class="field">
-                  <span>来源世界书</span>
-                  <select v-model="crossCopySourceWorldbook" class="text-input">
-                    <option value="">请选择来源世界书</option>
-                    <option v-for="name in worldbookNames" :key="`m-copy-source-${name}`" :value="name">{{ name }}</option>
-                  </select>
-                </label>
-                <label class="field">
-                  <span>目标世界书</span>
-                  <select v-model="crossCopyTargetWorldbook" class="text-input">
-                    <option value="">请选择目标世界书</option>
-                    <option v-for="name in worldbookNames" :key="`m-copy-target-${name}`" :value="name">{{ name }}</option>
-                  </select>
-                </label>
-                <label class="checkbox-inline">
-                  <input
-                    v-model="crossCopyUseDraftSourceWhenCurrent"
-                    type="checkbox"
-                    :disabled="!crossCopySourceIsCurrentWorldbook"
-                  />
-                  <span>{{ crossCopySourceVersionLabel }}</span>
-                </label>
-                <label class="checkbox-inline">
-                  <input v-model="crossCopySnapshotBeforeApply" type="checkbox" />
-                  <span>执行前写入目标快照（默认开启）</span>
-                </label>
-                <div class="cross-copy-control-actions">
-                  <button class="btn" type="button" :disabled="!crossCopyCanCompare || crossCopyCompareLoading || crossCopyApplyLoading" @click="refreshCrossCopyComparison">
-                    {{ crossCopyCompareLoading ? '比较中...' : '刷新比较' }}
-                  </button>
-                </div>
+              <div class="cross-copy-mobile-stepper">
+                <button class="cross-copy-mobile-step" type="button" :class="{ active: crossCopyMobileStep === 1 }" @click="goToCrossCopyMobileStep(1)">
+                  1 配置
+                </button>
+                <button
+                  class="cross-copy-mobile-step"
+                  type="button"
+                  :class="{ active: crossCopyMobileStep === 2 }"
+                  :disabled="!crossCopyMobileCanGoStep2 && crossCopyMobileStep !== 2"
+                  @click="goToCrossCopyMobileStep(2)"
+                >
+                  2 选择
+                </button>
+                <button
+                  class="cross-copy-mobile-step"
+                  type="button"
+                  :class="{ active: crossCopyMobileStep === 3 }"
+                  :disabled="!crossCopyMobileCanGoStep3 && crossCopyMobileStep !== 3"
+                  @click="goToCrossCopyMobileStep(3)"
+                >
+                  3 执行
+                </button>
               </div>
-
               <div v-if="crossCopySourceTargetInvalid" class="cross-copy-inline-tip warning">来源和目标不能相同。</div>
-              <div v-if="crossCopyCompareSummary" class="cross-copy-inline-tip">{{ crossCopyCompareSummary }}</div>
               <div v-if="crossCopyLastResultSummary" class="cross-copy-inline-tip success">{{ crossCopyLastResultSummary }}</div>
+              <div class="cross-copy-mobile-stage">
+                <section v-show="crossCopyMobileStep === 1" class="cross-copy-mobile-stage-panel">
+                  <div class="cross-copy-controls">
+                    <label class="field">
+                      <span>来源世界书</span>
+                      <select v-model="crossCopySourceWorldbook" class="text-input">
+                        <option value="">请选择来源世界书</option>
+                        <option v-for="name in worldbookNames" :key="`m-copy-source-${name}`" :value="name">{{ name }}</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>目标世界书</span>
+                      <select v-model="crossCopyTargetWorldbook" class="text-input">
+                        <option value="">请选择目标世界书</option>
+                        <option v-for="name in worldbookNames" :key="`m-copy-target-${name}`" :value="name">{{ name }}</option>
+                      </select>
+                    </label>
+                    <div class="cross-copy-control-actions">
+                      <button class="btn" type="button" :disabled="!crossCopyCanCompare || crossCopyCompareLoading || crossCopyApplyLoading" @click="refreshCrossCopyComparison">
+                        {{ crossCopyCompareLoading ? '比较中...' : '刷新比较' }}
+                      </button>
+                    </div>
+                  </div>
+                  <button class="btn mini utility-btn cross-copy-mobile-advanced-toggle" type="button" @click="toggleCrossCopyControlsCollapsed">
+                    {{ crossCopyControlsCollapsed ? '展开高级项' : '收起高级项' }}
+                  </button>
+                  <Transition name="copy-controls-advanced">
+                    <div v-if="!crossCopyControlsCollapsed" class="cross-copy-mobile-advanced">
+                      <label class="checkbox-inline">
+                        <input
+                          v-model="crossCopyUseDraftSourceWhenCurrent"
+                          type="checkbox"
+                          :disabled="!crossCopySourceIsCurrentWorldbook"
+                        />
+                        <span>{{ crossCopySourceVersionLabel }}</span>
+                      </label>
+                      <label class="checkbox-inline">
+                        <input v-model="crossCopySnapshotBeforeApply" type="checkbox" />
+                        <span>执行前写入目标快照（默认开启）</span>
+                      </label>
+                    </div>
+                  </Transition>
+                  <div v-if="crossCopyControlsCollapsed" class="cross-copy-inline-tip">
+                    {{ crossCopySourceVersionLabel }} | {{ crossCopySnapshotBeforeApply ? '执行前写入快照' : '不写入快照' }}
+                  </div>
+                  <div v-if="crossCopyCompareSummary" class="cross-copy-inline-tip">{{ crossCopyCompareSummary }}</div>
+                </section>
 
-              <div class="cross-copy-grid mobile">
-                <aside class="cross-copy-left">
+                <section v-show="crossCopyMobileStep === 2" class="cross-copy-mobile-stage-panel">
                   <div class="cross-copy-list-head">
                     <strong>来源条目</strong>
                     <span>{{ crossCopyRows.length }} 条</span>
                   </div>
                   <div class="cross-copy-list-tools">
-                    <input v-model="crossCopySearchText" type="text" class="text-input" placeholder="搜索来源条目..." />
+                    <input v-model="crossCopySearchText" type="text" class="text-input" placeholder="搜索来源名称 / 内容" />
                     <div class="cross-copy-mini-actions">
                       <button class="btn mini" type="button" :disabled="!crossCopySourceRowsFiltered.length" @click="setCrossCopySelectionForFiltered(true)">全选显示</button>
                       <button class="btn mini" type="button" :disabled="!crossCopyRows.length" @click="setCrossCopySelectionForAll(false)">全不选</button>
                     </div>
                   </div>
-                  <div class="cross-copy-source-list">
+                  <div class="cross-copy-source-list mobile-source-list">
                     <label v-for="row in crossCopySourceRowsFiltered" :key="`m-copy-pick-${row.id}`" class="cross-copy-source-item" :class="{ checked: row.selected }">
                       <input v-model="row.selected" type="checkbox" :disabled="row.status === 'invalid_same_source_target' || crossCopyApplyLoading" />
                       <span class="cross-copy-status-dot" :class="getCrossCopyStatusBadgeClass(row.status)"></span>
@@ -378,9 +411,9 @@
                     </label>
                     <div v-if="!crossCopySourceRowsFiltered.length" class="empty-note">暂无可选条目，请先刷新比较</div>
                   </div>
-                </aside>
+                </section>
 
-                <section class="cross-copy-right">
+                <section v-show="crossCopyMobileStep === 3" class="cross-copy-mobile-stage-panel">
                   <div class="cross-copy-list-head">
                     <strong>对比与动作</strong>
                     <span>已选 {{ crossCopySelectedCount }} 条</span>
@@ -393,7 +426,22 @@
                       </option>
                     </select>
                   </div>
-                  <div class="cross-copy-rows">
+                  <div class="cross-copy-mobile-bulk">
+                    <button class="btn mini" type="button" :disabled="!crossCopyRows.length" @click="setCrossCopySelectionForAll(false)">全不选</button>
+                    <button class="btn mini" type="button" :disabled="!crossCopySelectedCount" @click="applyCrossCopyActionByStatus('same_name_changed', 'overwrite')">同名更新→覆盖</button>
+                    <button class="btn mini" type="button" :disabled="!crossCopySelectedCount" @click="applyCrossCopyActionByStatus('duplicate_exact', 'skip')">同名同内容→跳过</button>
+                    <button class="btn mini" type="button" :disabled="!crossCopySelectedCount" @click="applyCrossCopyActionByStatus('content_duplicate_other_name', 'skip')">异名同内容→跳过</button>
+                    <div class="cross-copy-bulk-box">
+                      <select v-model="crossCopyBulkAction" class="text-input">
+                        <option value="skip">{{ getCrossCopyActionLabel('skip') }}</option>
+                        <option value="overwrite">{{ getCrossCopyActionLabel('overwrite') }}</option>
+                        <option value="create">{{ getCrossCopyActionLabel('create') }}</option>
+                        <option value="rename_create">{{ getCrossCopyActionLabel('rename_create') }}</option>
+                      </select>
+                      <button class="btn mini" type="button" :disabled="!crossCopySelectedCount" @click="applyCrossCopyBulkAction()">应用到已选</button>
+                    </div>
+                  </div>
+                  <div class="cross-copy-rows mobile-rows">
                     <article v-for="row in crossCopyRowsFiltered" :key="`m-copy-row-${row.id}`" class="cross-copy-row">
                       <div class="cross-copy-row-head">
                         <div class="cross-copy-row-title">
@@ -432,21 +480,24 @@
                 </section>
               </div>
 
-              <div class="cross-copy-actions mobile">
-                <button class="btn mini" type="button" :disabled="!crossCopyRows.length" @click="setCrossCopySelectionForAll(false)">全不选</button>
-                <button class="btn mini" type="button" :disabled="!crossCopySelectedCount" @click="applyCrossCopyActionByStatus('same_name_changed', 'overwrite')">同名更新→覆盖</button>
-                <button class="btn mini" type="button" :disabled="!crossCopySelectedCount" @click="applyCrossCopyActionByStatus('duplicate_exact', 'skip')">同名同内容→跳过</button>
-                <button class="btn mini" type="button" :disabled="!crossCopySelectedCount" @click="applyCrossCopyActionByStatus('content_duplicate_other_name', 'skip')">异名同内容→跳过</button>
-                <div class="cross-copy-bulk-box">
-                  <select v-model="crossCopyBulkAction" class="text-input">
-                    <option value="skip">{{ getCrossCopyActionLabel('skip') }}</option>
-                    <option value="overwrite">{{ getCrossCopyActionLabel('overwrite') }}</option>
-                    <option value="create">{{ getCrossCopyActionLabel('create') }}</option>
-                    <option value="rename_create">{{ getCrossCopyActionLabel('rename_create') }}</option>
-                  </select>
-                  <button class="btn mini" type="button" :disabled="!crossCopySelectedCount" @click="applyCrossCopyBulkAction()">应用到已选</button>
-                </div>
-                <button class="btn primary" type="button" :disabled="!crossCopyCanApply" @click="applyCrossCopySelection">
+              <div class="cross-copy-mobile-nav">
+                <button class="btn mini" type="button" :disabled="crossCopyMobileStep === 1" @click="goToPreviousCrossCopyMobileStep">上一步</button>
+                <button
+                  v-if="crossCopyMobileStep < 3"
+                  class="btn mini primary"
+                  type="button"
+                  :disabled="crossCopyMobileNextDisabled"
+                  @click="goToNextCrossCopyMobileStep"
+                >
+                  下一步
+                </button>
+                <button
+                  v-else
+                  class="btn primary"
+                  type="button"
+                  :disabled="crossCopyMobileNextDisabled"
+                  @click="applyCrossCopySelection"
+                >
                   {{ crossCopyApplyLoading ? '执行中...' : `执行复制（${crossCopySelectedCount}）` }}
                 </button>
               </div>
@@ -775,9 +826,29 @@
             @change="onImportChange"
           />
 
-          <div class="wb-scroll-area">
-          <section v-if="!isDesktopFocusMode || globalWorldbookMode" class="wb-bindings" :class="{ 'focus-bindings': isDesktopFocusMode }">
-            <div v-if="!isDesktopFocusMode" class="wb-history-shortcuts">
+          <div class="wb-scroll-area" :class="{ 'copy-workspace': crossCopyMode && !isMobile }">
+          <section
+            v-if="!isDesktopFocusMode || globalWorldbookMode"
+            class="wb-bindings"
+            :class="{
+              'focus-bindings': isDesktopFocusMode,
+              'copy-workspace': crossCopyMode && !globalWorldbookMode && !isDesktopFocusMode,
+            }"
+          >
+            <div v-if="!isDesktopFocusMode && crossCopyMode" class="wb-copy-workspace-head">
+              <div class="wb-copy-workspace-title">
+                <strong>📚 跨书复制工作台</strong>
+                <span>{{ crossCopyWorkspaceSummary }}</span>
+              </div>
+              <div class="wb-copy-workspace-actions">
+                <span class="wb-copy-workspace-meta">{{ crossCopyWorkspaceComparedText }}</span>
+                <button class="btn mini utility-btn" type="button" @click="toggleCrossCopyWorkspaceTools">
+                  {{ crossCopyWorkspaceToolsExpanded ? '收起工具' : '展开工具' }}
+                </button>
+              </div>
+            </div>
+            <Transition name="copy-workspace-tools">
+            <div v-if="!isDesktopFocusMode && (!crossCopyMode || crossCopyWorkspaceToolsExpanded)" class="wb-history-shortcuts" :class="{ 'copy-workspace-tools': crossCopyMode }">
               <button class="btn history-btn utility-btn" data-focus-hero="focus_toggle" type="button" :disabled="focusCineLocked" @click="toggleFocusEditing">🎯 专注编辑</button>
               <button
                 class="btn history-btn utility-btn"
@@ -872,6 +943,7 @@
                 🔧 AI配置
               </button>
             </div>
+            </Transition>
             <div v-if="globalWorldbookMode" class="global-mode-panel">
               <div class="global-mode-head">
                 <span class="global-mode-title">全局世界书（{{ bindings.global.length }}）</span>
@@ -1188,49 +1260,74 @@
 
           <section v-if="crossCopyMode" class="cross-copy-panel desktop">
             <div class="cross-copy-head">
-              <strong>📚 跨世界书复制条目</strong>
-              <span>{{ crossCopyHasCompared ? `上次比较：${formatDateTime(crossCopyLastComparedAt)}` : '尚未比较' }}</span>
-            </div>
-
-            <div class="cross-copy-controls">
-              <label class="field">
-                <span>来源世界书</span>
-                <select v-model="crossCopySourceWorldbook" class="text-input">
-                  <option value="">请选择来源世界书</option>
-                  <option v-for="name in worldbookNames" :key="`d-copy-source-${name}`" :value="name">{{ name }}</option>
-                </select>
-              </label>
-              <label class="field">
-                <span>目标世界书</span>
-                <select v-model="crossCopyTargetWorldbook" class="text-input">
-                  <option value="">请选择目标世界书</option>
-                  <option v-for="name in worldbookNames" :key="`d-copy-target-${name}`" :value="name">{{ name }}</option>
-                </select>
-              </label>
-              <label class="checkbox-inline">
-                <input
-                  v-model="crossCopyUseDraftSourceWhenCurrent"
-                  type="checkbox"
-                  :disabled="!crossCopySourceIsCurrentWorldbook"
-                />
-                <span>{{ crossCopySourceVersionLabel }}</span>
-              </label>
-              <label class="checkbox-inline">
-                <input v-model="crossCopySnapshotBeforeApply" type="checkbox" />
-                <span>执行前写入目标快照</span>
-              </label>
-              <div class="cross-copy-control-actions">
-                <button class="btn" type="button" :disabled="!crossCopyCanCompare || crossCopyCompareLoading || crossCopyApplyLoading" @click="refreshCrossCopyComparison">
-                  {{ crossCopyCompareLoading ? '比较中...' : '刷新比较' }}
+              <div class="cross-copy-head-main">
+                <strong>📚 跨世界书复制条目</strong>
+                <span>{{ crossCopyWorkspaceSummary }}</span>
+              </div>
+              <div class="cross-copy-head-actions">
+                <span>{{ crossCopyWorkspaceComparedText }}</span>
+                <button class="btn mini utility-btn" type="button" @click="toggleCrossCopyControlsCollapsed">
+                  {{ crossCopyControlsCollapsed ? '展开高级项' : '收起高级项' }}
                 </button>
               </div>
             </div>
 
-            <div v-if="crossCopySourceTargetInvalid" class="cross-copy-inline-tip warning">来源和目标不能相同。</div>
-            <div v-if="crossCopyCompareSummary" class="cross-copy-inline-tip">{{ crossCopyCompareSummary }}</div>
-            <div v-if="crossCopyLastResultSummary" class="cross-copy-inline-tip success">{{ crossCopyLastResultSummary }}</div>
+            <div class="cross-copy-controls-wrap">
+              <div class="cross-copy-controls cross-copy-controls-primary">
+                <label class="field">
+                  <span>来源世界书</span>
+                  <select v-model="crossCopySourceWorldbook" class="text-input">
+                    <option value="">请选择来源世界书</option>
+                    <option v-for="name in worldbookNames" :key="`d-copy-source-${name}`" :value="name">{{ name }}</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>目标世界书</span>
+                  <select v-model="crossCopyTargetWorldbook" class="text-input">
+                    <option value="">请选择目标世界书</option>
+                    <option v-for="name in worldbookNames" :key="`d-copy-target-${name}`" :value="name">{{ name }}</option>
+                  </select>
+                </label>
+                <div class="cross-copy-control-actions">
+                  <button class="btn" type="button" :disabled="!crossCopyCanCompare || crossCopyCompareLoading || crossCopyApplyLoading" @click="refreshCrossCopyComparison">
+                    {{ crossCopyCompareLoading ? '比较中...' : '刷新比较' }}
+                  </button>
+                </div>
+              </div>
 
-            <div class="cross-copy-grid">
+              <Transition name="copy-controls-advanced">
+                <div v-if="!crossCopyControlsCollapsed" class="cross-copy-controls cross-copy-controls-advanced">
+                  <label class="checkbox-inline">
+                    <input
+                      v-model="crossCopyUseDraftSourceWhenCurrent"
+                      type="checkbox"
+                      :disabled="!crossCopySourceIsCurrentWorldbook"
+                    />
+                    <span>{{ crossCopySourceVersionLabel }}</span>
+                  </label>
+                  <label class="checkbox-inline">
+                    <input v-model="crossCopySnapshotBeforeApply" type="checkbox" />
+                    <span>执行前写入目标快照</span>
+                  </label>
+                </div>
+              </Transition>
+
+              <div v-if="crossCopyControlsCollapsed" class="cross-copy-inline-tip">
+                {{ crossCopySourceVersionLabel }} | {{ crossCopySnapshotBeforeApply ? '执行前写入快照' : '不写入快照' }}
+              </div>
+              <div class="cross-copy-inline-tips">
+                <div v-if="crossCopySourceTargetInvalid" class="cross-copy-inline-tip warning">来源和目标不能相同。</div>
+                <div v-if="crossCopyCompareSummary" class="cross-copy-inline-tip">{{ crossCopyCompareSummary }}</div>
+                <div v-if="crossCopyLastResultSummary" class="cross-copy-inline-tip success">{{ crossCopyLastResultSummary }}</div>
+              </div>
+            </div>
+
+            <div
+              ref="crossCopyGridRef"
+              class="cross-copy-grid"
+              :class="{ 'single-column': crossCopyDesktopSingleColumn }"
+              :style="crossCopyGridStyle"
+            >
               <aside class="cross-copy-left">
                 <div class="cross-copy-list-head">
                   <strong>来源条目</strong>
@@ -1254,6 +1351,15 @@
                   <div v-if="!crossCopySourceRowsFiltered.length" class="empty-note">暂无可选条目，请先刷新比较</div>
                 </div>
               </aside>
+
+              <div
+                v-if="!crossCopyDesktopSingleColumn"
+                class="cross-copy-splitter"
+                :class="{ dragging: Boolean(crossCopyPaneResizeState) }"
+                @pointerdown="startCrossCopyPaneResize"
+              >
+                <span>⋮</span>
+              </div>
 
               <section class="cross-copy-right">
                 <div class="cross-copy-list-head">
@@ -2620,12 +2726,16 @@ type CrossCopyRowStatus =
 type CrossCopyAction = 'skip' | 'overwrite' | 'rename_create' | 'create';
 type CrossCopyStatusFilter = 'all' | CrossCopyRowStatus;
 type WorldbookHistoryCompareStatus = 'added' | 'removed' | 'changed';
+type CrossCopyMobileStep = 1 | 2 | 3;
 
 interface CrossCopyPersistState {
   last_source_worldbook: string;
   last_target_worldbook: string;
   use_draft_source_when_current: boolean;
   snapshot_before_apply: boolean;
+  desktop_left_width: number;
+  controls_collapsed: boolean;
+  workspace_tools_expanded: boolean;
 }
 
 interface CrossCopyMatchSummary {
@@ -2721,6 +2831,12 @@ interface HistorySectionResizeState {
   startY: number;
   containerHeight: number;
   startRatios: [number, number, number];
+  doc: Document;
+  win: Window;
+}
+
+interface CrossCopyPaneResizeState {
+  pointerId: number;
   doc: Document;
   win: Window;
 }
@@ -3156,6 +3272,11 @@ const CROSS_COPY_ACTION_LABELS: Record<CrossCopyAction, string> = {
   rename_create: '另存新名',
   create: '直接创建',
 };
+const CROSS_COPY_DESKTOP_LEFT_DEFAULT = 300;
+const CROSS_COPY_DESKTOP_LEFT_MIN = 240;
+const CROSS_COPY_DESKTOP_LEFT_MAX = 440;
+const CROSS_COPY_SPLITTER_SIZE = 8;
+const CROSS_COPY_RIGHT_MIN = 360;
 
 const strategyTypeOptions: StrategyType[] = ['constant', 'selective', 'vectorized'];
 const secondaryLogicOptions: SecondaryLogic[] = ['and_any', 'and_all', 'not_all', 'not_any'];
@@ -3273,6 +3394,9 @@ const crossCopySourceWorldbook = ref('');
 const crossCopyTargetWorldbook = ref('');
 const crossCopyUseDraftSourceWhenCurrent = ref(true);
 const crossCopySnapshotBeforeApply = ref(true);
+const crossCopyControlsCollapsed = ref(true);
+const crossCopyWorkspaceToolsExpanded = ref(false);
+const crossCopyDesktopLeftWidth = ref(CROSS_COPY_DESKTOP_LEFT_DEFAULT);
 const crossCopyRows = ref<CrossCopyRow[]>([]);
 const crossCopySourceBaselineEntries = ref<WorldbookEntry[]>([]);
 const crossCopyTargetBaselineEntries = ref<WorldbookEntry[]>([]);
@@ -3284,6 +3408,9 @@ const crossCopyBulkAction = ref<CrossCopyAction>('skip');
 const crossCopyCompareSummary = ref('');
 const crossCopyLastResultSummary = ref('');
 const crossCopyLastComparedAt = ref<number>(0);
+const crossCopyPaneResizeState = ref<CrossCopyPaneResizeState | null>(null);
+const crossCopyGridRef = ref<HTMLElement | null>(null);
+const crossCopyMobileStep = ref<CrossCopyMobileStep>(1);
 
 const AI_CHAT_SESSION_LIMIT = 50;
 const AI_CHAT_MESSAGE_LIMIT = 200;
@@ -3590,6 +3717,20 @@ const crossCopySourceVersionLabel = computed(() => {
   }
   return crossCopyUseDraftSourceWhenCurrent.value ? '来源读取当前草稿（含未保存修改）' : '来源读取已保存版本';
 });
+const crossCopyHasCompared = computed(() => crossCopyLastComparedAt.value > 0);
+
+const crossCopyWorkspaceSummary = computed(() => {
+  const source = crossCopySourceWorldbook.value || '未选择来源';
+  const target = crossCopyTargetWorldbook.value || '未选择目标';
+  return `${source} → ${target}`;
+});
+
+const crossCopyWorkspaceComparedText = computed(() => {
+  if (!crossCopyHasCompared.value) {
+    return '尚未比较';
+  }
+  return `上次比较：${formatDateTime(crossCopyLastComparedAt.value)}`;
+});
 
 const crossCopySourceTargetInvalid = computed(() => {
   if (!crossCopySourceWorldbook.value || !crossCopyTargetWorldbook.value) {
@@ -3634,7 +3775,6 @@ const crossCopyStatusCounts = computed(() => {
   return counts;
 });
 
-const crossCopyHasCompared = computed(() => crossCopyLastComparedAt.value > 0);
 const crossCopySelectedCount = computed(() => crossCopySelectedRows.value.length);
 const crossCopyCanCompare = computed(() =>
   Boolean(crossCopySourceWorldbook.value && crossCopyTargetWorldbook.value) && !crossCopySourceTargetInvalid.value,
@@ -3642,6 +3782,31 @@ const crossCopyCanCompare = computed(() =>
 const crossCopyCanApply = computed(() =>
   crossCopyCanCompare.value && crossCopySelectedRows.value.length > 0 && !crossCopyApplyLoading.value,
 );
+
+const crossCopyDesktopSingleColumn = computed(() => viewportWidth.value <= 1200);
+const crossCopyDesktopLeftWidthClamped = computed(() =>
+  clampNumber(Math.floor(crossCopyDesktopLeftWidth.value), CROSS_COPY_DESKTOP_LEFT_MIN, CROSS_COPY_DESKTOP_LEFT_MAX),
+);
+const crossCopyGridStyle = computed((): Record<string, string> | undefined => {
+  if (crossCopyDesktopSingleColumn.value) {
+    return undefined;
+  }
+  return {
+    gridTemplateColumns: `${crossCopyDesktopLeftWidthClamped.value}px ${CROSS_COPY_SPLITTER_SIZE}px minmax(0, 1fr)`,
+  };
+});
+
+const crossCopyMobileCanGoStep2 = computed(() => crossCopyHasCompared.value && crossCopyRows.value.length > 0);
+const crossCopyMobileCanGoStep3 = computed(() => crossCopyMobileCanGoStep2.value);
+const crossCopyMobileNextDisabled = computed(() => {
+  if (crossCopyMobileStep.value === 1) {
+    return !crossCopyMobileCanGoStep2.value || crossCopyCompareLoading.value;
+  }
+  if (crossCopyMobileStep.value === 2) {
+    return !crossCopyMobileCanGoStep3.value;
+  }
+  return !crossCopyCanApply.value;
+});
 
 const crossCopyDiffRow = computed(() => {
   if (!crossCopyDiffRowId.value) {
@@ -4321,6 +4486,30 @@ watch(crossCopySnapshotBeforeApply, () => {
   persistCrossCopyState();
 });
 
+watch([crossCopyControlsCollapsed, crossCopyWorkspaceToolsExpanded], () => {
+  persistCrossCopyState();
+});
+
+watch(crossCopyHasCompared, hasCompared => {
+  if (!hasCompared && crossCopyMobileStep.value > 1) {
+    crossCopyMobileStep.value = 1;
+  }
+});
+
+watch(crossCopyDesktopSingleColumn, isSingleColumn => {
+  if (isSingleColumn) {
+    stopCrossCopyPaneResize();
+  }
+});
+
+watch(crossCopyMode, enabled => {
+  if (!enabled) {
+    stopCrossCopyPaneResize();
+    closeCrossCopyDiff();
+    crossCopyMobileStep.value = 1;
+  }
+});
+
 watch(crossCopyDiffRow, row => {
   if (!row && showCrossCopyDiffModal.value) {
     closeCrossCopyDiff();
@@ -4335,6 +4524,7 @@ watch(mobileTab, tab => {
   aiGeneratorMode.value = false;
   tagEditorMode.value = false;
   normalizeCrossCopyWorldbookSelection();
+  crossCopyMobileStep.value = 1;
 });
 
 watch(
@@ -4922,6 +5112,9 @@ function createDefaultCrossCopyPersistState(): CrossCopyPersistState {
     last_target_worldbook: '',
     use_draft_source_when_current: true,
     snapshot_before_apply: true,
+    desktop_left_width: CROSS_COPY_DESKTOP_LEFT_DEFAULT,
+    controls_collapsed: true,
+    workspace_tools_expanded: false,
   };
 }
 
@@ -4936,6 +5129,13 @@ function normalizeCrossCopyPersistState(input: unknown): CrossCopyPersistState {
     last_target_worldbook: toStringSafe(raw.last_target_worldbook).trim(),
     use_draft_source_when_current: raw.use_draft_source_when_current !== false,
     snapshot_before_apply: raw.snapshot_before_apply !== false,
+    desktop_left_width: clampNumber(
+      Math.floor(toNumberSafe(raw.desktop_left_width, fallback.desktop_left_width)),
+      CROSS_COPY_DESKTOP_LEFT_MIN,
+      CROSS_COPY_DESKTOP_LEFT_MAX,
+    ),
+    controls_collapsed: raw.controls_collapsed !== false,
+    workspace_tools_expanded: raw.workspace_tools_expanded === true,
   };
 }
 
@@ -5227,6 +5427,9 @@ function applyCrossCopyStateFromPersisted(): void {
   crossCopyTargetWorldbook.value = state.last_target_worldbook;
   crossCopyUseDraftSourceWhenCurrent.value = state.use_draft_source_when_current;
   crossCopySnapshotBeforeApply.value = state.snapshot_before_apply;
+  crossCopyDesktopLeftWidth.value = state.desktop_left_width;
+  crossCopyControlsCollapsed.value = state.controls_collapsed;
+  crossCopyWorkspaceToolsExpanded.value = state.workspace_tools_expanded;
 }
 
 function persistCrossCopyState(): void {
@@ -5236,6 +5439,9 @@ function persistCrossCopyState(): void {
       last_target_worldbook: crossCopyTargetWorldbook.value,
       use_draft_source_when_current: crossCopyUseDraftSourceWhenCurrent.value,
       snapshot_before_apply: crossCopySnapshotBeforeApply.value,
+      desktop_left_width: crossCopyDesktopLeftWidthClamped.value,
+      controls_collapsed: crossCopyControlsCollapsed.value,
+      workspace_tools_expanded: crossCopyWorkspaceToolsExpanded.value,
     };
   });
 }
@@ -6317,15 +6523,112 @@ function closeCrossCopyDiff(): void {
   crossCopyDiffRowId.value = '';
 }
 
+function toggleCrossCopyWorkspaceTools(): void {
+  crossCopyWorkspaceToolsExpanded.value = !crossCopyWorkspaceToolsExpanded.value;
+}
+
+function toggleCrossCopyControlsCollapsed(): void {
+  crossCopyControlsCollapsed.value = !crossCopyControlsCollapsed.value;
+}
+
+function canEnterCrossCopyMobileStep(step: CrossCopyMobileStep): boolean {
+  if (step <= 1) {
+    return true;
+  }
+  if (step === 2) {
+    return crossCopyMobileCanGoStep2.value;
+  }
+  return crossCopyMobileCanGoStep3.value;
+}
+
+function goToCrossCopyMobileStep(step: CrossCopyMobileStep): void {
+  if (step === crossCopyMobileStep.value) {
+    return;
+  }
+  if (!canEnterCrossCopyMobileStep(step)) {
+    toastr.info('请先完成比较，再继续下一步');
+    return;
+  }
+  crossCopyMobileStep.value = step;
+}
+
+function goToPreviousCrossCopyMobileStep(): void {
+  const prev = clampNumber(crossCopyMobileStep.value - 1, 1, 3) as CrossCopyMobileStep;
+  crossCopyMobileStep.value = prev;
+}
+
+function goToNextCrossCopyMobileStep(): void {
+  const next = clampNumber(crossCopyMobileStep.value + 1, 1, 3) as CrossCopyMobileStep;
+  goToCrossCopyMobileStep(next);
+}
+
+function startCrossCopyPaneResize(event: PointerEvent): void {
+  if (crossCopyDesktopSingleColumn.value) {
+    return;
+  }
+  if (event.pointerType === 'mouse' && event.button !== 0) {
+    return;
+  }
+  const trigger = event.currentTarget as HTMLElement | null;
+  const hostDoc = trigger?.ownerDocument ?? document;
+  const hostWin = hostDoc.defaultView ?? window;
+  crossCopyPaneResizeState.value = {
+    pointerId: event.pointerId,
+    doc: hostDoc,
+    win: hostWin,
+  };
+  trigger?.setPointerCapture?.(event.pointerId);
+  hostDoc.addEventListener('pointermove', onCrossCopyPaneResizeMove);
+  hostDoc.addEventListener('pointerup', stopCrossCopyPaneResize);
+  hostDoc.addEventListener('pointercancel', stopCrossCopyPaneResize);
+  hostWin.addEventListener('blur', stopCrossCopyPaneResize);
+  event.preventDefault();
+}
+
+function onCrossCopyPaneResizeMove(event: PointerEvent): void {
+  const state = crossCopyPaneResizeState.value;
+  if (!state || state.pointerId !== event.pointerId) {
+    return;
+  }
+  const rect = crossCopyGridRef.value?.getBoundingClientRect();
+  if (!rect) {
+    return;
+  }
+  const pointerLeft = Math.floor(event.clientX - rect.left - CROSS_COPY_SPLITTER_SIZE / 2);
+  const maxByLayout = Math.max(
+    CROSS_COPY_DESKTOP_LEFT_MIN,
+    Math.floor(rect.width - CROSS_COPY_SPLITTER_SIZE - CROSS_COPY_RIGHT_MIN),
+  );
+  const maxWidth = Math.min(CROSS_COPY_DESKTOP_LEFT_MAX, maxByLayout);
+  crossCopyDesktopLeftWidth.value = clampNumber(pointerLeft, CROSS_COPY_DESKTOP_LEFT_MIN, maxWidth);
+}
+
+function stopCrossCopyPaneResize(): void {
+  const state = crossCopyPaneResizeState.value;
+  if (!state) {
+    return;
+  }
+  state.doc.removeEventListener('pointermove', onCrossCopyPaneResizeMove);
+  state.doc.removeEventListener('pointerup', stopCrossCopyPaneResize);
+  state.doc.removeEventListener('pointercancel', stopCrossCopyPaneResize);
+  state.win.removeEventListener('blur', stopCrossCopyPaneResize);
+  crossCopyPaneResizeState.value = null;
+  crossCopyDesktopLeftWidth.value = crossCopyDesktopLeftWidthClamped.value;
+  persistCrossCopyState();
+}
+
 function setCrossCopyModeActive(next: boolean): void {
   if (!next) {
     closeCrossCopyDiff();
+    stopCrossCopyPaneResize();
+    crossCopyMobileStep.value = 1;
   }
   crossCopyMode.value = next;
   if (next) {
     aiGeneratorMode.value = false;
     tagEditorMode.value = false;
     globalWorldbookMode.value = false;
+    crossCopyMobileStep.value = 1;
     closeFocusWorldbookMenu();
     closeFocusToolsBand();
     normalizeCrossCopyWorldbookSelection();
@@ -10020,6 +10323,7 @@ onUnmounted(() => {
   });
   stopFloatingDrag();
   stopPaneResize();
+  stopCrossCopyPaneResize();
   stopHistorySectionResize();
   window.removeEventListener('wb-helper:refresh', onPanelRefresh);
   window.removeEventListener('wb-helper:save', onPanelSave);
@@ -10166,6 +10470,10 @@ watch(hasUnsavedChanges, (val) => {
   gap: 10px;
 }
 
+.wb-scroll-area.copy-workspace {
+  overflow: hidden;
+}
+
 .wb-settings-wrapper {
   width: 100%;
 }
@@ -10175,15 +10483,25 @@ watch(hasUnsavedChanges, (val) => {
   border-radius: 12px;
   background: var(--wb-bg-panel);
   padding: 12px;
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: 10px;
   min-height: 0;
+  overflow: hidden;
 }
 
 .cross-copy-panel.mobile {
   padding: 10px;
   gap: 8px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.cross-copy-panel.desktop {
+  height: clamp(620px, calc(100vh - 220px), 82vh);
+  max-height: calc(100vh - 110px);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
 }
 
 .cross-copy-head {
@@ -10192,6 +10510,29 @@ watch(hasUnsavedChanges, (val) => {
   justify-content: space-between;
   gap: 8px;
   font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.cross-copy-head-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cross-copy-head-main span {
+  color: var(--wb-text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cross-copy-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .cross-copy-head strong {
@@ -10201,6 +10542,11 @@ watch(hasUnsavedChanges, (val) => {
 .cross-copy-head span {
   color: var(--wb-text-muted);
   font-size: 12px;
+}
+
+.cross-copy-controls-wrap {
+  display: grid;
+  gap: 8px;
 }
 
 .cross-copy-controls {
@@ -10214,13 +10560,31 @@ watch(hasUnsavedChanges, (val) => {
   grid-template-columns: minmax(0, 1fr);
 }
 
+.cross-copy-controls-primary {
+  grid-template-columns: repeat(2, minmax(220px, 1fr)) auto;
+}
+
+.cross-copy-controls-advanced {
+  grid-template-columns: repeat(2, minmax(240px, 1fr));
+  padding: 8px 10px;
+  border: 1px solid var(--wb-border-subtle);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
 .cross-copy-control-actions {
   display: flex;
   justify-content: flex-end;
+  align-items: end;
 }
 
 .cross-copy-panel.mobile .cross-copy-control-actions {
   justify-content: flex-start;
+}
+
+.cross-copy-inline-tips {
+  display: grid;
+  gap: 6px;
 }
 
 .cross-copy-inline-tip {
@@ -10239,6 +10603,26 @@ watch(hasUnsavedChanges, (val) => {
   color: #34d399;
 }
 
+.copy-controls-advanced-enter-active,
+.copy-controls-advanced-leave-active {
+  transition: opacity 200ms ease, transform 220ms cubic-bezier(0.22, 1, 0.36, 1), max-height 220ms ease;
+  overflow: hidden;
+}
+
+.copy-controls-advanced-enter-from,
+.copy-controls-advanced-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+  max-height: 0;
+}
+
+.copy-controls-advanced-enter-to,
+.copy-controls-advanced-leave-from {
+  opacity: 1;
+  transform: translateY(0);
+  max-height: 180px;
+}
+
 .cross-copy-grid {
   display: grid;
   grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
@@ -10247,19 +10631,44 @@ watch(hasUnsavedChanges, (val) => {
   flex: 1;
 }
 
+.cross-copy-grid.single-column {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
 .cross-copy-grid.mobile {
   grid-template-columns: minmax(0, 1fr);
+}
+
+.cross-copy-splitter {
+  width: 100%;
+  min-height: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--wb-border-main) 68%, transparent);
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--wb-text-muted);
+  user-select: none;
+  touch-action: none;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.cross-copy-splitter:hover,
+.cross-copy-splitter.dragging {
+  background: color-mix(in srgb, var(--wb-primary) 50%, transparent);
+  color: var(--wb-primary-light);
 }
 
 .cross-copy-left,
 .cross-copy-right {
   border: 1px solid var(--wb-border-subtle);
   border-radius: 10px;
-  padding: 10px;
+  padding: 8px;
   background: rgba(0, 0, 0, 0.12);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   min-height: 0;
 }
 
@@ -10381,11 +10790,11 @@ watch(hasUnsavedChanges, (val) => {
 .cross-copy-row {
   border: 1px solid var(--wb-border-subtle);
   border-radius: 10px;
-  padding: 8px;
+  padding: 6px 8px;
   background: var(--wb-input-bg);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .cross-copy-row-head {
@@ -10411,7 +10820,10 @@ watch(hasUnsavedChanges, (val) => {
 
 .cross-copy-row-note {
   color: var(--wb-text-muted);
-  font-size: 12px;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .cross-copy-row-actions {
@@ -10422,8 +10834,10 @@ watch(hasUnsavedChanges, (val) => {
 
 .cross-copy-detail-trigger {
   align-self: flex-start;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--wb-text-muted);
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .cross-copy-preview-grid {
@@ -10644,15 +11058,27 @@ watch(hasUnsavedChanges, (val) => {
   flex-wrap: wrap;
   align-items: center;
   border-top: 1px solid var(--wb-border-subtle);
-  padding-top: 8px;
+  padding: 10px 12px;
+  margin: 0 -12px -12px;
+  position: sticky;
+  bottom: 0;
+  z-index: 8;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  background: color-mix(in srgb, var(--wb-bg-panel) 78%, rgba(5, 8, 20, 0.88));
 }
 
 .cross-copy-actions.mobile {
-  position: sticky;
-  bottom: 0;
-  background: var(--wb-bg-panel);
-  z-index: 4;
-  padding-bottom: 4px;
+  position: static;
+  margin: 0;
+  padding: 0;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: transparent;
+}
+
+.cross-copy-panel.desktop .cross-copy-actions .btn.primary {
+  margin-left: auto;
 }
 
 .cross-copy-bulk-box {
@@ -10665,9 +11091,108 @@ watch(hasUnsavedChanges, (val) => {
   min-width: 120px;
 }
 
+.cross-copy-mobile-stepper {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.cross-copy-mobile-step {
+  border: 1px solid var(--wb-border-subtle);
+  border-radius: 8px;
+  background: var(--wb-input-bg);
+  color: var(--wb-text-muted);
+  padding: 6px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.cross-copy-mobile-step.active {
+  border-color: var(--wb-primary);
+  color: var(--wb-primary-light);
+  background: color-mix(in srgb, var(--wb-primary) 18%, transparent);
+}
+
+.cross-copy-mobile-step:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.cross-copy-mobile-stage {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+}
+
+.cross-copy-mobile-stage-panel {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cross-copy-mobile-advanced-toggle {
+  width: fit-content;
+}
+
+.cross-copy-mobile-advanced {
+  border: 1px solid var(--wb-border-subtle);
+  border-radius: 10px;
+  padding: 8px;
+  display: grid;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.mobile-source-list,
+.mobile-rows {
+  flex: 1;
+}
+
+.cross-copy-mobile-bulk {
+  display: grid;
+  gap: 6px;
+}
+
+.cross-copy-mobile-nav {
+  position: sticky;
+  bottom: 0;
+  z-index: 6;
+  display: flex;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--wb-border-subtle);
+  background: color-mix(in srgb, var(--wb-bg-panel) 82%, rgba(5, 8, 20, 0.9));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.cross-copy-mobile-nav .btn {
+  flex: 1 1 0;
+}
+
 @media (max-width: 1200px) {
+  .cross-copy-controls-primary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cross-copy-controls-primary .cross-copy-control-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
+  .cross-copy-head-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
   .cross-copy-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cross-copy-splitter {
+    display: none;
   }
 
   .cross-copy-row-actions {
@@ -11068,9 +11593,52 @@ watch(hasUnsavedChanges, (val) => {
   background: var(--wb-bg-panel);
 }
 
+.wb-bindings.copy-workspace {
+  padding: 8px 10px;
+  gap: 6px;
+}
+
 .wb-bindings.focus-bindings {
   padding: 0;
   background: transparent;
+}
+
+.wb-copy-workspace-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.wb-copy-workspace-title {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.wb-copy-workspace-title strong {
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.wb-copy-workspace-title span {
+  font-size: 12px;
+  color: var(--wb-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wb-copy-workspace-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wb-copy-workspace-meta {
+  font-size: 12px;
+  color: var(--wb-text-muted);
 }
 
 .wb-history-shortcuts {
@@ -11079,6 +11647,21 @@ watch(hasUnsavedChanges, (val) => {
   gap: 8px;
   flex-wrap: wrap;
   align-items: center;
+}
+
+.wb-history-shortcuts.copy-workspace-tools {
+  padding-top: 2px;
+}
+
+.copy-workspace-tools-enter-active,
+.copy-workspace-tools-leave-active {
+  transition: opacity 180ms ease, transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.copy-workspace-tools-enter-from,
+.copy-workspace-tools-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
 }
 
 .global-mode-panel {
