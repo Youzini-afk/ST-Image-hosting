@@ -2121,15 +2121,71 @@
                       恢复到 Left
                     </button>
                   </div>
-                  <div class="wb-history-diff-grid">
-                    <div>
-                      <div class="wb-history-diff-title">Left</div>
-                      <div class="wb-history-diff-body" v-html="entryHistoryDiff.leftHtml"></div>
+                  <div class="wb-history-visual-main">
+                    <div class="cross-copy-preview-grid cross-copy-preview-grid-modal wb-history-version-preview">
+                      <div class="cross-copy-preview-card">
+                        <strong>Left 版本</strong>
+                        <span class="name">{{ selectedEntryHistoryLeft ? selectedEntryHistoryLeft.name || `条目 ${selectedEntryHistoryLeft.entry.uid}` : '-' }}</span>
+                        <span class="meta">{{ selectedEntryHistoryLeft ? getCrossCopyEntryProfile(selectedEntryHistoryLeft.entry) : '-' }}</span>
+                        <p>{{ getEntryVersionPreview(selectedEntryHistoryLeft) || '-' }}</p>
+                      </div>
+                      <div class="cross-copy-preview-card">
+                        <strong>Right 版本</strong>
+                        <span class="name">{{ selectedEntryHistoryRight ? selectedEntryHistoryRight.name || `条目 ${selectedEntryHistoryRight.entry.uid}` : '-' }}</span>
+                        <span class="meta">{{ selectedEntryHistoryRight ? getCrossCopyEntryProfile(selectedEntryHistoryRight.entry) : '-' }}</span>
+                        <p>{{ getEntryVersionPreview(selectedEntryHistoryRight) || '-' }}</p>
+                      </div>
                     </div>
-                    <div>
-                      <div class="wb-history-diff-title">Right</div>
-                      <div class="wb-history-diff-body" v-html="entryHistoryDiff.rightHtml"></div>
-                    </div>
+
+                    <section class="cross-copy-visual-section">
+                      <div class="cross-copy-visual-head">
+                        <strong>字段对比</strong>
+                        <span>{{ entryHistoryFieldDiffSummary }}</span>
+                      </div>
+                      <div class="cross-copy-field-table">
+                        <div class="cross-copy-field-row cross-copy-field-header">
+                          <span>字段</span>
+                          <span>Left</span>
+                          <span>Right</span>
+                          <span>状态</span>
+                        </div>
+                        <div v-for="field in entryHistoryFieldDiffRows" :key="field.key" class="cross-copy-field-row" :class="{ changed: field.changed }">
+                          <span class="cross-copy-field-label">{{ field.label }}</span>
+                          <span class="cross-copy-field-value left">{{ field.left }}</span>
+                          <span class="cross-copy-field-value right">{{ field.right }}</span>
+                          <span class="cross-copy-field-state" :class="{ changed: field.changed, same: !field.changed }">
+                            {{ field.changed ? '不同' : '一致' }}
+                          </span>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section class="cross-copy-visual-section">
+                      <div class="cross-copy-visual-head">
+                        <strong>内容差异</strong>
+                        <span>{{ entryHistoryContentDiffSummary }}</span>
+                      </div>
+                      <div class="cross-copy-content-grid">
+                        <div class="cross-copy-content-col">
+                          <div class="wb-history-diff-title">Left / 条目内容</div>
+                          <div class="cross-copy-content-body">
+                            <div v-for="(line, idx) in entryHistoryContentDiff.left" :key="`eh-left-${idx}`" class="cross-copy-content-line" :class="line.type">
+                              <span class="line-no">{{ line.line_no ?? '' }}</span>
+                              <span class="line-text">{{ line.text || ' ' }}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="cross-copy-content-col">
+                          <div class="wb-history-diff-title">Right / 条目内容</div>
+                          <div class="cross-copy-content-body">
+                            <div v-for="(line, idx) in entryHistoryContentDiff.right" :key="`eh-right-${idx}`" class="cross-copy-content-line" :class="line.type">
+                              <span class="line-no">{{ line.line_no ?? '' }}</span>
+                              <span class="line-text">{{ line.text || ' ' }}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </section>
                   </div>
                 </section>
               </div>
@@ -2192,15 +2248,126 @@
                       恢复到 Left
                     </button>
                   </div>
-                  <div class="wb-history-diff-grid">
-                    <div>
-                      <div class="wb-history-diff-title">Left</div>
-                      <div class="wb-history-diff-body" v-html="worldbookHistoryDiff.leftHtml"></div>
+                  <div class="wb-history-visual-main">
+                    <div class="cross-copy-preview-grid cross-copy-preview-grid-modal wb-history-version-preview">
+                      <div class="cross-copy-preview-card">
+                        <strong>Left 版本</strong>
+                        <span class="name">{{ selectedWorldbookHistoryLeft ? formatHistoryOptionLabel(selectedWorldbookHistoryLeft.label, selectedWorldbookHistoryLeft.ts, selectedWorldbookHistoryLeft.isCurrent) : '-' }}</span>
+                        <span class="meta">entries: {{ selectedWorldbookHistoryLeft ? selectedWorldbookHistoryLeft.entries.length : 0 }}</span>
+                        <p>{{ selectedWorldbookHistoryLeft ? getWorldbookHistoryVersionPreview(selectedWorldbookHistoryLeft) : '-' }}</p>
+                      </div>
+                      <div class="cross-copy-preview-card">
+                        <strong>Right 版本</strong>
+                        <span class="name">{{ selectedWorldbookHistoryRight ? formatHistoryOptionLabel(selectedWorldbookHistoryRight.label, selectedWorldbookHistoryRight.ts, selectedWorldbookHistoryRight.isCurrent) : '-' }}</span>
+                        <span class="meta">entries: {{ selectedWorldbookHistoryRight ? selectedWorldbookHistoryRight.entries.length : 0 }}</span>
+                        <p>{{ selectedWorldbookHistoryRight ? getWorldbookHistoryVersionPreview(selectedWorldbookHistoryRight) : '-' }}</p>
+                      </div>
                     </div>
-                    <div>
-                      <div class="wb-history-diff-title">Right</div>
-                      <div class="wb-history-diff-body" v-html="worldbookHistoryDiff.rightHtml"></div>
-                    </div>
+
+                    <section class="cross-copy-visual-section wb-worldbook-compare-list-section">
+                      <div class="cross-copy-visual-head">
+                        <strong>条目变化列表</strong>
+                        <span>{{ worldbookHistoryCompareSummary }}</span>
+                      </div>
+                      <div class="wb-worldbook-compare-list">
+                        <button
+                          v-for="row in worldbookHistoryCompareRows"
+                          :key="row.key"
+                          type="button"
+                          class="wb-worldbook-compare-row"
+                          :class="{ active: worldbookHistoryActiveRowKey === row.key }"
+                          @click="worldbookHistoryActiveRowKey = row.key"
+                        >
+                          <div class="wb-worldbook-compare-row-head">
+                            <span class="cross-copy-status-badge" :class="getWorldbookHistoryStatusBadgeClass(row.status)">
+                              {{ getWorldbookHistoryStatusLabel(row.status) }}
+                            </span>
+                            <strong>{{ row.title }}</strong>
+                            <span v-if="row.uid !== null" class="entry-chip uid">#{{ row.uid }}</span>
+                          </div>
+                          <div class="wb-worldbook-compare-row-note">{{ row.note }}</div>
+                        </button>
+                        <div v-if="!worldbookHistoryCompareRows.length" class="empty-note">左右版本条目一致，无需处理。</div>
+                      </div>
+                    </section>
+
+                    <template v-if="worldbookHistoryActiveRow">
+                      <div class="cross-copy-preview-grid cross-copy-preview-grid-modal">
+                        <div class="cross-copy-preview-card">
+                          <strong>Left 条目</strong>
+                          <template v-if="worldbookHistoryActiveRow.left_entry">
+                            <span class="name">{{ worldbookHistoryActiveRow.left_entry.name || `条目 ${worldbookHistoryActiveRow.left_entry.uid}` }}</span>
+                            <span class="meta">{{ getCrossCopyEntryProfile(worldbookHistoryActiveRow.left_entry) }}</span>
+                            <p>{{ getCrossCopyPreviewText(worldbookHistoryActiveRow.left_entry.content, 260) }}</p>
+                          </template>
+                          <template v-else>
+                            <span class="meta">该条目在 Left 版本不存在</span>
+                          </template>
+                        </div>
+                        <div class="cross-copy-preview-card">
+                          <strong>Right 条目</strong>
+                          <template v-if="worldbookHistoryActiveRow.right_entry">
+                            <span class="name">{{ worldbookHistoryActiveRow.right_entry.name || `条目 ${worldbookHistoryActiveRow.right_entry.uid}` }}</span>
+                            <span class="meta">{{ getCrossCopyEntryProfile(worldbookHistoryActiveRow.right_entry) }}</span>
+                            <p>{{ getCrossCopyPreviewText(worldbookHistoryActiveRow.right_entry.content, 260) }}</p>
+                          </template>
+                          <template v-else>
+                            <span class="meta">该条目在 Right 版本不存在</span>
+                          </template>
+                        </div>
+                      </div>
+
+                      <section class="cross-copy-visual-section">
+                        <div class="cross-copy-visual-head">
+                          <strong>字段对比</strong>
+                          <span>{{ worldbookHistoryFieldDiffSummary }}</span>
+                        </div>
+                        <div class="cross-copy-field-table">
+                          <div class="cross-copy-field-row cross-copy-field-header">
+                            <span>字段</span>
+                            <span>Left</span>
+                            <span>Right</span>
+                            <span>状态</span>
+                          </div>
+                          <div v-for="field in worldbookHistoryFieldDiffRows" :key="field.key" class="cross-copy-field-row" :class="{ changed: field.changed }">
+                            <span class="cross-copy-field-label">{{ field.label }}</span>
+                            <span class="cross-copy-field-value left">{{ field.left }}</span>
+                            <span class="cross-copy-field-value right">{{ field.right }}</span>
+                            <span class="cross-copy-field-state" :class="{ changed: field.changed, same: !field.changed }">
+                              {{ field.changed ? '不同' : '一致' }}
+                            </span>
+                          </div>
+                        </div>
+                      </section>
+
+                      <section class="cross-copy-visual-section">
+                        <div class="cross-copy-visual-head">
+                          <strong>内容差异</strong>
+                          <span>{{ worldbookHistoryContentDiffSummary }}</span>
+                        </div>
+                        <div class="cross-copy-content-grid">
+                          <div class="cross-copy-content-col">
+                            <div class="wb-history-diff-title">Left / 条目内容</div>
+                            <div class="cross-copy-content-body">
+                              <div v-for="(line, idx) in worldbookHistoryContentDiff.left" :key="`wh-left-${idx}`" class="cross-copy-content-line" :class="line.type">
+                                <span class="line-no">{{ line.line_no ?? '' }}</span>
+                                <span class="line-text">{{ line.text || ' ' }}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="cross-copy-content-col">
+                            <div class="wb-history-diff-title">Right / 条目内容</div>
+                            <div class="cross-copy-content-body">
+                              <div v-for="(line, idx) in worldbookHistoryContentDiff.right" :key="`wh-right-${idx}`" class="cross-copy-content-line" :class="line.type">
+                                <span class="line-no">{{ line.line_no ?? '' }}</span>
+                                <span class="line-text">{{ line.text || ' ' }}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </section>
+                    </template>
+                    <div v-else class="empty-note wb-worldbook-detail-empty">请选择一条变化记录查看详细对比</div>
                   </div>
                 </section>
               </div>
@@ -2403,6 +2570,7 @@ type CrossCopyRowStatus =
   | 'invalid_same_source_target';
 type CrossCopyAction = 'skip' | 'overwrite' | 'rename_create' | 'create';
 type CrossCopyStatusFilter = 'all' | CrossCopyRowStatus;
+type WorldbookHistoryCompareStatus = 'added' | 'removed' | 'changed';
 
 interface CrossCopyPersistState {
   last_source_worldbook: string;
@@ -2452,6 +2620,21 @@ interface CrossCopyTextDiffResult {
   added: number;
   removed: number;
   changed: number;
+}
+
+interface EntryFieldDiffOptions {
+  left_fallback?: string;
+  right_fallback?: string;
+}
+
+interface WorldbookHistoryCompareRow {
+  key: string;
+  uid: number | null;
+  status: WorldbookHistoryCompareStatus;
+  title: string;
+  note: string;
+  left_entry: WorldbookEntry | null;
+  right_entry: WorldbookEntry | null;
 }
 
 interface WorldbookSwitchOptions {
@@ -3095,6 +3278,7 @@ const entryHistoryLeftId = ref('');
 const entryHistoryRightId = ref('');
 const worldbookHistoryLeftId = ref('');
 const worldbookHistoryRightId = ref('');
+const worldbookHistoryActiveRowKey = ref('');
 const floatingZCounter = ref(10005);
 const floatingPanels = reactive<Record<FloatingPanelKey, FloatingPanelState>>({
   find: { visible: false, x: 420, y: 170, z: 10006, width: 500 },
@@ -3572,6 +3756,90 @@ const canRestoreWorldbookFromLeft = computed(() => {
   return Boolean(selectedWorldbookHistoryLeft.value && !selectedWorldbookHistoryLeft.value.isCurrent);
 });
 
+const entryHistoryFieldDiffRows = computed<CrossCopyFieldDiffRow[]>(() => {
+  return buildEntryFieldDiffRows(
+    selectedEntryHistoryLeft.value?.entry ?? null,
+    selectedEntryHistoryRight.value?.entry ?? null,
+    { left_fallback: '（不存在）', right_fallback: '（不存在）' },
+  );
+});
+
+const entryHistoryContentDiff = computed<CrossCopyTextDiffResult>(() => {
+  const left = selectedEntryHistoryLeft.value?.entry?.content ?? '';
+  const right = selectedEntryHistoryRight.value?.entry?.content ?? '';
+  return buildCrossCopyTextDiff(toStringSafe(left), toStringSafe(right));
+});
+
+const entryHistoryFieldDiffSummary = computed(() => {
+  const rows = entryHistoryFieldDiffRows.value;
+  if (!rows.length) {
+    return '无可对比字段';
+  }
+  const changed = rows.filter(row => row.changed).length;
+  return `不同字段 ${changed} / ${rows.length}`;
+});
+
+const entryHistoryContentDiffSummary = computed(() => {
+  const result = entryHistoryContentDiff.value;
+  return `新增行 ${result.added} / 修改行 ${result.changed} / 删除行 ${result.removed}`;
+});
+
+const worldbookHistoryCompareRows = computed<WorldbookHistoryCompareRow[]>(() => {
+  return buildWorldbookHistoryCompareRows(selectedWorldbookHistoryLeft.value, selectedWorldbookHistoryRight.value);
+});
+
+const worldbookHistoryCompareSummary = computed(() => {
+  const rows = worldbookHistoryCompareRows.value;
+  let added = 0;
+  let removed = 0;
+  let changed = 0;
+  for (const row of rows) {
+    if (row.status === 'added') {
+      added += 1;
+    } else if (row.status === 'removed') {
+      removed += 1;
+    } else {
+      changed += 1;
+    }
+  }
+  return `新增 ${added} / 修改 ${changed} / 删除 ${removed}`;
+});
+
+const worldbookHistoryActiveRow = computed(() => {
+  if (!worldbookHistoryActiveRowKey.value) {
+    return null;
+  }
+  return worldbookHistoryCompareRows.value.find(row => row.key === worldbookHistoryActiveRowKey.value) ?? null;
+});
+
+const worldbookHistoryFieldDiffRows = computed<CrossCopyFieldDiffRow[]>(() => {
+  return buildEntryFieldDiffRows(
+    worldbookHistoryActiveRow.value?.left_entry ?? null,
+    worldbookHistoryActiveRow.value?.right_entry ?? null,
+    { left_fallback: '（不存在）', right_fallback: '（不存在）' },
+  );
+});
+
+const worldbookHistoryFieldDiffSummary = computed(() => {
+  const rows = worldbookHistoryFieldDiffRows.value;
+  if (!rows.length) {
+    return '无可对比字段';
+  }
+  const changed = rows.filter(row => row.changed).length;
+  return `不同字段 ${changed} / ${rows.length}`;
+});
+
+const worldbookHistoryContentDiff = computed<CrossCopyTextDiffResult>(() => {
+  const left = worldbookHistoryActiveRow.value?.left_entry?.content ?? '';
+  const right = worldbookHistoryActiveRow.value?.right_entry?.content ?? '';
+  return buildCrossCopyTextDiff(toStringSafe(left), toStringSafe(right));
+});
+
+const worldbookHistoryContentDiffSummary = computed(() => {
+  const result = worldbookHistoryContentDiff.value;
+  return `新增行 ${result.added} / 修改行 ${result.changed} / 删除行 ${result.removed}`;
+});
+
 const batchExcludeTokensPreview = computed(() => parseBatchExcludeTokens(batchExcludeText.value));
 
 const activeFindHit = computed(() => {
@@ -3594,22 +3862,8 @@ const findHitSummaryText = computed(() => {
   return `匹配 ${findHitIndex.value + 1} / ${findHits.value.length}`;
 });
 
-const entryHistoryDiff = computed(() => {
-  return buildDiffHtml(
-    serializeEntryVersionForDiff(selectedEntryHistoryLeft.value),
-    serializeEntryVersionForDiff(selectedEntryHistoryRight.value),
-  );
-});
-
 const entryHistorySummary = computed(() => {
   return getEntryVersionDiffSummary(selectedEntryHistoryLeft.value, selectedEntryHistoryRight.value);
-});
-
-const worldbookHistoryDiff = computed(() => {
-  return buildDiffHtml(
-    serializeWorldbookVersionForDiff(selectedWorldbookHistoryLeft.value),
-    serializeWorldbookVersionForDiff(selectedWorldbookHistoryRight.value),
-  );
 });
 
 const selectedKeysText = computed(() => {
@@ -3952,6 +4206,7 @@ watch(
     if (!views.length) {
       worldbookHistoryLeftId.value = '';
       worldbookHistoryRightId.value = '';
+      worldbookHistoryActiveRowKey.value = '';
       return;
     }
 
@@ -3968,6 +4223,20 @@ watch(
       if (fallback) {
         worldbookHistoryLeftId.value = fallback.id;
       }
+    }
+  },
+  { immediate: true },
+);
+
+watch(
+  worldbookHistoryCompareRows,
+  rows => {
+    if (!rows.length) {
+      worldbookHistoryActiveRowKey.value = '';
+      return;
+    }
+    if (!rows.some(row => row.key === worldbookHistoryActiveRowKey.value)) {
+      worldbookHistoryActiveRowKey.value = rows[0].key;
     }
   },
   { immediate: true },
@@ -5635,29 +5904,7 @@ function getCrossCopyRowDiffSummary(row: CrossCopyRow): string {
   if (!target) {
     return '目标无直接命中';
   }
-  const diff: string[] = [];
-  if (row.source_name_key !== normalizeCrossCopyNameKey(target.name)) {
-    diff.push('名称不同');
-  }
-  if (row.source_content_key !== normalizeCrossCopyContentKey(target.content)) {
-    diff.push('内容不同');
-  }
-  if (row.source_entry.strategy.type !== target.strategy.type) {
-    diff.push('策略不同');
-  }
-  if (row.source_entry.position.type !== target.position.type || row.source_entry.position.order !== target.position.order) {
-    diff.push('插入设置不同');
-  }
-  if (
-    row.source_entry.recursion.prevent_incoming !== target.recursion.prevent_incoming ||
-    row.source_entry.recursion.prevent_outgoing !== target.recursion.prevent_outgoing
-  ) {
-    diff.push('递归设置不同');
-  }
-  if (!diff.length) {
-    return '主要字段一致';
-  }
-  return diff.join(' / ');
+  return getEntryPairDiffSummary(row.source_entry, target, { left: '来源', right: '目标' });
 }
 
 function formatCrossCopyDiffScalar(value: unknown): string {
@@ -5690,11 +5937,16 @@ function formatCrossCopyDiffExtra(extra: WorldbookEntry['extra']): string {
   return keys.length > 6 ? `${keys.length} 项: ${preview} ...` : `${keys.length} 项: ${preview}`;
 }
 
-function buildCrossCopyFieldDiffRows(source: WorldbookEntry | null, target: WorldbookEntry | null): CrossCopyFieldDiffRow[] {
-  if (!source) {
+function buildEntryFieldDiffRows(
+  leftEntry: WorldbookEntry | null,
+  rightEntry: WorldbookEntry | null,
+  options: EntryFieldDiffOptions = {},
+): CrossCopyFieldDiffRow[] {
+  if (!leftEntry && !rightEntry) {
     return [];
   }
-  const rightFallback = '（无命中）';
+  const leftFallback = options.left_fallback ?? '（无命中）';
+  const rightFallback = options.right_fallback ?? '（无命中）';
   const rows: CrossCopyFieldDiffRow[] = [];
   const pushRow = (key: string, label: string, left: string, right: string): void => {
     rows.push({
@@ -5706,60 +5958,75 @@ function buildCrossCopyFieldDiffRows(source: WorldbookEntry | null, target: Worl
     });
   };
 
-  pushRow('name', '名称', source.name || '(空)', target ? (target.name || '(空)') : rightFallback);
-  pushRow('enabled', '启用', source.enabled ? '启用' : '禁用', target ? (target.enabled ? '启用' : '禁用') : rightFallback);
-  pushRow('strategy_type', '触发模式', getStrategyTypeLabel(source.strategy.type), target ? getStrategyTypeLabel(target.strategy.type) : rightFallback);
-  pushRow('probability', '概率', `${source.probability}%`, target ? `${target.probability}%` : rightFallback);
-  pushRow('keys', '主要关键词', formatCrossCopyDiffKeywords(source.strategy.keys), target ? formatCrossCopyDiffKeywords(target.strategy.keys) : rightFallback);
+  pushRow('name', '名称', leftEntry ? (leftEntry.name || '(空)') : leftFallback, rightEntry ? (rightEntry.name || '(空)') : rightFallback);
+  pushRow('enabled', '启用', leftEntry ? (leftEntry.enabled ? '启用' : '禁用') : leftFallback, rightEntry ? (rightEntry.enabled ? '启用' : '禁用') : rightFallback);
+  pushRow(
+    'strategy_type',
+    '触发模式',
+    leftEntry ? getStrategyTypeLabel(leftEntry.strategy.type) : leftFallback,
+    rightEntry ? getStrategyTypeLabel(rightEntry.strategy.type) : rightFallback,
+  );
+  pushRow('probability', '概率', leftEntry ? `${leftEntry.probability}%` : leftFallback, rightEntry ? `${rightEntry.probability}%` : rightFallback);
+  pushRow('keys', '主要关键词', leftEntry ? formatCrossCopyDiffKeywords(leftEntry.strategy.keys) : leftFallback, rightEntry ? formatCrossCopyDiffKeywords(rightEntry.strategy.keys) : rightFallback);
   pushRow(
     'secondary_keys',
     '次要关键词',
-    formatCrossCopyDiffKeywords(source.strategy.keys_secondary.keys),
-    target ? formatCrossCopyDiffKeywords(target.strategy.keys_secondary.keys) : rightFallback,
+    leftEntry ? formatCrossCopyDiffKeywords(leftEntry.strategy.keys_secondary.keys) : leftFallback,
+    rightEntry ? formatCrossCopyDiffKeywords(rightEntry.strategy.keys_secondary.keys) : rightFallback,
   );
   pushRow(
     'secondary_logic',
     '次要逻辑',
-    getSecondaryLogicLabel(source.strategy.keys_secondary.logic),
-    target ? getSecondaryLogicLabel(target.strategy.keys_secondary.logic) : rightFallback,
+    leftEntry ? getSecondaryLogicLabel(leftEntry.strategy.keys_secondary.logic) : leftFallback,
+    rightEntry ? getSecondaryLogicLabel(rightEntry.strategy.keys_secondary.logic) : rightFallback,
   );
-  pushRow('position_type', '插入位置', getPositionTypeLabel(source.position.type), target ? getPositionTypeLabel(target.position.type) : rightFallback);
-  pushRow('position_order', '插入权重', String(source.position.order), target ? String(target.position.order) : rightFallback);
+  pushRow('position_type', '插入位置', leftEntry ? getPositionTypeLabel(leftEntry.position.type) : leftFallback, rightEntry ? getPositionTypeLabel(rightEntry.position.type) : rightFallback);
+  pushRow('position_order', '插入权重', leftEntry ? String(leftEntry.position.order) : leftFallback, rightEntry ? String(rightEntry.position.order) : rightFallback);
   pushRow(
     'at_depth_role',
     'at_depth role',
-    source.position.type === 'at_depth' ? source.position.role : '-',
-    target ? (target.position.type === 'at_depth' ? target.position.role : '-') : rightFallback,
+    leftEntry ? (leftEntry.position.type === 'at_depth' ? leftEntry.position.role : '-') : leftFallback,
+    rightEntry ? (rightEntry.position.type === 'at_depth' ? rightEntry.position.role : '-') : rightFallback,
   );
   pushRow(
     'at_depth_depth',
     'at_depth depth',
-    source.position.type === 'at_depth' ? String(source.position.depth) : '-',
-    target ? (target.position.type === 'at_depth' ? String(target.position.depth) : '-') : rightFallback,
+    leftEntry ? (leftEntry.position.type === 'at_depth' ? String(leftEntry.position.depth) : '-') : leftFallback,
+    rightEntry ? (rightEntry.position.type === 'at_depth' ? String(rightEntry.position.depth) : '-') : rightFallback,
   );
   pushRow(
     'recursion_in',
     '不可递归命中',
-    source.recursion.prevent_incoming ? '是' : '否',
-    target ? (target.recursion.prevent_incoming ? '是' : '否') : rightFallback,
+    leftEntry ? (leftEntry.recursion.prevent_incoming ? '是' : '否') : leftFallback,
+    rightEntry ? (rightEntry.recursion.prevent_incoming ? '是' : '否') : rightFallback,
   );
   pushRow(
     'recursion_out',
     '阻止后续递归',
-    source.recursion.prevent_outgoing ? '是' : '否',
-    target ? (target.recursion.prevent_outgoing ? '是' : '否') : rightFallback,
+    leftEntry ? (leftEntry.recursion.prevent_outgoing ? '是' : '否') : leftFallback,
+    rightEntry ? (rightEntry.recursion.prevent_outgoing ? '是' : '否') : rightFallback,
   );
-  pushRow('effect_sticky', 'sticky', formatCrossCopyDiffScalar(source.effect.sticky), target ? formatCrossCopyDiffScalar(target.effect.sticky) : rightFallback);
-  pushRow('effect_cooldown', 'cooldown', formatCrossCopyDiffScalar(source.effect.cooldown), target ? formatCrossCopyDiffScalar(target.effect.cooldown) : rightFallback);
-  pushRow('effect_delay', 'delay', formatCrossCopyDiffScalar(source.effect.delay), target ? formatCrossCopyDiffScalar(target.effect.delay) : rightFallback);
+  pushRow(
+    'recursion_delay_until',
+    '递归 delay_until',
+    leftEntry ? formatCrossCopyDiffScalar(leftEntry.recursion.delay_until) : leftFallback,
+    rightEntry ? formatCrossCopyDiffScalar(rightEntry.recursion.delay_until) : rightFallback,
+  );
+  pushRow('effect_sticky', 'sticky', leftEntry ? formatCrossCopyDiffScalar(leftEntry.effect.sticky) : leftFallback, rightEntry ? formatCrossCopyDiffScalar(rightEntry.effect.sticky) : rightFallback);
+  pushRow('effect_cooldown', 'cooldown', leftEntry ? formatCrossCopyDiffScalar(leftEntry.effect.cooldown) : leftFallback, rightEntry ? formatCrossCopyDiffScalar(rightEntry.effect.cooldown) : rightFallback);
+  pushRow('effect_delay', 'delay', leftEntry ? formatCrossCopyDiffScalar(leftEntry.effect.delay) : leftFallback, rightEntry ? formatCrossCopyDiffScalar(rightEntry.effect.delay) : rightFallback);
   pushRow(
     'effect_delay_until',
     'delay_until',
-    formatCrossCopyDiffScalar(source.effect.delay_until),
-    target ? formatCrossCopyDiffScalar(target.effect.delay_until) : rightFallback,
+    leftEntry ? formatCrossCopyDiffScalar(leftEntry.effect.delay_until) : leftFallback,
+    rightEntry ? formatCrossCopyDiffScalar(rightEntry.effect.delay_until) : rightFallback,
   );
-  pushRow('extra', 'extra 字段', formatCrossCopyDiffExtra(source.extra), target ? formatCrossCopyDiffExtra(target.extra) : rightFallback);
+  pushRow('extra', 'extra 字段', leftEntry ? formatCrossCopyDiffExtra(leftEntry.extra) : leftFallback, rightEntry ? formatCrossCopyDiffExtra(rightEntry.extra) : rightFallback);
   return rows;
+}
+
+function buildCrossCopyFieldDiffRows(source: WorldbookEntry | null, target: WorldbookEntry | null): CrossCopyFieldDiffRow[] {
+  return buildEntryFieldDiffRows(source, target, { left_fallback: '（无命中）', right_fallback: '（无命中）' });
 }
 
 function buildCrossCopyTextDiff(leftText: string, rightText: string): CrossCopyTextDiffResult {
@@ -6316,74 +6583,107 @@ function getEntryVersionPreview(view: EntryVersionView | null): string {
   return content.slice(0, 160);
 }
 
-function getWorldbookVersionDiffSummary(
-  left: WorldbookVersionView | null,
-  right: WorldbookVersionView | null,
+function getWorldbookHistoryVersionPreview(view: WorldbookVersionView | null): string {
+  if (!view) {
+    return '';
+  }
+  if (!view.entries.length) {
+    return '空世界书';
+  }
+  const enabledCount = view.entries.filter(entry => entry.enabled).length;
+  const sampleNames = view.entries
+    .slice(0, 3)
+    .map(entry => entry.name || `#${entry.uid}`)
+    .join(' / ');
+  const suffix = view.entries.length > 3 ? ' ...' : '';
+  return `启用 ${enabledCount}/${view.entries.length} · ${sampleNames}${suffix}`;
+}
+
+function getWorldbookHistoryStatusLabel(status: WorldbookHistoryCompareStatus): string {
+  if (status === 'added') {
+    return '新增';
+  }
+  if (status === 'removed') {
+    return '删除';
+  }
+  return '修改';
+}
+
+function getWorldbookHistoryStatusBadgeClass(status: WorldbookHistoryCompareStatus): string {
+  if (status === 'added') {
+    return 'new';
+  }
+  if (status === 'removed') {
+    return 'invalid';
+  }
+  return 'changed';
+}
+
+function getEntryPairDiffSummary(
+  left: WorldbookEntry | null,
+  right: WorldbookEntry | null,
+  labels: { left: string; right: string } = { left: 'Left', right: 'Right' },
 ): string {
-  if (!left || !right) {
-    return '请选择左右版本进行对比';
+  if (!left && !right) {
+    return '无可比较条目';
   }
-  const leftMap = new Map<number, WorldbookEntry>();
-  const rightMap = new Map<number, WorldbookEntry>();
-  left.entries.forEach(entry => leftMap.set(entry.uid, entry));
-  right.entries.forEach(entry => rightMap.set(entry.uid, entry));
-
-  let added = 0;
-  let removed = 0;
-  let changed = 0;
-
-  for (const [uid, rightEntry] of rightMap) {
-    const leftEntry = leftMap.get(uid);
-    if (!leftEntry) {
-      added += 1;
-      continue;
-    }
-    if (JSON.stringify(leftEntry) !== JSON.stringify(rightEntry)) {
-      changed += 1;
-    }
+  if (!left) {
+    return `仅${labels.right}存在`;
   }
-  for (const uid of leftMap.keys()) {
-    if (!rightMap.has(uid)) {
-      removed += 1;
-    }
+  if (!right) {
+    return `仅${labels.left}存在`;
   }
 
-  return `新增 ${added} / 修改 ${changed} / 删除 ${removed}`;
-}
-
-function getEntryVersionDiffSummary(left: EntryVersionView | null, right: EntryVersionView | null): string {
-  if (!left || !right) {
-    return '请在左侧选择两个版本进行比对';
+  const diff: string[] = [];
+  if (normalizeCrossCopyNameKey(left.name) !== normalizeCrossCopyNameKey(right.name)) {
+    diff.push('名称不同');
   }
-  const leftText = serializeEntryVersionForDiff(left);
-  const rightText = serializeEntryVersionForDiff(right);
-  const parts = diffLines(leftText, rightText) as Array<{ value: string; added?: boolean; removed?: boolean }>;
-  let addLines = 0;
-  let delLines = 0;
-  for (const part of parts) {
-    const lines = part.value.split('\n');
-    if (lines.length && lines[lines.length - 1] === '') {
-      lines.pop();
-    }
-    if (part.added) {
-      addLines += lines.length;
-    } else if (part.removed) {
-      delLines += lines.length;
-    }
+  if (normalizeCrossCopyContentKey(left.content) !== normalizeCrossCopyContentKey(right.content)) {
+    diff.push('内容不同');
   }
-  const changed = Math.min(addLines, delLines);
-  const added = Math.max(0, addLines - changed);
-  const removed = Math.max(0, delLines - changed);
-  return `新增行 ${added} / 修改行 ${changed} / 删除行 ${removed}`;
-}
+  if (left.enabled !== right.enabled) {
+    diff.push('启用状态不同');
+  }
+  if (left.strategy.type !== right.strategy.type) {
+    diff.push('策略不同');
+  }
+  if (left.probability !== right.probability) {
+    diff.push('概率不同');
+  }
+  if (
+    left.position.type !== right.position.type ||
+    left.position.order !== right.position.order ||
+    left.position.role !== right.position.role ||
+    left.position.depth !== right.position.depth
+  ) {
+    diff.push('插入设置不同');
+  }
+  if (
+    left.recursion.prevent_incoming !== right.recursion.prevent_incoming ||
+    left.recursion.prevent_outgoing !== right.recursion.prevent_outgoing ||
+    left.recursion.delay_until !== right.recursion.delay_until
+  ) {
+    diff.push('递归设置不同');
+  }
+  if (
+    left.effect.sticky !== right.effect.sticky ||
+    left.effect.cooldown !== right.effect.cooldown ||
+    left.effect.delay !== right.effect.delay ||
+    left.effect.delay_until !== right.effect.delay_until
+  ) {
+    diff.push('效果设置不同');
+  }
+  if (left.strategy.keys.length !== right.strategy.keys.length) {
+    diff.push('主要关键词数量不同');
+  }
+  if (left.strategy.keys_secondary.keys.length !== right.strategy.keys_secondary.keys.length) {
+    diff.push('次要关键词数量不同');
+  }
 
-function escapeHtml(text: string): string {
-  return text
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
+  if (!diff.length) {
+    return '主要字段一致';
+  }
+  return diff.join(' / ');
 }
 
 function serializeWorldbookEntryForDiff(entry: WorldbookEntry | null): string {
@@ -6405,80 +6705,103 @@ function serializeWorldbookEntryForDiff(entry: WorldbookEntry | null): string {
   return JSON.stringify(payload, null, 2);
 }
 
-function serializeEntryVersionForDiff(view: EntryVersionView | null): string {
-  return serializeWorldbookEntryForDiff(view?.entry ?? null);
+function areWorldbookEntriesEqual(left: WorldbookEntry | null, right: WorldbookEntry | null): boolean {
+  return serializeWorldbookEntryForDiff(left) === serializeWorldbookEntryForDiff(right);
 }
 
-function serializeWorldbookVersionForDiff(view: WorldbookVersionView | null): string {
-  if (!view) {
-    return '';
+function buildWorldbookHistoryCompareRows(
+  left: WorldbookVersionView | null,
+  right: WorldbookVersionView | null,
+): WorldbookHistoryCompareRow[] {
+  if (!left || !right) {
+    return [];
   }
-  const entries = view.entries
-    .map(entry => ({
-      uid: entry.uid,
-      name: entry.name,
-      enabled: entry.enabled,
-      type: entry.strategy.type,
-      keys: entry.strategy.keys.map(stringifyKeyword),
-      position: entry.position,
-      probability: entry.probability,
-      content: entry.content,
-    }))
-    .sort((left, right) => left.uid - right.uid);
-  return JSON.stringify({ entries }, null, 2);
-}
 
-function buildDiffHtml(leftText: string, rightText: string): { leftHtml: string; rightHtml: string } {
-  const leftRendered: string[] = [];
-  const rightRendered: string[] = [];
-  let leftLineNo = 1;
-  let rightLineNo = 1;
-  const parts = diffLines(leftText, rightText);
+  const rows: WorldbookHistoryCompareRow[] = [];
+  const leftMap = new Map<number, WorldbookEntry>();
+  const rightMap = new Map<number, WorldbookEntry>();
+  for (const entry of left.entries) {
+    leftMap.set(entry.uid, entry);
+  }
+  for (const entry of right.entries) {
+    rightMap.set(entry.uid, entry);
+  }
 
-  for (const part of parts as Array<{ value: string; added?: boolean; removed?: boolean }>) {
-    const lines = part.value.split('\n');
-    if (lines.length && lines[lines.length - 1] === '') {
-      lines.pop();
-    }
-    if (!lines.length) {
+  for (const rightEntry of right.entries) {
+    const leftEntry = leftMap.get(rightEntry.uid) ?? null;
+    if (!leftEntry) {
+      rows.push({
+        key: `added:${rightEntry.uid}`,
+        uid: rightEntry.uid,
+        status: 'added',
+        title: rightEntry.name || `条目 ${rightEntry.uid}`,
+        note: '仅在 Right 版本存在',
+        left_entry: null,
+        right_entry: rightEntry,
+      });
       continue;
     }
-
-    if (part.added) {
-      for (const line of lines) {
-        leftRendered.push(`<div class="diff-row empty"><span class="line-no"></span><span class="line-text">&nbsp;</span></div>`);
-        rightRendered.push(
-          `<div class="diff-row add"><span class="line-no">${rightLineNo}</span><span class="line-text">${escapeHtml(line) || '&nbsp;'}</span></div>`,
-        );
-        rightLineNo += 1;
-      }
-      continue;
-    }
-
-    if (part.removed) {
-      for (const line of lines) {
-        leftRendered.push(
-          `<div class="diff-row del"><span class="line-no">${leftLineNo}</span><span class="line-text">${escapeHtml(line) || '&nbsp;'}</span></div>`,
-        );
-        rightRendered.push(`<div class="diff-row empty"><span class="line-no"></span><span class="line-text">&nbsp;</span></div>`);
-        leftLineNo += 1;
-      }
-      continue;
-    }
-
-    for (const line of lines) {
-      const safe = escapeHtml(line) || '&nbsp;';
-      leftRendered.push(`<div class="diff-row"><span class="line-no">${leftLineNo}</span><span class="line-text">${safe}</span></div>`);
-      rightRendered.push(`<div class="diff-row"><span class="line-no">${rightLineNo}</span><span class="line-text">${safe}</span></div>`);
-      leftLineNo += 1;
-      rightLineNo += 1;
+    if (!areWorldbookEntriesEqual(leftEntry, rightEntry)) {
+      rows.push({
+        key: `changed:${rightEntry.uid}`,
+        uid: rightEntry.uid,
+        status: 'changed',
+        title: rightEntry.name || leftEntry.name || `条目 ${rightEntry.uid}`,
+        note: getEntryPairDiffSummary(leftEntry, rightEntry),
+        left_entry: leftEntry,
+        right_entry: rightEntry,
+      });
     }
   }
 
-  return {
-    leftHtml: leftRendered.join(''),
-    rightHtml: rightRendered.join(''),
-  };
+  for (const leftEntry of left.entries) {
+    if (rightMap.has(leftEntry.uid)) {
+      continue;
+    }
+    rows.push({
+      key: `removed:${leftEntry.uid}`,
+      uid: leftEntry.uid,
+      status: 'removed',
+      title: leftEntry.name || `条目 ${leftEntry.uid}`,
+      note: '仅在 Left 版本存在',
+      left_entry: leftEntry,
+      right_entry: null,
+    });
+  }
+
+  return rows;
+}
+
+function getWorldbookVersionDiffSummary(
+  left: WorldbookVersionView | null,
+  right: WorldbookVersionView | null,
+): string {
+  if (!left || !right) {
+    return '请选择左右版本进行对比';
+  }
+  let added = 0;
+  let removed = 0;
+  let changed = 0;
+  for (const row of buildWorldbookHistoryCompareRows(left, right)) {
+    if (row.status === 'added') {
+      added += 1;
+    } else if (row.status === 'removed') {
+      removed += 1;
+    } else {
+      changed += 1;
+    }
+  }
+  return `新增 ${added} / 修改 ${changed} / 删除 ${removed}`;
+}
+
+function getEntryVersionDiffSummary(left: EntryVersionView | null, right: EntryVersionView | null): string {
+  if (!left || !right) {
+    return '请在左侧选择两个版本进行比对';
+  }
+  const fieldRows = buildEntryFieldDiffRows(left.entry, right.entry, { left_fallback: '（不存在）', right_fallback: '（不存在）' });
+  const fieldChanged = fieldRows.filter(row => row.changed).length;
+  const content = buildCrossCopyTextDiff(toStringSafe(left.entry.content), toStringSafe(right.entry.content));
+  return `字段 ${fieldChanged}/${fieldRows.length} 不同 · 新增行 ${content.added} / 修改行 ${content.changed} / 删除行 ${content.removed}`;
 }
 
 function parseBatchExcludeTokens(value: string): string[] {
@@ -7206,6 +7529,7 @@ function openWorldbookHistoryModal(): void {
   const nonCurrent = worldbookVersionViews.value.find(item => !item.isCurrent) ?? null;
   worldbookHistoryRightId.value = '__current__';
   worldbookHistoryLeftId.value = nonCurrent?.id ?? '__current__';
+  worldbookHistoryActiveRowKey.value = worldbookHistoryCompareRows.value[0]?.key ?? '';
   showWorldbookHistoryModal.value = true;
 }
 
@@ -12302,23 +12626,23 @@ watch(hasUnsavedChanges, (val) => {
   color: var(--wb-text-muted);
 }
 
-.wb-history-diff-grid {
+.wb-history-visual-main {
   min-height: 0;
   flex: 1;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-}
-
-.wb-history-diff-grid > div {
-  min-height: 0;
-  min-width: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  gap: 10px;
+  overflow: auto;
+  padding: 10px;
 }
 
-.wb-history-diff-grid > div + div {
-  border-left: 1px solid var(--wb-border-main);
+.wb-history-version-preview {
+  margin-top: 0;
+}
+
+.wb-worldbook-compare-list-section {
+  min-height: 0;
+  flex: 0 0 auto;
 }
 
 .wb-history-diff-title {
@@ -12328,48 +12652,60 @@ watch(hasUnsavedChanges, (val) => {
   color: var(--wb-primary-light);
 }
 
-.wb-history-diff-body {
+.wb-worldbook-compare-list {
   min-height: 0;
-  flex: 1;
+  max-height: 240px;
   overflow: auto;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-  font-size: 11px;
-  background: var(--wb-input-bg-focus);
-  word-break: break-all;
-  overflow-wrap: break-word;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
 }
 
-.diff-row {
-  display: grid;
-  grid-template-columns: 54px 1fr;
-  align-items: start;
-  border-bottom: 1px solid var(--wb-border-subtle);
-}
-
-.line-no {
-  color: var(--wb-text-muted);
-  padding: 2px 8px;
-  border-right: 1px solid var(--wb-border-subtle);
-  user-select: none;
-}
-
-.line-text {
-  white-space: pre-wrap;
-  word-break: break-word;
-  padding: 2px 8px;
+.wb-worldbook-compare-row {
+  width: 100%;
+  border: 1px solid var(--wb-border-subtle);
+  border-radius: 8px;
+  background: var(--wb-input-bg);
   color: var(--wb-text-main);
+  padding: 8px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
 }
 
-.diff-row.add {
-  background: rgba(34, 197, 94, 0.18);
+.wb-worldbook-compare-row.active {
+  border-color: var(--wb-primary);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--wb-primary) 32%, transparent);
 }
 
-.diff-row.del {
-  background: rgba(239, 68, 68, 0.18);
+.wb-worldbook-compare-row-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
-.diff-row.empty {
-  background: rgba(100, 116, 139, 0.08);
+.wb-worldbook-compare-row-head strong {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wb-worldbook-compare-row-note {
+  font-size: 12px;
+  color: var(--wb-text-muted);
+}
+
+.wb-worldbook-detail-empty {
+  border: 1px dashed var(--wb-border-subtle);
+  border-radius: 10px;
+  padding: 10px;
+  background: var(--wb-input-bg);
 }
 
 @media (max-width: 1380px) {
@@ -12439,31 +12775,34 @@ watch(hasUnsavedChanges, (val) => {
     min-height: 0;
   }
 
-  .wb-history-diff-grid {
+  .wb-history-visual-main {
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .wb-history-version-preview {
     grid-template-columns: 1fr;
-    overflow: visible;
   }
 
-  .wb-history-diff-grid > div {
-    max-height: 30vh;
-    overflow: auto;
+  .wb-worldbook-compare-list {
+    max-height: 180px;
   }
 
-  .wb-history-diff-grid > div + div {
+  .wb-history-visual-main .cross-copy-content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .wb-history-visual-main .cross-copy-content-col + .cross-copy-content-col {
     border-left: none;
     border-top: 1px solid var(--wb-border-main);
   }
 
-  .diff-row {
+  .wb-history-visual-main .cross-copy-content-line {
     grid-template-columns: 1fr;
   }
 
-  .line-no {
+  .wb-history-visual-main .cross-copy-content-line .line-no {
     display: none;
-  }
-
-  .wb-history-diff-body {
-    font-size: 10px;
   }
 
   .wb-history-diff-head {
@@ -12512,11 +12851,11 @@ watch(hasUnsavedChanges, (val) => {
     grid-template-columns: 1fr;
   }
 
-  .wb-history-diff-grid {
+  .wb-history-visual-main .cross-copy-content-grid {
     grid-template-columns: 1fr;
   }
 
-  .wb-history-diff-grid > div + div {
+  .wb-history-visual-main .cross-copy-content-col + .cross-copy-content-col {
     border-left: none;
     border-top: 1px solid var(--wb-border-main);
   }
