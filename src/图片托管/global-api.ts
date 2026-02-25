@@ -157,7 +157,7 @@ function bindRegistryUpdatedListener(onTrigger: () => void): () => void {
 /**
  * 启动 DOM 观察器, 自动解析新出现的 img[data-img] 元素
  */
-export function startDomObserver(): void {
+export function startDomObserver(): () => void {
     const scheduleResolve = createResolveScheduler();
 
     // 首次扫描
@@ -178,9 +178,12 @@ export function startDomObserver(): void {
         attributeFilter: ['data-img'],
     });
 
-    // 卸载时清理监听, 避免重复注册
-    $(window).on('pagehide', () => {
+    let stopped = false;
+    // 返回清理函数, 由入口统一管理生命周期
+    return () => {
+        if (stopped) return;
+        stopped = true;
         observer.disconnect();
         unbindRegistryListener();
-    });
+    };
 }
