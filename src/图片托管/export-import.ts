@@ -6,8 +6,7 @@
  */
 import JSZip from 'jszip';
 import { uploadFile, generateStorageName } from './api';
-import { useImageStore, type ImageRegistry } from './image-store';
-import { useSettingsStore } from './settings';
+import { ImageRegistry, useImageStore, type ImageRegistry as ImageRegistryType } from './image-store';
 
 const MANIFEST_VERSION = 1;
 
@@ -117,8 +116,15 @@ export async function importImages(): Promise<void> {
 
                 const manifestText = await manifestFile.async('string');
                 const manifestRaw = JSON.parse(manifestText);
-                // 兼容没有 version 的旧版 manifest
-                const manifest = (manifestRaw.images ? manifestRaw : { images: {} }) as ImageRegistry;
+                // 兼容没有 version 的旧版 manifest, 并对结构进行运行时校验
+                const parsedManifest = ImageRegistry.safeParse(manifestRaw.images ? manifestRaw : { images: {} });
+                if (!parsedManifest.success) {
+                    console.error('[图片托管] manifest 校验失败:', parsedManifest.error);
+                    toastr.error('manifest 格式错误，无法导入');
+                    resolve();
+                    return;
+                }
+                const manifest = parsedManifest.data;
 
                 const imagesFolder = zip.folder('images');
                 if (!imagesFolder) {
@@ -128,54 +134,72 @@ export async function importImages(): Promise<void> {
                 }
 
                 const imageStore = useImageStore();
-                const settingsStore = useSettingsStore();
-                const currentMode = settingsStore.settings.storage_mode;
-                let successCount = 0;
+                const existingNames = new Set(Object.keys(imageStore.registry.images));
+                const importedImages: ImageRegistryType['images'] = {};
+                let importedLocalCount = 0;
+                let retainedRemoteCount = 0;
+                let skippedCount = 0;
                 const entries = Object.entries(manifest.images);
 
-                for (const [origStorageName, meta] of entries) {
+                for (const [origStorageName, originMeta] of entries) {
                     const imageFile = imagesFolder.file(origStorageName);
-                    if (!imageFile) {
-                        console.warn(`压缩包中缺少图片文件: ${origStorageName}`);
-                        continue;
-                    }
+                    const meta = klona(originMeta);
+
+                    // 生成新的 storageName 避免覆盖已有条目
+                    const ext = origStorageName.split('.').pop() ?? 'png';
+                    const charName = substitudeMacros('{{char}}') || 'unknown';
+                    const hasConflict = existingNames.has(origStorageName)
+                        || Object.prototype.hasOwnProperty.call(importedImages, origStorageName);
+                    const newStorageName = hasConflict
+                        ? generateStorageName(charName, ext)
+                        : origStorageName;
+                    existingNames.add(newStorageName);
 
                     try {
-                        const base64 = await imageFile.async('base64');
-
-                        // 生成新的 storageName 避免覆盖已有条目
-                        const ext = origStorageName.split('.').pop() ?? 'png';
-                        const charName = substitudeMacros('{{char}}') || 'unknown';
-                        const newStorageName = imageStore.registry.images[origStorageName]
-                            ? generateStorageName(charName, ext)  // 已有同名, 生成新名
-                            : origStorageName;  // 无冲突, 保留原名
-
-                        if (currentMode === 'local') {
+                        if (imageFile) {
+                            // 混合策略: ZIP 中有二进制文件时, 统一按 local 导入
+                            const base64 = await imageFile.async('base64');
                             const serverPath = await uploadFile(newStorageName, base64);
                             meta.server_path = serverPath;
                             meta.base64_data = '';
+                            meta.remote_url = '';
                             meta.storage = 'local';
+                            importedImages[newStorageName] = meta;
+                            importedLocalCount++;
                         } else {
-                            meta.base64_data = base64;
+                            // ZIP 中没有文件时: remote 且有 URL 才保留为 remote
+                            if (meta.storage !== 'remote' || !meta.remote_url) {
+                                console.warn(`压缩包中缺少图片文件且无可用 remote_url: ${origStorageName}`);
+                                skippedCount++;
+                                continue;
+                            }
                             meta.server_path = '';
-                            meta.storage = 'embedded';
+                            meta.base64_data = '';
+                            meta.storage = 'remote';
+                            importedImages[newStorageName] = meta;
+                            retainedRemoteCount++;
                         }
-
-                        // 用新 key 存到 manifest
-                        if (newStorageName !== origStorageName) {
-                            delete manifest.images[origStorageName];
-                            manifest.images[newStorageName] = meta;
-                        }
-                        successCount++;
                     } catch (err) {
                         console.warn(`导入图片 '${meta.display_name}' 失败:`, err);
+                        skippedCount++;
                     }
                 }
 
                 // 合并注册表
-                imageStore.mergeRegistry(manifest);
+                const importedRegistry = ImageRegistry.parse({ images: importedImages });
+                imageStore.mergeRegistry(importedRegistry);
 
-                toastr.success(`成功导入 ${successCount}/${entries.length} 张图片`);
+                const successCount = importedLocalCount + retainedRemoteCount;
+                if (successCount > 0) {
+                    toastr.success(
+                        `成功导入 ${successCount}/${entries.length} 张图片 (本地 ${importedLocalCount} / 远程 ${retainedRemoteCount})`,
+                    );
+                } else {
+                    toastr.warning('没有可导入的图片条目');
+                }
+                if (skippedCount > 0) {
+                    toastr.info(`已跳过 ${skippedCount} 条无效或缺失数据的记录`);
+                }
             } catch (err) {
                 console.error('导入失败:', err);
                 toastr.error('导入压缩包失败, 请检查文件格式');

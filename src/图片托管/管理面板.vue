@@ -304,11 +304,13 @@
     </div>
 
     <!-- ======== 右侧面板: 搜索/上传/图片画廊 ======== -->
-    <div class="panel-right"
-         @dragover.prevent="isDesktop && (isDragging = true)"
-         @dragleave.prevent="isDesktop && (isDragging = false)"
-         @drop.prevent="isDesktop && handleDrop($event)"
-         :class="{ 'panel-right--dragover': isDesktop && isDragging }">
+    <div
+      class="panel-right"
+      :class="{ 'panel-right--dragover': isDesktop && isDragging }"
+      @dragover.prevent="isDesktop && (isDragging = true)"
+      @dragleave.prevent="isDesktop && (isDragging = false)"
+      @drop.prevent="isDesktop && handleDrop($event)"
+    >
 
       <!-- 移动端: 分隔线 -->
       <div v-if="!isDesktop" class="image-hosting_divider"></div>
@@ -398,9 +400,12 @@
             </div>
           </div>
 
-          <div v-for="image in filteredImages" :key="image.storageName" 
-               class="image-hosting_card"
-               :class="{ 'is-selected': selectedSet.has(image.storageName) }">
+          <div
+            v-for="image in filteredImages"
+            :key="image.storageName"
+            :class="{ 'is-selected': selectedSet.has(image.storageName) }"
+            class="image-hosting_card"
+          >
             
             <div class="card-select">
               <input type="checkbox" :checked="selectedSet.has(image.storageName)" @change="toggleSelect(image.storageName)" />
@@ -425,8 +430,8 @@
                 <template v-else>
                   <input
                     v-model="editNameValue"
-                    class="name-edit-input"
                     v-focus
+                    class="name-edit-input"
                     @keyup.enter="confirmRename(image.storageName)"
                     @keyup.escape="cancelRename"
                   />

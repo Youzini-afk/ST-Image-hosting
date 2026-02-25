@@ -10,6 +10,9 @@ import { uploadFile, deleteFile, verifyFiles, fileToBase64, generateStorageName 
 import { compressImage } from './compress';
 import { useSettingsStore } from './settings';
 
+/** 注册表变更事件: 用于通知 DOM 解析器重新尝试 data-img 绑定 */
+export const IMAGE_REGISTRY_UPDATED_EVENT = 'image-hosting:registry-updated';
+
 /** 单张图片的元数据 */
 const ImageMeta = z.object({
     display_name: z.string(),
@@ -31,7 +34,7 @@ const ImageMeta = z.object({
 export type ImageMeta = z.infer<typeof ImageMeta>;
 
 /** 角色卡的图片注册表 */
-const ImageRegistry = z
+export const ImageRegistry = z
     .object({
         /** storage_name -> ImageMeta */
         images: z.record(z.string(), ImageMeta).prefault({}),
@@ -57,6 +60,9 @@ function saveRegistry(registry: ImageRegistry): void {
         vars => _.set(vars, 'image_hosting', klona(registry)),
         { type: 'character' },
     );
+
+    // 通知页面重新解析 <img data-img="...">, 支持“先写标签后上传”的回填场景
+    window.dispatchEvent(new CustomEvent(IMAGE_REGISTRY_UPDATED_EVENT));
 }
 
 /** Object URL 缓存 (embedded 模式用) */
@@ -291,6 +297,25 @@ async function resolveWithCdn(
 export const useImageStore = defineStore('image-hosting-images', () => {
     const registry = ref(loadRegistry());
     const settingsStore = useSettingsStore();
+
+    /** CDN 相关设置变化后, 清理远程解析缓存并触发页面重解析 */
+    function invalidateResolvedRemoteCache(): void {
+        resolvedRemoteCache.clear();
+        window.dispatchEvent(new CustomEvent(IMAGE_REGISTRY_UPDATED_EVENT));
+    }
+
+    watch(
+        () => ({
+            cdn_proxy_enabled: settingsStore.settings.cdn_proxy_enabled,
+            cdn_proxy_list: settingsStore.settings.cdn_proxy_list.slice(),
+            cdn_preferred_proxy: settingsStore.settings.cdn_preferred_proxy,
+            cdn_strip_enabled: settingsStore.settings.cdn_strip_enabled,
+        }),
+        () => {
+            invalidateResolvedRemoteCache();
+        },
+        { deep: true },
+    );
 
     /** 确保 display_name 唯一 (重名时自动加后缀) */
     function deduplicateDisplayName(name: string): string {

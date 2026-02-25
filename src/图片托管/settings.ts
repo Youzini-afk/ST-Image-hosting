@@ -38,7 +38,12 @@ const Settings = z
     .prefault({});
 
 export const useSettingsStore = defineStore('image-hosting-settings', () => {
-    const settings = ref(Settings.parse(getVariables({ type: 'script', script_id: getScriptId() })));
+    const rawSettings = getVariables({ type: 'script', script_id: getScriptId() });
+    const parsedSettings = Settings.safeParse(rawSettings);
+    if (!parsedSettings.success) {
+        console.warn('[图片托管] 设置格式异常, 已回退默认值:', parsedSettings.error);
+    }
+    const settings = ref(parsedSettings.success ? parsedSettings.data : Settings.parse({}));
 
     // 老用户迁移: 自动补充新增的默认代理 (不影响用户已有的自定义代理)
     try {
