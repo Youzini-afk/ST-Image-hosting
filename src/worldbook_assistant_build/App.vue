@@ -704,17 +704,17 @@
                 </div>
               </div>
             </label>
-            <button class="btn" data-focus-hero="wb_new" data-copy-hero="wb_new" type="button" @click="createNewWorldbook">新建</button>
-            <button class="btn" data-focus-hero="wb_duplicate" data-copy-hero="wb_duplicate" type="button" :disabled="!selectedWorldbookName" @click="duplicateWorldbook">
+            <button class="btn" data-focus-hero="wb_new" type="button" @click="createNewWorldbook">新建</button>
+            <button class="btn" data-focus-hero="wb_duplicate" type="button" :disabled="!selectedWorldbookName" @click="duplicateWorldbook">
               另存为
             </button>
-            <button class="btn danger" data-focus-hero="wb_delete" data-copy-hero="wb_delete" type="button" :disabled="!selectedWorldbookName" @click="deleteCurrentWorldbook">
+            <button class="btn danger" data-focus-hero="wb_delete" type="button" :disabled="!selectedWorldbookName" @click="deleteCurrentWorldbook">
               删除
             </button>
-            <button class="btn" data-focus-hero="wb_export" data-copy-hero="wb_export" type="button" :disabled="!selectedWorldbookName" @click="exportCurrentWorldbook">
+            <button class="btn" data-focus-hero="wb_export" type="button" :disabled="!selectedWorldbookName" @click="exportCurrentWorldbook">
               导出
             </button>
-            <button class="btn" data-focus-hero="wb_import" data-copy-hero="wb_import" type="button" @click="triggerImport">导入</button>
+            <button class="btn" data-focus-hero="wb_import" type="button" @click="triggerImport">导入</button>
             <div class="focus-cine-sink-row" aria-hidden="true">
               <span class="focus-cine-sink" data-focus-sink="save_btn"></span>
               <span class="focus-cine-sink" data-focus-sink="more_btn"></span>
@@ -869,9 +869,28 @@
               </div>
               <div class="wb-copy-workspace-actions">
                 <span class="wb-copy-workspace-meta">{{ crossCopyWorkspaceComparedText }}</span>
-                <button class="btn mini utility-btn" type="button" @click="toggleCrossCopyWorkspaceTools">
-                  {{ crossCopyWorkspaceToolsExpanded ? '收起工具' : '展开工具' }}
-                </button>
+                <div class="wb-copy-workspace-tool-anchor">
+                  <button class="btn mini utility-btn" type="button" :disabled="isAnyCineLocked" @click="toggleCrossCopyWorkspaceTools">
+                    {{ crossCopyWorkspaceToolsExpanded ? '收起工具' : '展开工具' }}
+                  </button>
+                  <div class="copy-cine-sink-cluster workspace" aria-hidden="true">
+                    <span class="copy-cine-sink" data-copy-sink="focus_toggle"></span>
+                    <span class="copy-cine-sink" data-copy-sink="save_btn"></span>
+                    <span class="copy-cine-sink" data-copy-sink="more_btn"></span>
+                    <span class="copy-cine-sink" data-copy-sink="tools_btn"></span>
+                    <span class="copy-cine-sink" data-copy-sink="tool_global"></span>
+                    <span class="copy-cine-sink" data-copy-sink="tool_entry_history"></span>
+                    <span class="copy-cine-sink" data-copy-sink="tool_worldbook_history"></span>
+                    <span class="copy-cine-sink" data-copy-sink="tool_activation"></span>
+                    <span class="copy-cine-sink" data-copy-sink="tool_ai_generate"></span>
+                    <span class="copy-cine-sink" data-copy-sink="tool_extract"></span>
+                    <span class="copy-cine-sink" data-copy-sink="tool_tag"></span>
+                    <span class="copy-cine-sink" data-copy-sink="tool_copy"></span>
+                    <span class="copy-cine-sink" data-copy-sink="tool_settings"></span>
+                    <span class="copy-cine-sink" data-copy-sink="tool_ai_config"></span>
+                  </div>
+                </div>
+                <button class="btn mini utility-btn" type="button" :disabled="isAnyCineLocked" @click="toggleCrossCopyMode">退出模式</button>
               </div>
             </div>
             <Transition name="copy-workspace-tools">
@@ -1312,7 +1331,7 @@
           <section v-if="crossCopyMode" class="cross-copy-panel desktop">
             <div class="cross-copy-head">
               <div class="cross-copy-head-main">
-                <strong data-copy-hero="tool_copy">📚 跨世界书复制条目</strong>
+                <strong>📚 跨世界书复制条目</strong>
                 <span>{{ crossCopyWorkspaceSummary }}</span>
               </div>
               <div class="cross-copy-head-actions">
@@ -1320,16 +1339,12 @@
                 <button class="btn mini utility-btn" type="button" @click="toggleCrossCopyControlsCollapsed">
                   {{ crossCopyControlsCollapsed ? '展开高级项' : '收起高级项' }}
                 </button>
+                <button class="btn mini utility-btn" type="button" :disabled="isAnyCineLocked" @click="toggleCrossCopyMode">退出模式</button>
                 <div class="copy-cine-sink-cluster" aria-hidden="true">
                   <span class="copy-cine-sink" data-copy-sink="focus_toggle"></span>
                   <span class="copy-cine-sink" data-copy-sink="save_btn"></span>
                   <span class="copy-cine-sink" data-copy-sink="more_btn"></span>
                   <span class="copy-cine-sink" data-copy-sink="tools_btn"></span>
-                  <span class="copy-cine-sink" data-copy-sink="wb_new"></span>
-                  <span class="copy-cine-sink" data-copy-sink="wb_duplicate"></span>
-                  <span class="copy-cine-sink" data-copy-sink="wb_delete"></span>
-                  <span class="copy-cine-sink" data-copy-sink="wb_export"></span>
-                  <span class="copy-cine-sink" data-copy-sink="wb_import"></span>
                   <span class="copy-cine-sink" data-copy-sink="tool_global"></span>
                   <span class="copy-cine-sink" data-copy-sink="tool_entry_history"></span>
                   <span class="copy-cine-sink" data-copy-sink="tool_worldbook_history"></span>
@@ -1337,6 +1352,7 @@
                   <span class="copy-cine-sink" data-copy-sink="tool_ai_generate"></span>
                   <span class="copy-cine-sink" data-copy-sink="tool_extract"></span>
                   <span class="copy-cine-sink" data-copy-sink="tool_tag"></span>
+                  <span class="copy-cine-sink" data-copy-sink="tool_copy"></span>
                   <span class="copy-cine-sink" data-copy-sink="tool_settings"></span>
                   <span class="copy-cine-sink" data-copy-sink="tool_ai_config"></span>
                 </div>
@@ -3399,11 +3415,6 @@ const COPY_FALLBACK_PRIORITY: FocusHeroKey[] = [
   'save_btn',
   'more_btn',
   'tools_btn',
-  'wb_new',
-  'wb_duplicate',
-  'wb_delete',
-  'wb_export',
-  'wb_import',
   'tool_global',
   'tool_entry_history',
   'tool_worldbook_history',
@@ -7025,6 +7036,9 @@ function closeCrossCopyDiff(): void {
 }
 
 function toggleCrossCopyWorkspaceTools(): void {
+  if (isAnyCineLocked.value) {
+    return;
+  }
   crossCopyWorkspaceToolsExpanded.value = !crossCopyWorkspaceToolsExpanded.value;
 }
 
@@ -7129,6 +7143,7 @@ function setCrossCopyModeActive(next: boolean): void {
   }
   crossCopyMode.value = next;
   if (next) {
+    crossCopyWorkspaceToolsExpanded.value = false;
     aiGeneratorMode.value = false;
     tagEditorMode.value = false;
     globalWorldbookMode.value = false;
@@ -11591,6 +11606,17 @@ watch(hasUnsavedChanges, (val) => {
   transform: translateY(-50%);
 }
 
+.copy-cine-sink-cluster.workspace {
+  left: 50%;
+  right: auto;
+}
+
+.copy-cine-sink-cluster.workspace .copy-cine-sink {
+  left: 0;
+  right: auto;
+  transform: translate(-50%, -50%);
+}
+
 .cross-copy-head strong {
   font-size: 15px;
 }
@@ -12690,6 +12716,12 @@ watch(hasUnsavedChanges, (val) => {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.wb-copy-workspace-tool-anchor {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
 }
 
 .wb-copy-workspace-meta {
