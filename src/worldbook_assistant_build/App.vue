@@ -138,6 +138,14 @@
               </div>
             </div>
             <div class="mobile-entry-list">
+              <div v-if="mobileMultiSelectMode" class="mobile-multi-toolbar">
+                <span class="mobile-multi-title">多选模式 · 已选 {{ selectedEntryCount }}</span>
+                <div class="mobile-multi-actions">
+                  <button class="btn mini" type="button" @click="selectAllVisibleForMobileMultiSelect">全选可见</button>
+                  <button class="btn mini" type="button" @click="clearMobileMultiSelectSelection">清空</button>
+                  <button class="btn mini" type="button" @click="finishMobileMultiSelectMode">完成</button>
+                </div>
+              </div>
               <button
                 v-for="entry in filteredEntries"
                 :key="`me-${entry.uid}`"
@@ -148,13 +156,29 @@
                   selected: selectedEntryUidSet.has(entry.uid),
                   primary: entry.uid === selectedEntryUid,
                   disabled: !entry.enabled,
+                  'mobile-multi-item': mobileMultiSelectMode,
                 }"
                 @click="selectEntry(entry.uid, $event)"
+                @pointerdown="startMobileEntryLongPress(entry.uid, $event)"
+                @pointermove="handleMobileEntryLongPressMove($event)"
+                @pointerup="finishMobileEntryLongPress($event)"
+                @pointercancel="finishMobileEntryLongPress($event)"
+                @lostpointercapture="finishMobileEntryLongPress()"
+                @contextmenu.prevent
                 style="border: 1px solid var(--wb-border-subtle); border-radius: 8px; padding: 8px 10px; margin-bottom: 4px;"
               >
                 <div class="entry-item-head">
+                  <input
+                    v-if="mobileMultiSelectMode"
+                    type="checkbox"
+                    class="mobile-multi-checkbox"
+                    :checked="selectedEntryUidSet.has(entry.uid)"
+                    @click.stop
+                    @change="toggleMobileEntrySelection(entry.uid)"
+                  />
                   <span class="entry-status-dot" :data-status="getEntryVisualStatus(entry)"></span>
                   <div class="entry-item-title">{{ entry.name || `条目 ${entry.uid}` }}</div>
+                  <span v-if="mobileMultiSelectMode && selectedEntryUid === entry.uid && selectedEntryUidSet.has(entry.uid)" class="entry-chip mono">样板</span>
                   <span class="entry-chip uid">#{{ entry.uid }}</span>
                 </div>
                 <div class="entry-item-keys" v-if="entry.strategy.keys?.length">
@@ -201,11 +225,13 @@
                 <div v-if="isMobile" class="content-top-drag-handle" @pointerdown="startContentTopDrag">
                   <span class="content-top-drag-grip">━━━</span>
                 </div>
+                <div v-if="mobileMultiSelectMode" class="mobile-multi-content-note">多选模式下仅支持配置联动，内容编辑已禁用</div>
                 <div class="editor-content-title">世界观设定 / 内容 (CONTENT)</div>
                 <textarea
                   ref="contentTextareaRef"
                   v-model="selectedEntry.content"
                   class="text-area large editor-content-area"
+                  :disabled="mobileMultiSelectMode"
                   style="min-height: calc(100vh - 500px);"
                 ></textarea>
                 <div class="content-resize-handle" @pointerdown="startContentResize">
@@ -1445,6 +1471,9 @@
               <div v-if="!isDesktopFocusMode" class="list-summary">
                 条目 {{ filteredEntries.length }} / {{ draftEntries.length }} | 启用 {{ enabledEntryCount }} | 选中 {{ selectedEntryCount }}
               </div>
+              <div v-if="selectedEntryCount > 1 && !isMobile" class="list-multi-edit-hint" :class="{ off: !multiEditEnabled }">
+                {{ multiEditHintText }}
+              </div>
               <TransitionGroup name="list" tag="div" class="list-scroll">
                 <button
                   v-for="entry in filteredEntries"
@@ -1866,6 +1895,23 @@
             <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
               <input type="checkbox" :checked="persistedState.show_ai_chat" @change="updatePersistedState(s => s.show_ai_chat = ($event.target as HTMLInputElement).checked)" />
               <span>显示 AI 对话模块</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px;">
+              <input
+                type="checkbox"
+                :checked="persistedState.multi_edit.enabled"
+                @change="updatePersistedState(s => s.multi_edit.enabled = ($event.target as HTMLInputElement).checked)"
+              />
+              <span>启用多选配置联动</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input
+                type="checkbox"
+                :checked="persistedState.multi_edit.sync_extra_json"
+                @change="updatePersistedState(s => s.multi_edit.sync_extra_json = ($event.target as HTMLInputElement).checked)"
+                :disabled="!persistedState.multi_edit.enabled"
+              />
+              <span>多选联动时同步高级字段 / extra JSON</span>
             </label>
             <div style="font-size:11px;color:var(--wb-text-muted,#64748b);margin-top:4px;">开启后将在工具栏和移动端 Tab 中显示 AI 对话入口</div>
             <label class="field" style="margin-top:8px;">
@@ -2728,6 +2774,11 @@ type CrossCopyStatusFilter = 'all' | CrossCopyRowStatus;
 type WorldbookHistoryCompareStatus = 'added' | 'removed' | 'changed';
 type CrossCopyMobileStep = 1 | 2 | 3;
 
+interface MultiEditPersistState {
+  enabled: boolean;
+  sync_extra_json: boolean;
+}
+
 interface CrossCopyPersistState {
   last_source_worldbook: string;
   last_target_worldbook: string;
@@ -3186,6 +3237,7 @@ interface PersistedState {
   extract_ignore_tags: string[];
   ai_api_config: AIApiConfig;
   show_ai_chat: boolean;
+  multi_edit: MultiEditPersistState;
   layout: LayoutState;
   cross_copy: CrossCopyPersistState;
 }
@@ -3216,6 +3268,37 @@ interface FindHit {
   end: number;
   matchedText: string;
   preview: string;
+}
+
+interface EntryConfigPatch {
+  enabled: boolean;
+  strategy_type: StrategyType;
+  keys: WorldbookEntry['strategy']['keys'];
+  keys_secondary_logic: SecondaryLogic;
+  keys_secondary: WorldbookEntry['strategy']['keys_secondary']['keys'];
+  scan_depth: WorldbookEntry['strategy']['scan_depth'];
+  position_type: PositionType;
+  position_order: number;
+  position_role: RoleType;
+  position_depth: number;
+  probability: number;
+  recursion_delay_until: number | null;
+  prevent_incoming: boolean;
+  prevent_outgoing: boolean;
+  effect_sticky: number | null;
+  effect_cooldown: number | null;
+  effect_delay: number | null;
+  extra: Record<string, unknown> | null;
+}
+
+interface MobileEntryLongPressState {
+  uid: number;
+  pointerId: number;
+  startX: number;
+  startY: number;
+  triggered: boolean;
+  timerId: number | null;
+  target: HTMLElement | null;
 }
 
 const STORAGE_KEY = 'worldbook_assistant_state_v1';
@@ -3277,6 +3360,8 @@ const CROSS_COPY_DESKTOP_LEFT_MIN = 240;
 const CROSS_COPY_DESKTOP_LEFT_MAX = 440;
 const CROSS_COPY_SPLITTER_SIZE = 8;
 const CROSS_COPY_RIGHT_MIN = 360;
+const MOBILE_MULTI_LONG_PRESS_MS = 420;
+const MOBILE_MULTI_LONG_PRESS_MOVE_PX = 12;
 
 const strategyTypeOptions: StrategyType[] = ['constant', 'selective', 'vectorized'];
 const secondaryLogicOptions: SecondaryLogic[] = ['and_any', 'and_all', 'not_all', 'not_any'];
@@ -3438,10 +3523,16 @@ const draftEntries = ref<WorldbookEntry[]>([]);
 const selectedEntryUid = ref<number | null>(null);
 const selectedEntryUids = ref<number[]>([]);
 const selectedEntryAnchorUid = ref<number | null>(null);
+const mobileMultiSelectMode = ref(false);
+const mobileLongPressState = ref<MobileEntryLongPressState | null>(null);
+const mobileSuppressNextTap = ref(false);
 const draggingEntryUids = ref<number[]>([]);
 const entryDropTargetUid = ref<number | null>(null);
 const entryDropPosition = ref<'before' | 'after' | null>(null);
 const suppressNextEntryClick = ref(false);
+const multiEditLastPatch = ref<EntryConfigPatch | null>(null);
+const multiEditSnapshotDone = ref(false);
+const multiEditApplying = ref(false);
 const draftEntriesDigest = ref('[]');
 const originalEntriesDigest = ref('[]');
 
@@ -3567,6 +3658,35 @@ const selectedEntryIndex = computed(() => {
 
 const selectedEntryUidSet = computed(() => new Set(selectedEntryUids.value));
 const selectedEntryCount = computed(() => selectedEntryUids.value.length);
+const multiEditEnabled = computed(() => persistedState.value.multi_edit.enabled !== false);
+const multiEditSyncExtraJson = computed(() => persistedState.value.multi_edit.sync_extra_json === true);
+const isMultiEditSyncActive = computed(() => {
+  if (!multiEditEnabled.value) {
+    return false;
+  }
+  if (!selectedEntry.value || selectedEntryUids.value.length <= 1) {
+    return false;
+  }
+  if (!selectedEntryUids.value.includes(selectedEntry.value.uid)) {
+    return false;
+  }
+  if (isMobile.value && !mobileMultiSelectMode.value) {
+    return false;
+  }
+  return true;
+});
+const multiEditSessionKey = computed(() => {
+  if (!isMultiEditSyncActive.value || !selectedEntry.value) {
+    return '';
+  }
+  return `${selectedWorldbookName.value}::${selectedEntry.value.uid}::${getOrderedSelectedEntryUids().join(',')}`;
+});
+const multiEditHintText = computed(() => {
+  if (!multiEditEnabled.value) {
+    return '多选联动已关闭（可在设置中心开启）';
+  }
+  return '多选联动已开启：配置字段会同步到其余选中条目（名称/内容不同步）';
+});
 const selectedPositionSelectValue = computed<PositionSelectValue>({
   get() {
     if (!selectedEntry.value) {
@@ -4239,6 +4359,13 @@ const selectedSecondaryKeysText = computed(() => {
   return selectedEntry.value.strategy.keys_secondary.keys.map(stringifyKeyword).join(', ');
 });
 
+const selectedEntryConfigDigest = computed(() => {
+  if (!selectedEntry.value) {
+    return '';
+  }
+  return JSON.stringify(extractEntryConfigPatch(selectedEntry.value, multiEditSyncExtraJson.value));
+});
+
 function commitKeysFromRaw(): void {
   if (keysDebounceTimer) { clearTimeout(keysDebounceTimer); keysDebounceTimer = null; }
   if (!selectedEntry.value) return;
@@ -4308,6 +4435,148 @@ const selectedEffectDelayText = computed({
     selectedEntry.value.effect.delay = parseNullableInteger(value);
   },
 });
+
+function extractEntryConfigPatch(entry: WorldbookEntry, includeExtra: boolean): EntryConfigPatch {
+  return {
+    enabled: entry.enabled,
+    strategy_type: entry.strategy.type,
+    keys: klona(entry.strategy.keys),
+    keys_secondary_logic: entry.strategy.keys_secondary.logic,
+    keys_secondary: klona(entry.strategy.keys_secondary.keys),
+    scan_depth: entry.strategy.scan_depth,
+    position_type: entry.position.type,
+    position_order: Math.floor(toNumberSafe(entry.position.order, 100)),
+    position_role: entry.position.role,
+    position_depth: Math.max(1, Math.floor(toNumberSafe(entry.position.depth, 4))),
+    probability: clampNumber(Math.floor(toNumberSafe(entry.probability, 100)), 0, 100),
+    recursion_delay_until: parseNullableInteger(entry.recursion.delay_until),
+    prevent_incoming: Boolean(entry.recursion.prevent_incoming),
+    prevent_outgoing: Boolean(entry.recursion.prevent_outgoing),
+    effect_sticky: parseNullableInteger(entry.effect.sticky),
+    effect_cooldown: parseNullableInteger(entry.effect.cooldown),
+    effect_delay: parseNullableInteger(entry.effect.delay),
+    extra: includeExtra ? (entry.extra ? klona(entry.extra) : null) : null,
+  };
+}
+
+function applyEntryConfigPatch(entry: WorldbookEntry, patch: EntryConfigPatch, includeExtra: boolean): void {
+  entry.enabled = patch.enabled;
+
+  entry.strategy.type = patch.strategy_type;
+  entry.strategy.keys = normalizeKeywordList(klona(patch.keys));
+  entry.strategy.keys_secondary.logic = normalizeSecondaryLogic(patch.keys_secondary_logic);
+  entry.strategy.keys_secondary.keys = normalizeKeywordList(klona(patch.keys_secondary));
+  entry.strategy.scan_depth = normalizeScanDepth(patch.scan_depth);
+
+  entry.position.type = normalizePositionType(patch.position_type);
+  entry.position.order = Math.floor(toNumberSafe(patch.position_order, entry.position.order));
+  if (entry.position.type === 'at_depth') {
+    entry.position.role = normalizeRole(patch.position_role);
+    entry.position.depth = Math.max(1, Math.floor(toNumberSafe(patch.position_depth, 4)));
+  } else {
+    entry.position.role = 'system';
+    entry.position.depth = 4;
+  }
+
+  entry.probability = clampNumber(Math.floor(toNumberSafe(patch.probability, entry.probability)), 0, 100);
+
+  entry.recursion.prevent_incoming = Boolean(patch.prevent_incoming);
+  entry.recursion.prevent_outgoing = Boolean(patch.prevent_outgoing);
+  entry.recursion.delay_until = parseNullableInteger(patch.recursion_delay_until);
+
+  entry.effect.sticky = parseNullableInteger(patch.effect_sticky);
+  entry.effect.cooldown = parseNullableInteger(patch.effect_cooldown);
+  entry.effect.delay = parseNullableInteger(patch.effect_delay);
+
+  if (includeExtra) {
+    if (patch.extra && Object.keys(patch.extra).length > 0) {
+      entry.extra = klona(patch.extra);
+    } else {
+      delete entry.extra;
+    }
+  }
+}
+
+function resetMultiEditSessionState(): void {
+  if (!isMultiEditSyncActive.value || !selectedEntry.value) {
+    multiEditLastPatch.value = null;
+    multiEditSnapshotDone.value = false;
+    return;
+  }
+  multiEditLastPatch.value = extractEntryConfigPatch(selectedEntry.value, multiEditSyncExtraJson.value);
+  multiEditSnapshotDone.value = false;
+}
+
+function syncSelectedEntryConfigToMultiSelection(nextPatch: EntryConfigPatch, previousPatch: EntryConfigPatch): void {
+  if (!selectedEntry.value || !isMultiEditSyncActive.value) {
+    return;
+  }
+  const orderedSelected = getOrderedSelectedEntryUids();
+  if (orderedSelected.length <= 1) {
+    return;
+  }
+  const primaryUid = selectedEntry.value.uid;
+  const includeExtra = multiEditSyncExtraJson.value;
+
+  const entryByUid = new Map(draftEntries.value.map(entry => [entry.uid, entry] as const));
+
+  if (!multiEditSnapshotDone.value) {
+    const snapshotItems: Array<{
+      label: string;
+      uid: number;
+      name: string;
+      entry: WorldbookEntry;
+    }> = [];
+
+    for (const uid of orderedSelected) {
+      const original = entryByUid.get(uid);
+      if (!original) {
+        continue;
+      }
+      const snapshotEntry = normalizeEntry(klona(original), uid);
+      if (uid === primaryUid) {
+        applyEntryConfigPatch(snapshotEntry, previousPatch, includeExtra);
+      }
+      snapshotItems.push({
+        label: '多选配置前快照',
+        uid,
+        name: original.name,
+        entry: snapshotEntry,
+      });
+    }
+
+    if (snapshotItems.length) {
+      pushEntrySnapshotsBulk(snapshotItems);
+    }
+    multiEditSnapshotDone.value = true;
+  }
+
+  let changedCount = 0;
+  multiEditApplying.value = true;
+  try {
+    for (const uid of orderedSelected) {
+      if (uid === primaryUid) {
+        continue;
+      }
+      const target = entryByUid.get(uid);
+      if (!target) {
+        continue;
+      }
+      const beforeDigest = JSON.stringify(extractEntryConfigPatch(target, includeExtra));
+      applyEntryConfigPatch(target, nextPatch, includeExtra);
+      const afterDigest = JSON.stringify(extractEntryConfigPatch(target, includeExtra));
+      if (beforeDigest !== afterDigest) {
+        changedCount += 1;
+      }
+    }
+  } finally {
+    multiEditApplying.value = false;
+  }
+
+  if (changedCount > 0) {
+    setStatus(`已同步配置到 ${changedCount} 个条目（名称/内容未同步）`);
+  }
+}
 
 const selectedContentChars = computed(() => {
   return selectedEntry.value?.content.length ?? 0;
@@ -4416,6 +4685,9 @@ watch(
 
 watch(selectedWorldbookName, name => {
   closeWorldbookPicker();
+  mobileMultiSelectMode.value = false;
+  clearMobileLongPressState();
+  mobileSuppressNextTap.value = false;
   if (!name) {
     draftEntries.value = [];
     originalEntries.value = [];
@@ -4474,6 +4746,31 @@ watch(
     }
   },
 );
+
+watch(multiEditSessionKey, () => {
+  resetMultiEditSessionState();
+});
+
+watch(multiEditSyncExtraJson, () => {
+  resetMultiEditSessionState();
+});
+
+watch(selectedEntryConfigDigest, digest => {
+  if (!digest || multiEditApplying.value || !selectedEntry.value || !isMultiEditSyncActive.value) {
+    return;
+  }
+  const currentPatch = extractEntryConfigPatch(selectedEntry.value, multiEditSyncExtraJson.value);
+  if (!multiEditLastPatch.value) {
+    multiEditLastPatch.value = klona(currentPatch);
+    return;
+  }
+  if (JSON.stringify(currentPatch) === JSON.stringify(multiEditLastPatch.value)) {
+    return;
+  }
+  const previousPatch = klona(multiEditLastPatch.value);
+  syncSelectedEntryConfigToMultiSelection(currentPatch, previousPatch);
+  multiEditLastPatch.value = klona(currentPatch);
+});
 
 // Debounced watcher: parse keywords 600ms after user stops typing
 watch(selectedKeysRaw, () => {
@@ -4555,6 +4852,15 @@ watch(mobileTab, tab => {
   tagEditorMode.value = false;
   normalizeCrossCopyWorldbookSelection();
   crossCopyMobileStep.value = 1;
+});
+
+watch(isMobile, mobile => {
+  if (mobile) {
+    return;
+  }
+  mobileMultiSelectMode.value = false;
+  mobileLongPressState.value = null;
+  mobileSuppressNextTap.value = false;
 });
 
 watch(
@@ -5176,6 +5482,13 @@ function createDefaultLayoutState(): LayoutState {
   };
 }
 
+function createDefaultMultiEditPersistState(): MultiEditPersistState {
+  return {
+    enabled: true,
+    sync_extra_json: false,
+  };
+}
+
 function createDefaultCrossCopyPersistState(): CrossCopyPersistState {
   return {
     last_source_worldbook: '',
@@ -5185,6 +5498,18 @@ function createDefaultCrossCopyPersistState(): CrossCopyPersistState {
     desktop_left_width: CROSS_COPY_DESKTOP_LEFT_DEFAULT,
     controls_collapsed: true,
     workspace_tools_expanded: false,
+  };
+}
+
+function normalizeMultiEditPersistState(input: unknown): MultiEditPersistState {
+  const fallback = createDefaultMultiEditPersistState();
+  const raw = asRecord(input);
+  if (!raw) {
+    return fallback;
+  }
+  return {
+    enabled: raw.enabled !== false,
+    sync_extra_json: raw.sync_extra_json === true,
   };
 }
 
@@ -5237,6 +5562,7 @@ function createDefaultPersistedState(): PersistedState {
     worldbook_tags: { definitions: [], assignments: {} },
     extract_ignore_tags: ['think', 'thinking', 'recap', 'content', 'details', 'summary'],
     show_ai_chat: false,
+    multi_edit: createDefaultMultiEditPersistState(),
     ai_api_config: {
       mode: 'tavern',
       use_main_api: true,
@@ -5419,6 +5745,7 @@ function normalizePersistedState(input: unknown): PersistedState {
       ? root.extract_ignore_tags.map((t: unknown) => toStringSafe(t).trim().toLowerCase()).filter(Boolean)
       : ['thinking', 'recap', 'content', 'details', 'summary'],
     show_ai_chat: root.show_ai_chat === true,
+    multi_edit: normalizeMultiEditPersistState(root.multi_edit),
     ai_api_config: (() => {
       const raw = asRecord(root.ai_api_config);
       if (!raw) return createDefaultPersistedState().ai_api_config;
@@ -7743,6 +8070,170 @@ function ensureSelectedEntryExists(): void {
   }
 }
 
+function enterMobileMultiSelectMode(initialUid: number): void {
+  if (!isMobile.value) {
+    return;
+  }
+  mobileMultiSelectMode.value = true;
+  if (draftEntries.value.some(entry => entry.uid === initialUid)) {
+    selectedEntryUids.value = [initialUid];
+    selectedEntryUid.value = initialUid;
+    selectedEntryAnchorUid.value = initialUid;
+  }
+  setStatus('已进入多选模式');
+}
+
+function finishMobileMultiSelectMode(): void {
+  if (!mobileMultiSelectMode.value) {
+    return;
+  }
+  mobileMultiSelectMode.value = false;
+  if (selectedEntryUids.value.length > 0) {
+    const primaryUid = selectedEntryUids.value[0];
+    selectedEntryUid.value = primaryUid;
+    selectedEntryUids.value = [primaryUid];
+    selectedEntryAnchorUid.value = primaryUid;
+  } else {
+    selectedEntryUid.value = null;
+    selectedEntryUids.value = [];
+    selectedEntryAnchorUid.value = null;
+  }
+  setStatus('已退出多选模式');
+}
+
+function toggleMobileEntrySelection(uid: number): void {
+  if (!isMobile.value || !mobileMultiSelectMode.value) {
+    return;
+  }
+  if (!draftEntries.value.some(entry => entry.uid === uid)) {
+    return;
+  }
+  const next = [...selectedEntryUids.value];
+  const index = next.indexOf(uid);
+  if (index >= 0) {
+    next.splice(index, 1);
+  } else {
+    next.push(uid);
+  }
+  selectedEntryUids.value = next;
+  if (!next.length) {
+    selectedEntryUid.value = null;
+    selectedEntryAnchorUid.value = null;
+    return;
+  }
+  if (!selectedEntryUid.value || !next.includes(selectedEntryUid.value)) {
+    selectedEntryUid.value = next[0];
+    selectedEntryAnchorUid.value = next[0];
+  }
+}
+
+function selectAllVisibleForMobileMultiSelect(): void {
+  if (!isMobile.value || !mobileMultiSelectMode.value) {
+    return;
+  }
+  const visibleUids = filteredEntries.value.map(entry => entry.uid);
+  selectedEntryUids.value = visibleUids;
+  if (visibleUids.length > 0) {
+    selectedEntryUid.value = visibleUids[0];
+    selectedEntryAnchorUid.value = visibleUids[0];
+  } else {
+    selectedEntryUid.value = null;
+    selectedEntryAnchorUid.value = null;
+  }
+}
+
+function clearMobileMultiSelectSelection(): void {
+  if (!isMobile.value || !mobileMultiSelectMode.value) {
+    return;
+  }
+  selectedEntryUids.value = [];
+  selectedEntryUid.value = null;
+  selectedEntryAnchorUid.value = null;
+}
+
+function clearMobileLongPressState(): void {
+  const state = mobileLongPressState.value;
+  if (!state) {
+    return;
+  }
+  if (state.timerId !== null) {
+    clearTimeout(state.timerId);
+  }
+  if (state.target) {
+    try {
+      if (state.target.hasPointerCapture(state.pointerId)) {
+        state.target.releasePointerCapture(state.pointerId);
+      }
+    } catch {
+      // ignore pointer capture release failures
+    }
+  }
+  mobileLongPressState.value = null;
+}
+
+function startMobileEntryLongPress(uid: number, event: PointerEvent): void {
+  if (!isMobile.value || mobileTab.value !== 'list' || mobileMultiSelectMode.value) {
+    return;
+  }
+  if (event.pointerType === 'mouse' && event.button !== 0) {
+    return;
+  }
+  clearMobileLongPressState();
+  const target = event.currentTarget as HTMLElement | null;
+  const state: MobileEntryLongPressState = {
+    uid,
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    triggered: false,
+    timerId: null,
+    target,
+  };
+  if (target) {
+    try {
+      target.setPointerCapture(event.pointerId);
+    } catch {
+      // ignore pointer capture failures
+    }
+  }
+  state.timerId = window.setTimeout(() => {
+    if (!mobileLongPressState.value || mobileLongPressState.value.pointerId !== state.pointerId) {
+      return;
+    }
+    mobileLongPressState.value.triggered = true;
+    mobileSuppressNextTap.value = true;
+    enterMobileMultiSelectMode(uid);
+  }, MOBILE_MULTI_LONG_PRESS_MS);
+  mobileLongPressState.value = state;
+}
+
+function handleMobileEntryLongPressMove(event: PointerEvent): void {
+  const state = mobileLongPressState.value;
+  if (!state || state.pointerId !== event.pointerId || state.triggered) {
+    return;
+  }
+  const offsetX = event.clientX - state.startX;
+  const offsetY = event.clientY - state.startY;
+  if (Math.hypot(offsetX, offsetY) > MOBILE_MULTI_LONG_PRESS_MOVE_PX) {
+    clearMobileLongPressState();
+  }
+}
+
+function finishMobileEntryLongPress(event?: PointerEvent): void {
+  const state = mobileLongPressState.value;
+  if (!state) {
+    return;
+  }
+  if (event && state.pointerId !== event.pointerId) {
+    return;
+  }
+  const triggered = state.triggered;
+  clearMobileLongPressState();
+  if (triggered) {
+    mobileSuppressNextTap.value = true;
+  }
+}
+
 function selectEntry(uid: number, event?: MouseEvent): void {
   if (suppressNextEntryClick.value) {
     suppressNextEntryClick.value = false;
@@ -7755,6 +8246,14 @@ function selectEntry(uid: number, event?: MouseEvent): void {
   }
 
   if (isMobile.value) {
+    if (mobileSuppressNextTap.value) {
+      mobileSuppressNextTap.value = false;
+      return;
+    }
+    if (mobileMultiSelectMode.value) {
+      toggleMobileEntrySelection(uid);
+      return;
+    }
     selectedEntryUid.value = uid;
     selectedEntryUids.value = [uid];
     selectedEntryAnchorUid.value = uid;
@@ -10386,6 +10885,7 @@ onUnmounted(() => {
   subscriptions.forEach(subscription => {
     subscription.stop();
   });
+  clearMobileLongPressState();
   stopFloatingDrag();
   stopPaneResize();
   stopCrossCopyPaneResize();
@@ -12124,6 +12624,23 @@ watch(hasUnsavedChanges, (val) => {
   flex-shrink: 0;
 }
 
+.list-multi-edit-hint {
+  margin: 0 8px;
+  border: 1px solid color-mix(in srgb, var(--wb-primary) 36%, transparent);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--wb-primary-light);
+  background: color-mix(in srgb, var(--wb-primary-soft) 72%, transparent);
+  flex-shrink: 0;
+}
+
+.list-multi-edit-hint.off {
+  color: var(--wb-text-muted);
+  border-color: var(--wb-border-subtle);
+  background: var(--wb-input-bg);
+}
+
 .list-scroll {
   flex: 1 1 0;
   min-height: 0;
@@ -13842,6 +14359,48 @@ watch(hasUnsavedChanges, (val) => {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.mobile-multi-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  border: 1px solid var(--wb-border-subtle);
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--wb-bg-panel);
+  margin-bottom: 4px;
+}
+
+.mobile-multi-title {
+  font-size: 12px;
+  color: var(--wb-primary-light);
+}
+
+.mobile-multi-actions {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.mobile-multi-item {
+  position: relative;
+}
+
+.mobile-multi-checkbox {
+  flex-shrink: 0;
+}
+
+.mobile-multi-content-note {
+  margin-bottom: 6px;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.08);
 }
 
 .mobile-ai-panel {
