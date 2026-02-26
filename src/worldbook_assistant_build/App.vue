@@ -704,17 +704,17 @@
                 </div>
               </div>
             </label>
-            <button class="btn" data-focus-hero="wb_new" type="button" @click="createNewWorldbook">新建</button>
-            <button class="btn" data-focus-hero="wb_duplicate" type="button" :disabled="!selectedWorldbookName" @click="duplicateWorldbook">
+            <button class="btn" data-focus-hero="wb_new" data-copy-hero="wb_new" type="button" @click="createNewWorldbook">新建</button>
+            <button class="btn" data-focus-hero="wb_duplicate" data-copy-hero="wb_duplicate" type="button" :disabled="!selectedWorldbookName" @click="duplicateWorldbook">
               另存为
             </button>
-            <button class="btn danger" data-focus-hero="wb_delete" type="button" :disabled="!selectedWorldbookName" @click="deleteCurrentWorldbook">
+            <button class="btn danger" data-focus-hero="wb_delete" data-copy-hero="wb_delete" type="button" :disabled="!selectedWorldbookName" @click="deleteCurrentWorldbook">
               删除
             </button>
-            <button class="btn" data-focus-hero="wb_export" type="button" :disabled="!selectedWorldbookName" @click="exportCurrentWorldbook">
+            <button class="btn" data-focus-hero="wb_export" data-copy-hero="wb_export" type="button" :disabled="!selectedWorldbookName" @click="exportCurrentWorldbook">
               导出
             </button>
-            <button class="btn" data-focus-hero="wb_import" type="button" @click="triggerImport">导入</button>
+            <button class="btn" data-focus-hero="wb_import" data-copy-hero="wb_import" type="button" @click="triggerImport">导入</button>
             <div class="focus-cine-sink-row" aria-hidden="true">
               <span class="focus-cine-sink" data-focus-sink="save_btn"></span>
               <span class="focus-cine-sink" data-focus-sink="more_btn"></span>
@@ -769,14 +769,14 @@
                     </div>
                   </div>
                 </label>
-                <button class="btn" data-focus-hero="save_btn" type="button" :class="{ 'glow-pulse': hasUnsavedChanges }" :disabled="!hasUnsavedChanges || focusCineLocked" @click="saveCurrentWorldbook">
+                <button class="btn" data-focus-hero="save_btn" data-copy-hero="save_btn" type="button" :class="{ 'glow-pulse': hasUnsavedChanges }" :disabled="!hasUnsavedChanges || isAnyCineLocked" @click="saveCurrentWorldbook">
                   {{ isFocusToolbarCompact ? '💾' : '💾 保存' }}
                 </button>
-                <button class="btn utility-btn" data-focus-hero="focus_toggle" type="button" :class="{ active: isDesktopFocusMode }" :disabled="focusCineLocked" @click="toggleFocusEditing">
+                <button class="btn utility-btn" data-focus-hero="focus_toggle" data-copy-hero="focus_toggle" type="button" :class="{ active: isDesktopFocusMode }" :disabled="isAnyCineLocked" @click="toggleFocusEditing">
                   {{ isFocusToolbarCompact ? '🎯' : '🎯 专注开关' }}
                 </button>
                 <div ref="focusWorldbookMenuRef" class="focus-menu-wrap">
-                  <button class="btn utility-btn" data-focus-hero="more_btn" type="button" :disabled="focusCineLocked" @click="toggleFocusWorldbookMenu">
+                  <button class="btn utility-btn" data-focus-hero="more_btn" data-copy-hero="more_btn" type="button" :disabled="isAnyCineLocked" @click="toggleFocusWorldbookMenu">
                     {{ isFocusToolbarCompact ? '⋯' : '更多' }}
                   </button>
                   <div class="focus-cine-sink-cluster menu" aria-hidden="true">
@@ -801,15 +801,16 @@
                 <button
                   class="btn history-btn utility-btn focus-search-btn"
                   data-focus-hero="find_btn"
+                  data-copy-hero="find_btn"
                   type="button"
                   :class="{ active: floatingPanels.find.visible }"
-                  :disabled="!draftEntries.length || focusCineLocked"
+                  :disabled="!draftEntries.length || isAnyCineLocked"
                   @click="toggleFloatingPanel('find')"
                 >
                   {{ isFocusToolbarCompact ? '🔎' : '🔎 查找替换' }}
                 </button>
                 <Transition name="focus-tools-trigger">
-                  <button v-if="focusToolsTriggerVisible" class="btn history-btn utility-btn" data-focus-hero="tools_btn" type="button" :disabled="focusToolsExpanded || focusCineLocked" @click="openFocusToolsBand">
+                  <button v-if="focusToolsTriggerVisible" class="btn history-btn utility-btn" data-focus-hero="tools_btn" data-copy-hero="tools_btn" type="button" :disabled="focusToolsExpanded || isAnyCineLocked" @click="openFocusToolsBand">
                     {{ isFocusToolbarCompact ? '工具' : '更多工具' }}
                   </button>
                 </Transition>
@@ -829,16 +830,16 @@
             </div>
             <Transition name="focus-tools-band" @after-leave="onFocusToolsBandAfterLeave">
               <div v-if="focusToolsExpanded" class="wb-focus-tools-band">
-                <button class="btn history-btn utility-btn" data-focus-hero="tool_global" type="button" :class="{ active: globalWorldbookMode }" @click="toggleGlobalMode">🌐 全局模式</button>
-                <button class="btn history-btn utility-btn" data-focus-hero="tool_entry_history" type="button" :disabled="!selectedEntry" @click="openEntryHistoryModal">🕰️ 条目时光机</button>
-                <button class="btn history-btn utility-btn" data-focus-hero="tool_worldbook_history" type="button" :disabled="!selectedWorldbookName" @click="openWorldbookHistoryModal">⏪ 整本时光机</button>
-                <button class="btn history-btn utility-btn" data-focus-hero="tool_activation" type="button" :class="{ active: floatingPanels.activation.visible }" @click="toggleFloatingPanel('activation')">📡 激活监控</button>
-                <button v-if="persistedState.show_ai_chat" class="btn history-btn utility-btn" data-focus-hero="tool_ai_generate" type="button" :class="{ active: aiGeneratorMode }" @click="aiToggleMode">🤖 AI 生成</button>
-                <button class="btn history-btn utility-btn" data-focus-hero="tool_extract" type="button" @click="extractFromChat">📥 从聊天提取</button>
-                <button class="btn history-btn utility-btn" data-focus-hero="tool_tag" type="button" :class="{ active: tagEditorMode }" @click="tagToggleMode">🏷️ 标签管理</button>
-                <button class="btn history-btn utility-btn" data-focus-hero="tool_copy" type="button" :class="{ active: crossCopyMode }" @click="toggleCrossCopyMode">📚 跨书复制</button>
-                <button class="btn history-btn utility-btn" data-focus-hero="tool_settings" type="button" @click="showApiSettings = true">⚙️ 设置</button>
-                <button class="btn history-btn utility-btn" data-focus-hero="tool_ai_config" type="button" @click="aiConfigPreview = false; aiConfigChanges = []; aiConfigTargetWorldbook = selectedWorldbookName || ''">🔧 AI配置</button>
+                <button class="btn history-btn utility-btn" data-focus-hero="tool_global" data-copy-hero="tool_global" type="button" :class="{ active: globalWorldbookMode }" @click="toggleGlobalMode">🌐 全局模式</button>
+                <button class="btn history-btn utility-btn" data-focus-hero="tool_entry_history" data-copy-hero="tool_entry_history" type="button" :disabled="!selectedEntry" @click="openEntryHistoryModal">🕰️ 条目时光机</button>
+                <button class="btn history-btn utility-btn" data-focus-hero="tool_worldbook_history" data-copy-hero="tool_worldbook_history" type="button" :disabled="!selectedWorldbookName" @click="openWorldbookHistoryModal">⏪ 整本时光机</button>
+                <button class="btn history-btn utility-btn" data-focus-hero="tool_activation" data-copy-hero="tool_activation" type="button" :class="{ active: floatingPanels.activation.visible }" @click="toggleFloatingPanel('activation')">📡 激活监控</button>
+                <button v-if="persistedState.show_ai_chat" class="btn history-btn utility-btn" data-focus-hero="tool_ai_generate" data-copy-hero="tool_ai_generate" type="button" :class="{ active: aiGeneratorMode }" @click="aiToggleMode">🤖 AI 生成</button>
+                <button class="btn history-btn utility-btn" data-focus-hero="tool_extract" data-copy-hero="tool_extract" type="button" @click="extractFromChat">📥 从聊天提取</button>
+                <button class="btn history-btn utility-btn" data-focus-hero="tool_tag" data-copy-hero="tool_tag" type="button" :class="{ active: tagEditorMode }" @click="tagToggleMode">🏷️ 标签管理</button>
+                <button class="btn history-btn utility-btn" data-focus-hero="tool_copy" data-copy-hero="tool_copy" type="button" :class="{ active: crossCopyMode }" :disabled="isAnyCineLocked" @click="toggleCrossCopyMode">📚 跨书复制</button>
+                <button class="btn history-btn utility-btn" data-focus-hero="tool_settings" data-copy-hero="tool_settings" type="button" @click="showApiSettings = true">⚙️ 设置</button>
+                <button class="btn history-btn utility-btn" data-focus-hero="tool_ai_config" data-copy-hero="tool_ai_config" type="button" @click="aiConfigPreview = false; aiConfigChanges = []; aiConfigTargetWorldbook = selectedWorldbookName || ''">🔧 AI配置</button>
                 <button class="btn history-btn utility-btn focus-tools-collapse" type="button" @click="closeFocusToolsBand">收起工具</button>
               </div>
             </Transition>
@@ -875,22 +876,24 @@
             </div>
             <Transition name="copy-workspace-tools">
             <div v-if="!isDesktopFocusMode && (!crossCopyMode || crossCopyWorkspaceToolsExpanded)" class="wb-history-shortcuts" :class="{ 'copy-workspace-tools': crossCopyMode }">
-              <button class="btn history-btn utility-btn" data-focus-hero="focus_toggle" type="button" :disabled="focusCineLocked" @click="toggleFocusEditing">🎯 专注编辑</button>
+              <button class="btn history-btn utility-btn" data-focus-hero="focus_toggle" data-copy-hero="focus_toggle" type="button" :disabled="isAnyCineLocked" @click="toggleFocusEditing">🎯 专注编辑</button>
               <button
                 class="btn history-btn utility-btn"
                 data-focus-hero="tool_global"
+                data-copy-hero="tool_global"
                 type="button"
                 :class="{ active: globalWorldbookMode }"
                 @click="toggleGlobalMode"
               >
                 🌐 全局模式
               </button>
-              <button class="btn history-btn" data-focus-hero="tool_entry_history" type="button" :disabled="!selectedEntry" @click="openEntryHistoryModal">
+              <button class="btn history-btn" data-focus-hero="tool_entry_history" data-copy-hero="tool_entry_history" type="button" :disabled="!selectedEntry" @click="openEntryHistoryModal">
                 🕰️ 条目时光机
               </button>
               <button
                 class="btn history-btn"
                 data-focus-hero="tool_worldbook_history"
+                data-copy-hero="tool_worldbook_history"
                 type="button"
                 :disabled="!selectedWorldbookName"
                 @click="openWorldbookHistoryModal"
@@ -900,9 +903,10 @@
               <button
                 class="btn history-btn utility-btn"
                 data-focus-hero="find_btn"
+                data-copy-hero="find_btn"
                 type="button"
                 :class="{ active: floatingPanels.find.visible }"
-                :disabled="!draftEntries.length || focusCineLocked"
+                :disabled="!draftEntries.length || isAnyCineLocked"
                 @click="toggleFloatingPanel('find')"
               >
                 🔎 查找与替换
@@ -910,6 +914,7 @@
               <button
                 class="btn history-btn utility-btn"
                 data-focus-hero="tool_activation"
+                data-copy-hero="tool_activation"
                 type="button"
                 :class="{ active: floatingPanels.activation.visible }"
                 @click="toggleFloatingPanel('activation')"
@@ -920,6 +925,7 @@
                 v-if="persistedState.show_ai_chat"
                 class="btn history-btn utility-btn"
                 data-focus-hero="tool_ai_generate"
+                data-copy-hero="tool_ai_generate"
                 type="button"
                 :class="{ active: aiGeneratorMode }"
                 @click="aiToggleMode"
@@ -929,6 +935,7 @@
               <button
                 class="btn history-btn utility-btn"
                 data-focus-hero="tool_extract"
+                data-copy-hero="tool_extract"
                 type="button"
                 @click="extractFromChat"
               >
@@ -937,6 +944,7 @@
               <button
                 class="btn history-btn utility-btn"
                 data-focus-hero="tool_tag"
+                data-copy-hero="tool_tag"
                 type="button"
                 :class="{ active: tagEditorMode }"
                 @click="tagToggleMode"
@@ -946,8 +954,10 @@
               <button
                 class="btn history-btn utility-btn"
                 data-focus-hero="tool_copy"
+                data-copy-hero="tool_copy"
                 type="button"
                 :class="{ active: crossCopyMode }"
+                :disabled="isAnyCineLocked"
                 @click="toggleCrossCopyMode"
               >
                 📚 跨书复制
@@ -955,6 +965,7 @@
               <button
                 class="btn history-btn utility-btn"
                 data-focus-hero="tool_settings"
+                data-copy-hero="tool_settings"
                 type="button"
                 @click="showApiSettings = true"
               >
@@ -963,6 +974,7 @@
               <button
                 class="btn history-btn utility-btn"
                 data-focus-hero="tool_ai_config"
+                data-copy-hero="tool_ai_config"
                 type="button"
                 @click="aiConfigPreview = false; aiConfigChanges = []; aiConfigTargetWorldbook = selectedWorldbookName || ''"
               >
@@ -1300,7 +1312,7 @@
           <section v-if="crossCopyMode" class="cross-copy-panel desktop">
             <div class="cross-copy-head">
               <div class="cross-copy-head-main">
-                <strong>📚 跨世界书复制条目</strong>
+                <strong data-copy-hero="tool_copy">📚 跨世界书复制条目</strong>
                 <span>{{ crossCopyWorkspaceSummary }}</span>
               </div>
               <div class="cross-copy-head-actions">
@@ -1308,6 +1320,26 @@
                 <button class="btn mini utility-btn" type="button" @click="toggleCrossCopyControlsCollapsed">
                   {{ crossCopyControlsCollapsed ? '展开高级项' : '收起高级项' }}
                 </button>
+                <div class="copy-cine-sink-cluster" aria-hidden="true">
+                  <span class="copy-cine-sink" data-copy-sink="focus_toggle"></span>
+                  <span class="copy-cine-sink" data-copy-sink="save_btn"></span>
+                  <span class="copy-cine-sink" data-copy-sink="more_btn"></span>
+                  <span class="copy-cine-sink" data-copy-sink="tools_btn"></span>
+                  <span class="copy-cine-sink" data-copy-sink="wb_new"></span>
+                  <span class="copy-cine-sink" data-copy-sink="wb_duplicate"></span>
+                  <span class="copy-cine-sink" data-copy-sink="wb_delete"></span>
+                  <span class="copy-cine-sink" data-copy-sink="wb_export"></span>
+                  <span class="copy-cine-sink" data-copy-sink="wb_import"></span>
+                  <span class="copy-cine-sink" data-copy-sink="tool_global"></span>
+                  <span class="copy-cine-sink" data-copy-sink="tool_entry_history"></span>
+                  <span class="copy-cine-sink" data-copy-sink="tool_worldbook_history"></span>
+                  <span class="copy-cine-sink" data-copy-sink="tool_activation"></span>
+                  <span class="copy-cine-sink" data-copy-sink="tool_ai_generate"></span>
+                  <span class="copy-cine-sink" data-copy-sink="tool_extract"></span>
+                  <span class="copy-cine-sink" data-copy-sink="tool_tag"></span>
+                  <span class="copy-cine-sink" data-copy-sink="tool_settings"></span>
+                  <span class="copy-cine-sink" data-copy-sink="tool_ai_config"></span>
+                </div>
               </div>
             </div>
 
@@ -1373,7 +1405,7 @@
                   <span>{{ crossCopyRows.length }} 条</span>
                 </div>
                 <div class="cross-copy-list-tools">
-                  <input v-model="crossCopySearchText" type="text" class="text-input" placeholder="搜索来源名称 / 内容" />
+                  <input v-model="crossCopySearchText" data-copy-hero="find_btn" type="text" class="text-input" placeholder="搜索来源名称 / 内容" />
                   <div class="cross-copy-mini-actions">
                     <button class="btn mini" type="button" :disabled="!crossCopySourceRowsFiltered.length" @click="setCrossCopySelectionForFiltered(true)">全选显示</button>
                     <button class="btn mini" type="button" :disabled="!crossCopyRows.length" @click="setCrossCopySelectionForAll(false)">全不选</button>
@@ -1883,6 +1915,12 @@
       v-if="focusCinePhase !== 'idle'"
       ref="focusCineOverlayRef"
       class="focus-cine-overlay"
+      aria-hidden="true"
+    ></div>
+    <div
+      v-if="copyCinePhase !== 'idle'"
+      ref="copyCineOverlayRef"
+      class="copy-cine-overlay"
       aria-hidden="true"
     ></div>
 
@@ -2775,6 +2813,8 @@ type FocusSidePanelKey = 'strategy' | 'insertion' | 'recursion';
 type FocusMetaPanelKey = 'comment' | 'keywords';
 type FocusCinePhase = 'idle' | 'prepare' | 'running' | 'settling';
 type FocusCineDirection = 'enter' | 'exit';
+type CopyCinePhase = 'idle' | 'prepare' | 'running' | 'settling';
+type CopyCineDirection = 'enter' | 'exit';
 type FocusHeroKey = string;
 type CrossCopyRowStatus =
   | 'new'
@@ -3341,12 +3381,38 @@ const FOCUS_CINE_DURATION = 1400;
 const FOCUS_CINE_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
 const FOCUS_CINE_STAGGER = 28;
 const FOCUS_CINE_MAX_STAGGER_STEPS = 8;
+const COPY_CINE_DURATION = 1100;
+const COPY_CINE_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
+const COPY_CINE_STAGGER = 22;
+const COPY_CINE_MAX_STAGGER_STEPS = 14;
 const FOCUS_FALLBACK_PRIORITY: FocusHeroKey[] = [
   'focus_toggle',
   'find_btn',
   'save_btn',
   'more_btn',
   'tools_btn',
+];
+const COPY_FALLBACK_PRIORITY: FocusHeroKey[] = [
+  'tool_copy',
+  'find_btn',
+  'focus_toggle',
+  'save_btn',
+  'more_btn',
+  'tools_btn',
+  'wb_new',
+  'wb_duplicate',
+  'wb_delete',
+  'wb_export',
+  'wb_import',
+  'tool_global',
+  'tool_entry_history',
+  'tool_worldbook_history',
+  'tool_activation',
+  'tool_ai_generate',
+  'tool_extract',
+  'tool_tag',
+  'tool_settings',
+  'tool_ai_config',
 ];
 const CROSS_COPY_STATUS_PRIORITY: CrossCopyRowStatus[] = [
   'same_name_changed',
@@ -3431,6 +3497,13 @@ const focusCineOverlayRef = ref<HTMLElement | null>(null);
 let focusCineToken = 0;
 let focusCineGhostNodes: HTMLElement[] = [];
 let focusCineHiddenNodes: HTMLElement[] = [];
+const copyCinePhase = ref<CopyCinePhase>('idle');
+const copyCineDirection = ref<CopyCineDirection>('enter');
+const copyCineLocked = ref(false);
+const copyCineOverlayRef = ref<HTMLElement | null>(null);
+let copyCineToken = 0;
+let copyCineGhostNodes: HTMLElement[] = [];
+let copyCineHiddenNodes: HTMLElement[] = [];
 const focusMetaPanel = reactive<Record<FocusMetaPanelKey, boolean>>({
   comment: false,
   keywords: false,
@@ -3747,11 +3820,18 @@ const isDesktopFocusMode = computed(() => !isMobile.value && !isCompactLayout.va
 const canResizeHistorySections = computed(() => !isMobile.value && viewportWidth.value > 1380);
 const focusCineEnabled = computed(() => !isMobile.value && viewportWidth.value > 1100);
 const isFocusCineRunning = computed(() => focusCinePhase.value === 'running' || focusCinePhase.value === 'settling');
+const copyCineEnabled = computed(() => !isMobile.value && viewportWidth.value > 1100);
+const isCopyCineRunning = computed(() => copyCinePhase.value === 'running' || copyCinePhase.value === 'settling');
+const isAnyCineLocked = computed(() => focusCineLocked.value || copyCineLocked.value);
 const focusCineRootClass = computed(() => ({
   'focus-cine-running': isFocusCineRunning.value,
   'focus-cine-enter': isFocusCineRunning.value && focusCineDirection.value === 'enter',
   'focus-cine-exit': isFocusCineRunning.value && focusCineDirection.value === 'exit',
   'focus-cine-locked': focusCineLocked.value,
+  'copy-cine-running': isCopyCineRunning.value,
+  'copy-cine-enter': isCopyCineRunning.value && copyCineDirection.value === 'enter',
+  'copy-cine-exit': isCopyCineRunning.value && copyCineDirection.value === 'exit',
+  'copy-cine-locked': copyCineLocked.value,
 }));
 const isFocusToolbarCompact = computed(() => isDesktopFocusMode.value && viewportWidth.value < 1360);
 const activeMainPaneMin = computed(() => (isDesktopFocusMode.value ? FOCUS_MAIN_PANE_MIN : MAIN_PANE_MIN));
@@ -6534,6 +6614,9 @@ async function aiCreateSelectedEntries(): Promise<void> {
 }
 
 function aiToggleMode(): void {
+  if (isAnyCineLocked.value) {
+    return;
+  }
   aiGeneratorMode.value = !aiGeneratorMode.value;
   if (aiGeneratorMode.value) {
     globalWorldbookMode.value = false;
@@ -6543,6 +6626,9 @@ function aiToggleMode(): void {
 }
 
 function tagToggleMode(): void {
+  if (isAnyCineLocked.value) {
+    return;
+  }
   tagEditorMode.value = !tagEditorMode.value;
   if (tagEditorMode.value) {
     aiGeneratorMode.value = false;
@@ -6978,6 +7064,9 @@ function goToNextCrossCopyMobileStep(): void {
 }
 
 function startCrossCopyPaneResize(event: PointerEvent): void {
+  if (isAnyCineLocked.value) {
+    return;
+  }
   if (crossCopyDesktopSingleColumn.value) {
     return;
   }
@@ -7055,7 +7144,15 @@ function setCrossCopyModeActive(next: boolean): void {
 }
 
 function toggleCrossCopyMode(): void {
-  setCrossCopyModeActive(!crossCopyMode.value);
+  if (isAnyCineLocked.value) {
+    return;
+  }
+  const nextCrossCopy = !crossCopyMode.value;
+  if (!copyCineEnabled.value) {
+    setCrossCopyModeActive(nextCrossCopy);
+    return;
+  }
+  void runCrossCopyCinematicTransition(nextCrossCopy);
 }
 
 function resetCrossCopyCompare(reason = ''): void {
@@ -9190,6 +9287,9 @@ function trySelectWorldbookByContext(
 }
 
 function toggleGlobalMode(): void {
+  if (isAnyCineLocked.value) {
+    return;
+  }
   globalWorldbookMode.value = !globalWorldbookMode.value;
   if (globalWorldbookMode.value) {
     aiGeneratorMode.value = false;
@@ -9699,7 +9799,7 @@ function closeFocusWorldbookMenu(): void {
 }
 
 function toggleFocusWorldbookMenu(): void {
-  if (focusCineLocked.value) {
+  if (isAnyCineLocked.value) {
     return;
   }
   if (!focusWorldbookMenuOpen.value) {
@@ -9709,7 +9809,7 @@ function toggleFocusWorldbookMenu(): void {
 }
 
 function openFocusToolsBand(): void {
-  if (focusCineLocked.value) {
+  if (isAnyCineLocked.value) {
     return;
   }
   if (focusToolsExpanded.value || !focusToolsTriggerVisible.value) {
@@ -9777,7 +9877,10 @@ function applyFocusEditingState(nextFocus: boolean): void {
   }
 }
 
-function collectFocusAnimatedKeys(root: HTMLElement, attribute: 'data-focus-hero' | 'data-focus-sink'): Set<FocusHeroKey> {
+function collectFocusAnimatedKeys(
+  root: HTMLElement,
+  attribute: 'data-focus-hero' | 'data-focus-sink' | 'data-copy-hero' | 'data-copy-sink',
+): Set<FocusHeroKey> {
   const keys = new Set<FocusHeroKey>();
   const nodes = Array.from(root.querySelectorAll<HTMLElement>(`[${attribute}]`));
   for (const node of nodes) {
@@ -9833,6 +9936,63 @@ function collectFocusSinkSnapshots(): Map<FocusHeroKey, FocusSinkSnapshot> {
   const keys = collectFocusAnimatedKeys(root, 'data-focus-sink');
   for (const key of keys) {
     const nodes = Array.from(root.querySelectorAll<HTMLElement>(`[data-focus-sink="${key}"]`));
+    const element = nodes.find(node => node.isConnected && node.getBoundingClientRect().width > 1 && node.getBoundingClientRect().height > 1) ?? null;
+    if (!element) {
+      continue;
+    }
+    const rect = element.getBoundingClientRect();
+    if (rect.width <= 1 || rect.height <= 1) {
+      continue;
+    }
+    snapshots.set(key, { key, element, rect });
+  }
+  return snapshots;
+}
+
+function collectCopyHeroSnapshots(): Map<FocusHeroKey, FocusHeroSnapshot> {
+  const snapshots = new Map<FocusHeroKey, FocusHeroSnapshot>();
+  const root = rootRef.value;
+  if (!root) {
+    return snapshots;
+  }
+
+  const keys = collectFocusAnimatedKeys(root, 'data-copy-hero');
+  for (const key of keys) {
+    const nodes = Array.from(root.querySelectorAll<HTMLElement>(`[data-copy-hero="${key}"]`));
+    const visibleNodes = nodes.filter(node => {
+      if (!node.isConnected) {
+        return false;
+      }
+      const style = window.getComputedStyle(node);
+      if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) <= 0) {
+        return false;
+      }
+      const rect = node.getBoundingClientRect();
+      return rect.width > 1 && rect.height > 1;
+    });
+    const element = visibleNodes[visibleNodes.length - 1] ?? nodes[nodes.length - 1] ?? null;
+    if (!element) {
+      continue;
+    }
+    const rect = element.getBoundingClientRect();
+    if (rect.width <= 1 || rect.height <= 1) {
+      continue;
+    }
+    snapshots.set(key, { key, element, rect });
+  }
+
+  return snapshots;
+}
+
+function collectCopySinkSnapshots(): Map<FocusHeroKey, FocusSinkSnapshot> {
+  const snapshots = new Map<FocusHeroKey, FocusSinkSnapshot>();
+  const root = rootRef.value;
+  if (!root) {
+    return snapshots;
+  }
+  const keys = collectFocusAnimatedKeys(root, 'data-copy-sink');
+  for (const key of keys) {
+    const nodes = Array.from(root.querySelectorAll<HTMLElement>(`[data-copy-sink="${key}"]`));
     const element = nodes.find(node => node.isConnected && node.getBoundingClientRect().width > 1 && node.getBoundingClientRect().height > 1) ?? null;
     if (!element) {
       continue;
@@ -9902,6 +10062,62 @@ function buildFocusGhostKeyOrder(
   return ordered;
 }
 
+function resolveCopyFallbackRect(
+  heroMap: Map<FocusHeroKey, FocusHeroSnapshot>,
+  sinkMap: Map<FocusHeroKey, FocusSinkSnapshot>,
+): DOMRect | null {
+  for (const key of COPY_FALLBACK_PRIORITY) {
+    const hero = heroMap.get(key);
+    if (hero) {
+      return hero.rect;
+    }
+  }
+  for (const key of COPY_FALLBACK_PRIORITY) {
+    const sink = sinkMap.get(key);
+    if (sink) {
+      return sink.rect;
+    }
+  }
+  for (const hero of heroMap.values()) {
+    return hero.rect;
+  }
+  for (const sink of sinkMap.values()) {
+    return sink.rect;
+  }
+  return null;
+}
+
+function buildCopyGhostKeyOrder(
+  sourceMap: Map<FocusHeroKey, FocusHeroSnapshot>,
+  targetMap: Map<FocusHeroKey, FocusHeroSnapshot>,
+  sourceSinkMap: Map<FocusHeroKey, FocusSinkSnapshot>,
+  targetSinkMap: Map<FocusHeroKey, FocusSinkSnapshot>,
+): FocusHeroKey[] {
+  const keySet = new Set<FocusHeroKey>();
+  for (const key of sourceMap.keys()) {
+    keySet.add(key);
+  }
+  for (const key of targetMap.keys()) {
+    keySet.add(key);
+  }
+  for (const key of sourceSinkMap.keys()) {
+    keySet.add(key);
+  }
+  for (const key of targetSinkMap.keys()) {
+    keySet.add(key);
+  }
+
+  const ordered: FocusHeroKey[] = [];
+  for (const key of COPY_FALLBACK_PRIORITY) {
+    if (keySet.delete(key)) {
+      ordered.push(key);
+    }
+  }
+  const remaining = Array.from(keySet).sort((a, b) => a.localeCompare(b));
+  ordered.push(...remaining);
+  return ordered;
+}
+
 function clearFocusCineArtifacts(): void {
   for (const node of focusCineGhostNodes) {
     node.remove();
@@ -9912,6 +10128,18 @@ function clearFocusCineArtifacts(): void {
     node.classList.remove('focus-cine-real-hidden');
   }
   focusCineHiddenNodes = [];
+}
+
+function clearCopyCineArtifacts(): void {
+  for (const node of copyCineGhostNodes) {
+    node.remove();
+  }
+  copyCineGhostNodes = [];
+
+  for (const node of copyCineHiddenNodes) {
+    node.classList.remove('copy-cine-real-hidden');
+  }
+  copyCineHiddenNodes = [];
 }
 
 function mountFocusCineGhosts(
@@ -9997,8 +10225,96 @@ function mountFocusCineGhosts(
   return index;
 }
 
+function mountCopyCineGhosts(
+  sourceMap: Map<FocusHeroKey, FocusHeroSnapshot>,
+  targetMap: Map<FocusHeroKey, FocusHeroSnapshot>,
+  sourceSinkMap: Map<FocusHeroKey, FocusSinkSnapshot>,
+  targetSinkMap: Map<FocusHeroKey, FocusSinkSnapshot>,
+): number {
+  clearCopyCineArtifacts();
+  const overlay = copyCineOverlayRef.value;
+  if (!overlay) {
+    return 0;
+  }
+  const sourceFallbackRect = resolveCopyFallbackRect(sourceMap, sourceSinkMap);
+  const targetFallbackRect = resolveCopyFallbackRect(targetMap, targetSinkMap);
+  const sourceElementFallback =
+    sourceMap.get('tool_copy')?.element
+    ?? targetMap.get('tool_copy')?.element
+    ?? sourceMap.get('find_btn')?.element
+    ?? targetMap.get('find_btn')?.element
+    ?? null;
+  const hiddenTargets = new Set<HTMLElement>();
+  const orderedKeys = buildCopyGhostKeyOrder(sourceMap, targetMap, sourceSinkMap, targetSinkMap);
+  let index = 0;
+
+  for (const key of orderedKeys) {
+    const sourceSelf = sourceMap.get(key) ?? null;
+    const targetSelf = targetMap.get(key) ?? null;
+    const sourceSink = sourceSinkMap.get(key) ?? null;
+    const targetSink = targetSinkMap.get(key) ?? null;
+
+    if (!sourceSelf && !targetSelf && !sourceSink && !targetSink) {
+      continue;
+    }
+
+    const startRect = sourceSelf?.rect ?? sourceSink?.rect ?? sourceFallbackRect;
+    const endRect = targetSelf?.rect ?? targetSink?.rect ?? targetFallbackRect;
+    if (!startRect || !endRect) {
+      continue;
+    }
+    const sourceElement = sourceSelf?.element ?? targetSelf?.element ?? sourceElementFallback;
+    if (!sourceElement) {
+      continue;
+    }
+    const ghost = sourceElement.cloneNode(true) as HTMLElement;
+    ghost.classList.add('copy-cine-ghost');
+    ghost.removeAttribute('id');
+    ghost.removeAttribute('data-copy-hero');
+    ghost.setAttribute('aria-hidden', 'true');
+
+    const startWidth = Math.max(1, startRect.width);
+    const startHeight = Math.max(1, startRect.height);
+    const endWidth = Math.max(1, endRect.width);
+    const endHeight = Math.max(1, endRect.height);
+    const dx = endRect.left - startRect.left;
+    const dy = endRect.top - startRect.top;
+    const scaleX = clampNumber(endWidth / startWidth, 0.72, 1.42);
+    const scaleY = clampNumber(endHeight / startHeight, 0.72, 1.42);
+    const arcYOffset = -10;
+
+    ghost.style.left = `${startRect.left}px`;
+    ghost.style.top = `${startRect.top}px`;
+    ghost.style.width = `${startWidth}px`;
+    ghost.style.height = `${startHeight}px`;
+    ghost.style.setProperty('--copy-cine-dx', `${dx}px`);
+    ghost.style.setProperty('--copy-cine-dy', `${dy}px`);
+    ghost.style.setProperty('--copy-cine-scale-x', `${scaleX}`);
+    ghost.style.setProperty('--copy-cine-scale-y', `${scaleY}`);
+    ghost.style.setProperty('--copy-cine-arc-y', `${arcYOffset}px`);
+    ghost.style.setProperty('--copy-cine-from-opacity', sourceSelf ? '1' : '0');
+    ghost.style.setProperty('--copy-cine-to-opacity', targetSelf ? '1' : '0');
+    ghost.style.animationDuration = `${COPY_CINE_DURATION}ms`;
+    ghost.style.animationTimingFunction = COPY_CINE_EASE;
+    const delaySteps = Math.min(index, COPY_CINE_MAX_STAGGER_STEPS);
+    ghost.style.animationDelay = `${delaySteps * COPY_CINE_STAGGER}ms`;
+
+    overlay.appendChild(ghost);
+    copyCineGhostNodes.push(ghost);
+
+    if (targetSelf && !hiddenTargets.has(targetSelf.element)) {
+      hiddenTargets.add(targetSelf.element);
+      targetSelf.element.classList.add('copy-cine-real-hidden');
+      copyCineHiddenNodes.push(targetSelf.element);
+    }
+    index += 1;
+  }
+
+  return index;
+}
+
 async function runFocusCinematicTransition(nextFocus: boolean): Promise<void> {
-  if (focusCineLocked.value) {
+  if (isAnyCineLocked.value) {
     return;
   }
   const token = ++focusCineToken;
@@ -10057,8 +10373,73 @@ async function runFocusCinematicTransition(nextFocus: boolean): Promise<void> {
   }
 }
 
+async function runCrossCopyCinematicTransition(nextCrossCopy: boolean): Promise<void> {
+  if (isAnyCineLocked.value) {
+    return;
+  }
+  const token = ++copyCineToken;
+  copyCineLocked.value = true;
+  copyCineDirection.value = nextCrossCopy ? 'enter' : 'exit';
+  copyCinePhase.value = 'prepare';
+  let switched = false;
+
+  try {
+    await nextTick();
+    const sourceMap = collectCopyHeroSnapshots();
+    const sourceSinkMap = collectCopySinkSnapshots();
+
+    setCrossCopyModeActive(nextCrossCopy);
+    switched = true;
+    await nextTick();
+    await waitForFrame();
+    await waitForFrame();
+
+    const targetMap = collectCopyHeroSnapshots();
+    const targetSinkMap = collectCopySinkSnapshots();
+    const ghostCount = mountCopyCineGhosts(sourceMap, targetMap, sourceSinkMap, targetSinkMap);
+    if (token !== copyCineToken) {
+      return;
+    }
+    if (ghostCount <= 0) {
+      copyCinePhase.value = 'settling';
+      await nextTick();
+      clampPaneWidths();
+      persistLayoutState();
+      return;
+    }
+
+    copyCinePhase.value = 'running';
+    const staggerTail = Math.min(Math.max(ghostCount - 1, 0), COPY_CINE_MAX_STAGGER_STEPS) * COPY_CINE_STAGGER;
+    const totalDuration = COPY_CINE_DURATION + staggerTail + 40;
+    await waitForDuration(totalDuration);
+    if (token !== copyCineToken) {
+      return;
+    }
+
+    copyCinePhase.value = 'settling';
+    clearCopyCineArtifacts();
+    await nextTick();
+    clampPaneWidths();
+    persistLayoutState();
+  } catch (error) {
+    console.error('[copy-cine] transition failed', error);
+    if (!switched) {
+      setCrossCopyModeActive(nextCrossCopy);
+    }
+    await nextTick();
+    clampPaneWidths();
+    persistLayoutState();
+  } finally {
+    if (token === copyCineToken) {
+      clearCopyCineArtifacts();
+      copyCinePhase.value = 'idle';
+      copyCineLocked.value = false;
+    }
+  }
+}
+
 function toggleFocusEditing(): void {
-  if (focusCineLocked.value) {
+  if (isAnyCineLocked.value) {
     return;
   }
   const nextFocus = !isFocusEditing.value;
@@ -10877,6 +11258,10 @@ onUnmounted(() => {
   focusCineLocked.value = false;
   focusCinePhase.value = 'idle';
   clearFocusCineArtifacts();
+  copyCineToken += 1;
+  copyCineLocked.value = false;
+  copyCinePhase.value = 'idle';
+  clearCopyCineArtifacts();
   if (keysDebounceTimer) {
     clearTimeout(keysDebounceTimer);
     keysDebounceTimer = null;
@@ -10994,6 +11379,24 @@ watch(hasUnsavedChanges, (val) => {
   animation: focus-cine-vignette 1400ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+.copy-cine-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10292;
+  pointer-events: auto;
+  overflow: hidden;
+}
+
+.copy-cine-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 52% 46%, rgba(125, 211, 252, 0.12), rgba(2, 6, 23, 0.46) 70%),
+    radial-gradient(circle at 48% 60%, rgba(2, 6, 23, 0), rgba(2, 6, 23, 0.38) 100%);
+  animation: copy-cine-vignette 1100ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 .focus-cine-ghost {
   position: fixed;
   z-index: 10305;
@@ -11006,7 +11409,23 @@ watch(hasUnsavedChanges, (val) => {
   animation-fill-mode: forwards;
 }
 
+.copy-cine-ghost {
+  position: fixed;
+  z-index: 10308;
+  margin: 0;
+  pointer-events: none;
+  transform-origin: center center;
+  will-change: transform, opacity, filter;
+  filter: drop-shadow(0 10px 20px rgba(2, 6, 23, 0.42));
+  animation-name: copy-cine-hero-flight;
+  animation-fill-mode: forwards;
+}
+
 [data-focus-hero].focus-cine-real-hidden {
+  visibility: hidden !important;
+}
+
+[data-copy-hero].copy-cine-real-hidden {
   visibility: hidden !important;
 }
 
@@ -11035,6 +11454,40 @@ watch(hasUnsavedChanges, (val) => {
   100% {
     opacity: var(--cine-to-opacity, 1);
     transform: translate3d(var(--cine-dx, 0px), var(--cine-dy, 0px), 0) scale(var(--cine-scale-x, 1), var(--cine-scale-y, 1));
+  }
+}
+
+@keyframes copy-cine-vignette {
+  0% {
+    opacity: 0;
+  }
+  40% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0.16;
+  }
+}
+
+@keyframes copy-cine-hero-flight {
+  0% {
+    opacity: var(--copy-cine-from-opacity, 1);
+    transform: translate3d(0, 0, 0) scale(1, 1);
+  }
+  60% {
+    opacity: 1;
+    transform: translate3d(
+      calc(var(--copy-cine-dx, 0px) * 0.62),
+      calc(var(--copy-cine-dy, 0px) * 0.62 + var(--copy-cine-arc-y, -12px)),
+      0
+    ) scale(
+      calc(var(--copy-cine-scale-x, 1) * 1.03),
+      calc(var(--copy-cine-scale-y, 1) * 1.03)
+    );
+  }
+  100% {
+    opacity: var(--copy-cine-to-opacity, 1);
+    transform: translate3d(var(--copy-cine-dx, 0px), var(--copy-cine-dy, 0px), 0) scale(var(--copy-cine-scale-x, 1), var(--copy-cine-scale-y, 1));
   }
 }
 
@@ -11107,10 +11560,35 @@ watch(hasUnsavedChanges, (val) => {
 }
 
 .cross-copy-head-actions {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
+}
+
+.copy-cine-sink-cluster {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.copy-cine-sink {
+  width: 86px;
+  height: 34px;
+  border-radius: 8px;
+}
+
+.copy-cine-sink-cluster .copy-cine-sink {
+  position: absolute;
+  right: 0;
+  top: 0;
+  transform: translateY(-50%);
 }
 
 .cross-copy-head strong {
@@ -12663,6 +13141,84 @@ watch(hasUnsavedChanges, (val) => {
 .wb-assistant-root.focus-cine-locked .wb-main-layout {
   transition-duration: 1400ms;
   transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.wb-assistant-root.copy-cine-locked .wb-bindings,
+.wb-assistant-root.copy-cine-locked .cross-copy-panel.desktop,
+.wb-assistant-root.copy-cine-locked .wb-main-layout {
+  transition:
+    opacity 1100ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 1100ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 1100ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform, opacity, filter;
+}
+
+.wb-assistant-root.copy-cine-enter.copy-cine-running .wb-bindings {
+  animation: copy-cine-bindings-enter 1100ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.wb-assistant-root.copy-cine-enter.copy-cine-running .cross-copy-panel.desktop {
+  animation: copy-cine-panel-enter 1100ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.wb-assistant-root.copy-cine-exit.copy-cine-running .wb-bindings {
+  animation: copy-cine-bindings-exit 1100ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.wb-assistant-root.copy-cine-exit.copy-cine-running .wb-main-layout {
+  animation: copy-cine-main-enter 1100ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes copy-cine-bindings-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.992);
+    filter: blur(1px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes copy-cine-bindings-exit {
+  0% {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.994);
+    filter: blur(1px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes copy-cine-panel-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.985);
+    filter: blur(1.5px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes copy-cine-main-enter {
+  0% {
+    opacity: 0.2;
+    transform: translateY(18px) scale(0.972);
+    filter: blur(1.6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
 }
 
 .wb-entry-list,
