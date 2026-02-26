@@ -977,107 +977,120 @@
                   清空全局
                 </button>
               </div>
-              <div class="global-preset-panel">
-                <label class="field">
-                  <span>世界书预设（切换即应用）</span>
-                  <select v-model="selectedGlobalPresetId" class="text-input" @change="onGlobalPresetSelectionChanged">
-                    <option value="">默认预设（清空全局世界书）</option>
-                    <option v-for="preset in globalWorldbookPresets" :key="preset.id" :value="preset.id">
-                      {{ preset.name }}（{{ preset.worldbooks.length }}）
-                    </option>
-                  </select>
-                </label>
-                <div class="global-mode-actions">
-                  <button class="btn" type="button" :disabled="!bindings.global.length" @click="saveCurrentAsGlobalPreset">
-                    保存当前组合
-                  </button>
-                  <button class="btn" type="button" :disabled="!selectedGlobalPreset" @click="overwriteSelectedGlobalPreset">
-                    覆盖当前预设
-                  </button>
-                  <button class="btn danger" type="button" :disabled="!selectedGlobalPreset" @click="deleteSelectedGlobalPreset">
-                    删除预设
-                  </button>
-                </div>
-                <div class="preset-role-panel">
-                  <div class="preset-role-head">
-                    <span>角色绑定（一个预设可绑定多个角色）</span>
+              <div class="global-mode-sections">
+                <details class="global-mode-section" open>
+                  <summary class="global-mode-section-summary">
+                    <span class="global-mode-section-title">世界书预设（切换即应用）</span>
+                    <span class="global-mode-section-meta">
+                      {{ selectedGlobalPreset ? selectedGlobalPreset.name : '默认预设（清空全局）' }}
+                    </span>
+                  </summary>
+                  <div class="global-mode-section-body global-preset-panel">
+                    <label class="field">
+                      <span>选择预设</span>
+                      <select v-model="selectedGlobalPresetId" class="text-input" @change="onGlobalPresetSelectionChanged">
+                        <option value="">默认预设（清空全局世界书）</option>
+                        <option v-for="preset in globalWorldbookPresets" :key="preset.id" :value="preset.id">
+                          {{ preset.name }}（{{ preset.worldbooks.length }}）
+                        </option>
+                      </select>
+                    </label>
+                    <div class="global-mode-actions">
+                      <button class="btn" type="button" :disabled="!bindings.global.length" @click="saveCurrentAsGlobalPreset">
+                        保存当前组合
+                      </button>
+                      <button class="btn" type="button" :disabled="!selectedGlobalPreset" @click="overwriteSelectedGlobalPreset">
+                        覆盖当前预设
+                      </button>
+                      <button class="btn danger" type="button" :disabled="!selectedGlobalPreset" @click="deleteSelectedGlobalPreset">
+                        删除预设
+                      </button>
+                    </div>
+                  </div>
+                </details>
+
+                <details class="global-mode-section" open>
+                  <summary class="global-mode-section-summary">
+                    <span class="global-mode-section-title">角色绑定（一个预设可绑定多个角色）</span>
                     <span class="preset-role-current" :class="{ empty: !currentRoleContext }">
                       {{ currentRoleContext ? `当前角色: ${currentRoleContext.name}` : '当前未进入角色聊天' }}
                     </span>
-                  </div>
-                  <div class="preset-role-actions">
-                    <button
-                      class="btn mini"
-                      type="button"
-                      :disabled="!selectedGlobalPreset || !currentRoleContext"
-                      @click="bindCurrentRoleToSelectedPreset"
-                    >
-                      绑定当前角色
-                    </button>
-                    <button
-                      class="btn mini"
-                      type="button"
-                      :disabled="!selectedGlobalPreset || !isCurrentRoleBoundToSelectedPreset"
-                      @click="unbindCurrentRoleFromSelectedPreset"
-                    >
-                      解绑当前角色
-                    </button>
-                  </div>
-                  <div ref="rolePickerRef" class="role-picker">
-                    <button
-                      class="role-picker-trigger"
-                      type="button"
-                      :disabled="!selectedGlobalPreset"
-                      @click="toggleRolePicker"
-                    >
-                      <span class="role-picker-trigger-text">
-                        {{ selectedGlobalPreset ? '从角色卡列表选择绑定' : '请先选择预设' }}
-                      </span>
-                      <span class="role-picker-trigger-arrow">{{ rolePickerOpen ? '▴' : '▾' }}</span>
-                    </button>
-                    <div v-if="rolePickerOpen" class="role-picker-dropdown">
-                      <input
-                        ref="rolePickerSearchInputRef"
-                        v-model="roleBindSearchText"
-                        type="text"
-                        class="text-input role-picker-search"
-                        placeholder="搜索角色名 / avatar..."
-                        @keydown.enter.prevent="bindFirstRoleCandidate"
-                      />
-                      <div class="role-picker-list">
-                        <button
-                          v-for="candidate in roleBindingCandidates"
-                          :key="`role-candidate-${candidate.key}`"
-                          class="role-picker-item"
-                          type="button"
-                          :disabled="candidate.bound"
-                          @click="bindRoleCandidateToSelectedPreset(candidate)"
-                        >
-                          <span class="name">{{ candidate.name }}</span>
-                          <span class="meta">{{ candidate.bound ? '已绑定' : '绑定' }}</span>
-                        </button>
-                        <div v-if="!roleBindingCandidates.length" class="empty-note">没有匹配角色</div>
+                  </summary>
+                  <div class="global-mode-section-body preset-role-panel">
+                    <div class="preset-role-actions">
+                      <button
+                        class="btn mini"
+                        type="button"
+                        :disabled="!selectedGlobalPreset || !currentRoleContext"
+                        @click="bindCurrentRoleToSelectedPreset"
+                      >
+                        绑定当前角色
+                      </button>
+                      <button
+                        class="btn mini"
+                        type="button"
+                        :disabled="!selectedGlobalPreset || !isCurrentRoleBoundToSelectedPreset"
+                        @click="unbindCurrentRoleFromSelectedPreset"
+                      >
+                        解绑当前角色
+                      </button>
+                    </div>
+                    <div ref="rolePickerRef" class="role-picker">
+                      <button
+                        class="role-picker-trigger"
+                        type="button"
+                        :disabled="!selectedGlobalPreset"
+                        @click="toggleRolePicker"
+                      >
+                        <span class="role-picker-trigger-text">
+                          {{ selectedGlobalPreset ? '从角色卡列表选择绑定' : '请先选择预设' }}
+                        </span>
+                        <span class="role-picker-trigger-arrow">{{ rolePickerOpen ? '▴' : '▾' }}</span>
+                      </button>
+                      <div v-if="rolePickerOpen" class="role-picker-dropdown">
+                        <input
+                          ref="rolePickerSearchInputRef"
+                          v-model="roleBindSearchText"
+                          type="text"
+                          class="text-input role-picker-search"
+                          placeholder="搜索角色名 / avatar..."
+                          @keydown.enter.prevent="bindFirstRoleCandidate"
+                        />
+                        <div class="role-picker-list">
+                          <button
+                            v-for="candidate in roleBindingCandidates"
+                            :key="`role-candidate-${candidate.key}`"
+                            class="role-picker-item"
+                            type="button"
+                            :disabled="candidate.bound"
+                            @click="bindRoleCandidateToSelectedPreset(candidate)"
+                          >
+                            <span class="name">{{ candidate.name }}</span>
+                            <span class="meta">{{ candidate.bound ? '已绑定' : '绑定' }}</span>
+                          </button>
+                          <div v-if="!roleBindingCandidates.length" class="empty-note">没有匹配角色</div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div class="preset-role-tags">
-                    <button
-                      v-for="binding in selectedGlobalPresetRoleBindings"
-                      :key="`binding-${selectedGlobalPreset?.id}-${binding.key}`"
-                      class="preset-role-tag"
-                      type="button"
-                      :title="`点击移除绑定: ${binding.name}`"
-                      @click="removeRoleBindingFromSelectedPreset(binding.key)"
-                    >
-                      <span>{{ binding.name }}</span>
-                      <span class="remove">×</span>
-                    </button>
-                    <div v-if="selectedGlobalPreset && !selectedGlobalPresetRoleBindings.length" class="empty-note">
-                      当前预设尚未绑定角色
+                    <div class="preset-role-tags">
+                      <button
+                        v-for="binding in selectedGlobalPresetRoleBindings"
+                        :key="`binding-${selectedGlobalPreset?.id}-${binding.key}`"
+                        class="preset-role-tag"
+                        type="button"
+                        :title="`点击移除绑定: ${binding.name}`"
+                        @click="removeRoleBindingFromSelectedPreset(binding.key)"
+                      >
+                        <span>{{ binding.name }}</span>
+                        <span class="remove">×</span>
+                      </button>
+                      <div v-if="selectedGlobalPreset && !selectedGlobalPresetRoleBindings.length" class="empty-note">
+                        当前预设尚未绑定角色
+                      </div>
+                      <div v-if="!selectedGlobalPreset" class="empty-note">选择预设后可配置角色绑定</div>
                     </div>
-                    <div v-if="!selectedGlobalPreset" class="empty-note">选择预设后可配置角色绑定</div>
                   </div>
-                </div>
+                </details>
               </div>
               <div class="global-mode-grid">
                 <div class="global-mode-column">
@@ -12250,18 +12263,75 @@ watch(hasUnsavedChanges, (val) => {
   letter-spacing: 0.02em;
 }
 
-.global-preset-panel {
-  border-radius: 8px;
+.global-mode-sections {
+  display: grid;
+  gap: 10px;
+}
+
+.global-mode-section {
+  border: 1px solid var(--wb-border-subtle);
+  border-radius: 10px;
   background: var(--wb-bg-panel);
+  overflow: hidden;
+}
+
+.global-mode-section-summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 180ms ease;
+}
+
+.global-mode-section-summary:hover {
+  background: color-mix(in srgb, var(--wb-primary-soft) 45%, transparent);
+}
+
+.global-mode-section-summary::-webkit-details-marker {
+  display: none;
+}
+
+.global-mode-section-summary::after {
+  content: '▾';
+  margin-left: auto;
+  color: var(--wb-text-muted);
+  transition: transform 180ms ease;
+}
+
+.global-mode-section:not([open]) .global-mode-section-summary::after {
+  transform: rotate(-90deg);
+}
+
+.global-mode-section-title {
+  color: var(--wb-primary-light);
+  font-weight: 600;
+}
+
+.global-mode-section-meta {
+  color: var(--wb-text-muted);
+  font-size: 12px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.global-mode-section-body {
+  border-top: 1px solid var(--wb-border-subtle);
   padding: 10px;
   display: grid;
   gap: 8px;
 }
 
+.global-preset-panel {
+  display: grid;
+  gap: 8px;
+}
+
 .preset-role-panel {
-  border-radius: 8px;
-  background: var(--wb-bg-panel);
-  padding: 10px;
   display: grid;
   gap: 6px;
 }
