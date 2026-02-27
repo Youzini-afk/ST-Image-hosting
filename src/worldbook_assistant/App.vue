@@ -339,7 +339,7 @@
                       </label>
                       <div class="editor-grid two-cols">
                         <label class="field" :class="{ disabled: selectedEntry.position.type !== 'at_depth' }">
-                          <span>at_depth role</span>
+                          <span>深度角色</span>
                           <select
                             v-model="selectedEntry.position.role"
                             class="text-input"
@@ -351,12 +351,12 @@
                           </select>
                         </label>
                         <label class="field" :class="{ disabled: selectedEntry.position.type !== 'at_depth' }">
-                          <span>at_depth depth</span>
+                          <span>深度层级</span>
                           <input
                             v-model.number="selectedEntry.position.depth"
                             type="number"
                             class="text-input"
-                            min="1"
+                            min="0"
                             step="1"
                             :disabled="selectedEntry.position.type !== 'at_depth'"
                           />
@@ -1738,7 +1738,7 @@ function normalizeEntry(rawInput: unknown, fallbackUid: number): WorldbookEntry 
   const secondaryLogic = normalizeSecondaryLogic(secondaryRecord?.logic ?? raw.logic ?? raw.selectiveLogic);
   const positionType = normalizePositionType(positionRecord?.type ?? raw.position);
   const role = normalizeRole(positionRecord?.role ?? raw.role);
-  const depth = Math.max(1, Math.floor(toNumberSafe(positionRecord?.depth ?? raw.depth, 4)));
+  const depth = Math.max(0, Math.floor(toNumberSafe(positionRecord?.depth ?? raw.depth, 4)));
   const order = Math.floor(toNumberSafe(positionRecord?.order ?? raw.insertion_order ?? raw.order, 100));
   const probability = clampNumber(toNumberSafe(raw.probability, 100), 0, 100);
 

@@ -338,7 +338,7 @@
                 </label>
                 <div class="editor-grid two-cols">
                   <label class="field" :class="{ disabled: selectedEntry.position.type !== 'at_depth' }">
-                    <span>at_depth role</span>
+                    <span>深度角色</span>
                     <select v-model="selectedEntry.position.role" class="text-input" :disabled="selectedEntry.position.type !== 'at_depth'">
                       <option value="system">system</option>
                       <option value="assistant">assistant</option>
@@ -346,8 +346,8 @@
                     </select>
                   </label>
                   <label class="field" :class="{ disabled: selectedEntry.position.type !== 'at_depth' }">
-                    <span>at_depth depth</span>
-                    <input v-model.number="selectedEntry.position.depth" type="number" class="text-input" min="1" step="1" :disabled="selectedEntry.position.type !== 'at_depth'" />
+                    <span>深度层级</span>
+                    <input v-model.number="selectedEntry.position.depth" type="number" class="text-input" min="0" step="1" :disabled="selectedEntry.position.type !== 'at_depth'" />
                   </label>
                 </div>
               </article>
@@ -2005,9 +2005,9 @@
                         <div class="editor-collapsible-group">
                           <details class="editor-mini-collapse" :class="{ disabled: selectedEntry.position.type !== 'at_depth' }">
                             <summary>
-                              <span>at_depth role</span>
+                              <span>深度角色</span>
                               <span class="editor-mini-collapse-value">
-                                {{ selectedEntry.position.type === 'at_depth' ? selectedEntry.position.role : '仅 at_depth 可用' }}
+                                {{ selectedEntry.position.type === 'at_depth' ? selectedEntry.position.role : '仅深度插入可用' }}
                               </span>
                             </summary>
                             <div class="editor-mini-collapse-body">
@@ -2024,9 +2024,9 @@
                           </details>
                           <details class="editor-mini-collapse" :class="{ disabled: selectedEntry.position.type !== 'at_depth' }">
                             <summary>
-                              <span>at_depth depth</span>
+                              <span>深度层级</span>
                               <span class="editor-mini-collapse-value">
-                                {{ selectedEntry.position.type === 'at_depth' ? selectedEntry.position.depth : '仅 at_depth 可用' }}
+                                {{ selectedEntry.position.type === 'at_depth' ? selectedEntry.position.depth : '仅深度插入可用' }}
                               </span>
                             </summary>
                             <div class="editor-mini-collapse-body">
@@ -2034,7 +2034,7 @@
                                 v-model.number="selectedEntry.position.depth"
                                 type="number"
                                 class="text-input"
-                                min="1"
+                                min="0"
                                 step="1"
                                 :disabled="selectedEntry.position.type !== 'at_depth'"
                               />
@@ -5045,7 +5045,7 @@ function extractEntryConfigPatch(entry: WorldbookEntry, includeExtra: boolean): 
     position_type: entry.position.type,
     position_order: Math.floor(toNumberSafe(entry.position.order, 100)),
     position_role: entry.position.role,
-    position_depth: Math.max(1, Math.floor(toNumberSafe(entry.position.depth, 4))),
+    position_depth: Math.max(0, Math.floor(toNumberSafe(entry.position.depth, 4))),
     probability: clampNumber(Math.floor(toNumberSafe(entry.probability, 100)), 0, 100),
     recursion_delay_until: parseNullableInteger(entry.recursion.delay_until),
     prevent_incoming: Boolean(entry.recursion.prevent_incoming),
@@ -5068,7 +5068,7 @@ function applyEntryConfigPatch(entry: WorldbookEntry, patch: EntryConfigPatch, i
   entry.position.order = Math.floor(toNumberSafe(patch.position_order, entry.position.order));
   if (entry.position.type === 'at_depth') {
     entry.position.role = normalizeRole(patch.position_role);
-    entry.position.depth = Math.max(1, Math.floor(toNumberSafe(patch.position_depth, 4)));
+    entry.position.depth = Math.max(0, Math.floor(toNumberSafe(patch.position_depth, 4)));
   } else {
     entry.position.role = 'system';
     entry.position.depth = 4;
@@ -5787,7 +5787,7 @@ function applySelectedPositionSelectValue(value: PositionSelectValue): void {
   if (depthRole) {
     selectedEntry.value.position.type = 'at_depth';
     selectedEntry.value.position.role = depthRole;
-    selectedEntry.value.position.depth = Math.max(1, Math.floor(toNumberSafe(selectedEntry.value.position.depth, 4)));
+    selectedEntry.value.position.depth = Math.max(0, Math.floor(toNumberSafe(selectedEntry.value.position.depth, 4)));
     return;
   }
   selectedEntry.value.position.type = value as PositionType;
@@ -6029,7 +6029,7 @@ function normalizeEntry(rawInput: unknown, fallbackUid: number): WorldbookEntry 
   const inferredDepthRole = parseAtDepthRoleFromPositionValue(rawPositionType);
   const positionType = normalizePositionType(rawPositionType);
   const role = normalizeRole(positionRecord?.role ?? raw.role ?? inferredDepthRole);
-  const depth = Math.max(1, Math.floor(toNumberSafe(positionRecord?.depth ?? raw.depth, 4)));
+  const depth = Math.max(0, Math.floor(toNumberSafe(positionRecord?.depth ?? raw.depth, 4)));
   const order = Math.floor(toNumberSafe(positionRecord?.order ?? raw.insertion_order ?? raw.order, 100));
   const probability = clampNumber(toNumberSafe(raw.probability, 100), 0, 100);
 
@@ -7648,13 +7648,13 @@ function buildEntryFieldDiffRows(
   pushRow('position_order', '插入权重', leftEntry ? String(leftEntry.position.order) : leftFallback, rightEntry ? String(rightEntry.position.order) : rightFallback);
   pushRow(
     'at_depth_role',
-    'at_depth role',
+    '深度角色',
     leftEntry ? (leftEntry.position.type === 'at_depth' ? leftEntry.position.role : '-') : leftFallback,
     rightEntry ? (rightEntry.position.type === 'at_depth' ? rightEntry.position.role : '-') : rightFallback,
   );
   pushRow(
     'at_depth_depth',
-    'at_depth depth',
+    '深度层级',
     leftEntry ? (leftEntry.position.type === 'at_depth' ? String(leftEntry.position.depth) : '-') : leftFallback,
     rightEntry ? (rightEntry.position.type === 'at_depth' ? String(rightEntry.position.depth) : '-') : rightFallback,
   );
