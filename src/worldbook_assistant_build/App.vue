@@ -2927,6 +2927,7 @@ interface HardRefreshOptions {
   force?: boolean;
   source?: SelectionSource;
   reason?: string;
+  preferContextSelection?: boolean;
 }
 
 interface FloatingPanelState {
@@ -10691,7 +10692,11 @@ async function hardRefresh(options: HardRefreshOptions = {}): Promise<void> {
       silentOnCancel: true,
     });
   } else {
-    trySelectWorldbookByContext({ preferWhenEmptyOnly: true, force: allowDirty, source: options.source ?? 'auto' });
+    trySelectWorldbookByContext({
+      preferWhenEmptyOnly: options.preferContextSelection !== true,
+      force: allowDirty,
+      source: options.source ?? 'auto',
+    });
   }
   setStatus('已刷新世界书和绑定信息');
 }
@@ -11265,7 +11270,12 @@ onMounted(() => {
 
   handleFloatingWindowResize();
   updateHostPanelTheme();
-  void hardRefresh({ force: true, source: 'manual', reason: '初始化加载' });
+  void hardRefresh({
+    force: true,
+    source: 'manual',
+    reason: '初始化加载',
+    preferContextSelection: true,
+  });
 });
 
 onUnmounted(() => {
