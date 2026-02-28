@@ -10,6 +10,8 @@ const PANEL_STYLE_ID = 'preset-assistant-panel-style';
 const PANEL_BODY_ID = 'preset-assistant-panel-body';
 const EVENT_NS = '.presetAssistantMenu';
 const DIRTY_STATE_KEY = '__PRESET_ASSISTANT_HAS_UNSAVED_CHANGES__';
+const INSTANCE_KEY = '__PRESET_ASSISTANT_INSTANCE__';
+const INSTANCE_TOKEN = `preset-assistant-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 let app: VueApp<Element> | null = null;
 let panelRoot: JQuery<HTMLDivElement> | null = null;
@@ -26,6 +28,30 @@ function getHostDocument(): Document {
   return getHostWindow().document;
 }
 
+function claimSingleton(): void {
+  const host = getHostWindow() as unknown as Record<string, unknown>;
+  const existing = host[INSTANCE_KEY] as { token?: string; cleanup?: (() => void) | null } | undefined;
+  if (existing?.token && existing.token !== INSTANCE_TOKEN && typeof existing.cleanup === 'function') {
+    try {
+      existing.cleanup();
+    } catch (error) {
+      console.warn('[PresetAssistant] previous instance cleanup failed:', error);
+    }
+  }
+  host[INSTANCE_KEY] = {
+    token: INSTANCE_TOKEN,
+    cleanup,
+  };
+}
+
+function releaseSingleton(): void {
+  const host = getHostWindow() as unknown as Record<string, unknown>;
+  const current = host[INSTANCE_KEY] as { token?: string } | undefined;
+  if (current?.token === INSTANCE_TOKEN) {
+    delete host[INSTANCE_KEY];
+  }
+}
+
 function ensurePanelStyle(): void {
   const doc = getHostDocument();
   if (doc.getElementById(PANEL_STYLE_ID)) {
@@ -36,7 +62,7 @@ function ensurePanelStyle(): void {
   style.textContent = `
 #${PANEL_ID} {
   position: fixed;
-  z-index: 10020;
+  z-index: 2147483000;
   left: 50%;
   transform: translateX(-50%);
   top: 10px;
@@ -53,6 +79,8 @@ function ensurePanelStyle(): void {
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
   overflow: hidden;
   resize: both;
+  pointer-events: auto;
+  isolation: isolate;
 }
 
 #${PANEL_ID}.active {
@@ -110,11 +138,13 @@ function ensurePanelStyle(): void {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  pointer-events: auto;
 }
 
 #${PANEL_BODY_ID} .preset-assistant-app-root {
   width: 100%;
   min-height: 100%;
+  pointer-events: auto;
 }
 
 #${MENU_ID}.active {
@@ -149,6 +179,7 @@ function mountAppIntoPanel(): void {
   if (!body) {
     return;
   }
+  $(body).find('.preset-assistant-app-root').remove();
   panelRoot = $(doc.createElement('div')).addClass('preset-assistant-app-root').appendTo(body as unknown as JQuery);
   try {
     destroyTeleport = teleportStyle(doc.head).destroy;
@@ -367,6 +398,7 @@ function stopMenuRetry(): void {
 }
 
 function init(): void {
+  claimSingleton();
   replaceScriptButtons([]);
   const doc = getHostDocument();
   $(doc).off(`click${EVENT_NS}`, `#${MENU_ID}`).on(`click${EVENT_NS}`, `#${MENU_ID}`, event => {
@@ -396,6 +428,7 @@ function cleanup(): void {
   panelRoot = null;
   destroyTeleport?.();
   destroyTeleport = null;
+  releaseSingleton();
 }
 
 $(() => {

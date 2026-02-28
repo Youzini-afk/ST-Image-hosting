@@ -13,9 +13,18 @@ export async function loadReadme(url: string): Promise<boolean> {
 export function teleportStyle(
   append_to: JQuery.Selector | JQuery.htmlString | JQuery.TypeOrArray<Element | DocumentFragment> | JQuery = 'head',
 ): { destroy: () => void } {
+  const scriptId = getScriptId();
+  const resetStyleSnippet = 'html,body{margin:0!important;padding:0;overflow:hidden!important;max-width:100%!important;}';
+  const $scriptStyles = $(`head > style[script_id="${scriptId}"]`, document);
+  const $fallbackStyles = $(`head > style`, document).filter((_, element) => {
+    const text = (element as HTMLStyleElement).textContent ?? '';
+    return !text.includes(resetStyleSnippet);
+  });
+  const $styles = $scriptStyles.length > 0 ? $scriptStyles : $fallbackStyles;
+
   const $div = $(`<div>`)
-    .attr('script_id', getScriptId())
-    .append($(`head > style`, document).clone())
+    .attr('script_id', scriptId)
+    .append($styles.clone())
     .appendTo(append_to);
 
   return {

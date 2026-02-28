@@ -111,6 +111,16 @@ function toPromptCollection(raw: unknown): unknown[] {
   return [];
 }
 
+function toPromptArray(raw: unknown): unknown[] {
+  if (Array.isArray(raw)) {
+    return raw;
+  }
+  if (!raw || typeof raw !== 'object') {
+    return [];
+  }
+  return Object.values(raw as Record<string, unknown>).filter(value => value && typeof value === 'object');
+}
+
 function toPromptRole(raw: unknown): PresetPrompt['role'] {
   return raw === 'assistant' || raw === 'user' ? raw : 'system';
 }
@@ -205,6 +215,74 @@ function dedupePrompts(prompts: PresetPrompt[]): PresetPrompt[] {
   return unique;
 }
 
+function extractPromptsFromPresetSource(source: unknown): PresetPrompt[] {
+  if (!source || typeof source !== 'object') {
+    return [];
+  }
+  const raw = source as Record<string, unknown>;
+  const rawPrompts = toPromptArray(raw.prompts);
+  const rawUnused = toPromptArray(raw.prompts_unused);
+  const merged = dedupePrompts(
+    [...rawPrompts, ...rawUnused]
+      .map((item, index) => coercePromptFromUnknown(item, index))
+      .filter((item): item is PresetPrompt => Boolean(item)),
+  );
+  if (merged.length < 1) {
+    return [];
+  }
+
+  const rawPromptOrder = Array.isArray(raw.prompt_order) ? raw.prompt_order : [];
+  const orderContainer = rawPromptOrder.find(
+    item => item && typeof item === 'object' && Array.isArray((item as Record<string, unknown>).order),
+  ) as Record<string, unknown> | undefined;
+  const rawOrder = orderContainer && Array.isArray(orderContainer.order) ? orderContainer.order : [];
+  if (rawOrder.length < 1) {
+    return merged;
+  }
+
+  const promptsById = new Map<string, PresetPrompt[]>();
+  for (const prompt of merged) {
+    const queue = promptsById.get(prompt.id) ?? [];
+    queue.push(prompt);
+    promptsById.set(prompt.id, queue);
+  }
+
+  const consumed = new Set<PresetPrompt>();
+  const ordered: PresetPrompt[] = [];
+  for (const entry of rawOrder) {
+    if (!entry || typeof entry !== 'object') {
+      continue;
+    }
+    const orderItem = entry as Record<string, unknown>;
+    const identifier = typeof orderItem.identifier === 'string' ? orderItem.identifier : '';
+    if (!identifier) {
+      continue;
+    }
+    const queue = promptsById.get(identifier);
+    const prompt = queue?.shift();
+    if (!prompt) {
+      continue;
+    }
+    consumed.add(prompt);
+    const enabled = typeof orderItem.enabled === 'boolean' ? orderItem.enabled : prompt.enabled;
+    ordered.push(
+      normalizePromptEntry(
+        {
+          ...prompt,
+          enabled,
+        },
+        ordered.length,
+      ),
+    );
+  }
+
+  if (ordered.length < 1) {
+    return merged;
+  }
+  const rest = merged.filter(prompt => !consumed.has(prompt));
+  return dedupePrompts([...ordered, ...rest]);
+}
+
 function getPromptsFromPromptManagerCollection(): PresetPrompt[] {
   try {
     const promptManager = getBuiltinPromptManager();
@@ -271,22 +349,18 @@ function getFallbackPromptsFromHost(): PresetPrompt[] {
   }
   try {
     const inUse = getPreset('in_use');
-    if (Array.isArray(inUse.prompts) && inUse.prompts.length > 0) {
-      return inUse.prompts.map((prompt, index) => normalizePromptEntry(prompt, index));
-    }
-    if (Array.isArray(inUse.prompts_unused) && inUse.prompts_unused.length > 0) {
-      return inUse.prompts_unused.map((prompt, index) => normalizePromptEntry(prompt, index));
+    const promptsFromInUse = extractPromptsFromPresetSource(inUse);
+    if (promptsFromInUse.length > 0) {
+      return promptsFromInUse;
     }
   } catch (error) {
     console.warn('[PresetAssistant] fallback in_use prompts unavailable:', error);
   }
   const globalDefault = (globalThis as { default_preset?: Preset }).default_preset;
   if (globalDefault) {
-    if (Array.isArray(globalDefault.prompts) && globalDefault.prompts.length > 0) {
-      return globalDefault.prompts.map((prompt, index) => normalizePromptEntry(prompt, index));
-    }
-    if (Array.isArray(globalDefault.prompts_unused) && globalDefault.prompts_unused.length > 0) {
-      return globalDefault.prompts_unused.map((prompt, index) => normalizePromptEntry(prompt, index));
+    const promptsFromDefault = extractPromptsFromPresetSource(globalDefault);
+    if (promptsFromDefault.length > 0) {
+      return promptsFromDefault;
     }
   }
   return [];
@@ -294,17 +368,9 @@ function getFallbackPromptsFromHost(): PresetPrompt[] {
 
 function normalizePresetForAssistant(preset: Preset, fallbackPrompts: PresetPrompt[] = []): Preset {
   const next = clonePreset(preset);
-  const activePrompts = Array.isArray(next.prompts) ? next.prompts : [];
-  const unusedPrompts = Array.isArray(next.prompts_unused) ? next.prompts_unused : [];
-
-  const normalizedActive = activePrompts.map((prompt, index) => normalizePromptEntry(prompt, index));
-  if (normalizedActive.length > 0) {
-    next.prompts = normalizedActive;
-    return next;
-  }
-
-  if (unusedPrompts.length > 0) {
-    next.prompts = unusedPrompts.map((prompt, index) => normalizePromptEntry(prompt, index));
+  const normalizedPrompts = extractPromptsFromPresetSource(next);
+  if (normalizedPrompts.length > 0) {
+    next.prompts = normalizedPrompts;
     return next;
   }
 
