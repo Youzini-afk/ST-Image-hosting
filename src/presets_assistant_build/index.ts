@@ -1,4 +1,5 @@
-import { createApp, createPinia, type App as VueApp } from 'vue';
+import { createApp, type App as VueApp } from 'vue';
+import { createPinia } from 'pinia';
 
 import { teleportStyle } from '@util/script';
 import PresetAssistantApp from './App.vue';
