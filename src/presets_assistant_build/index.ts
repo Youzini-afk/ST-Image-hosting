@@ -1,6 +1,6 @@
 import { createApp, createPinia, type App as VueApp } from 'vue';
 
-import { createScriptIdDiv, teleportStyle } from '@util/script';
+import { teleportStyle } from '@util/script';
 import PresetAssistantApp from './App.vue';
 
 const MENU_ID = 'preset-assistant-menu-item';
@@ -123,6 +123,11 @@ function ensurePanelStyle(): void {
   height: 100%;
 }
 
+#${PANEL_BODY_ID} .preset-assistant-app-root {
+  width: 100%;
+  height: 100%;
+}
+
 #${MENU_ID}.active {
   background-color: rgba(56, 189, 248, 0.18) !important;
 }
@@ -154,11 +159,22 @@ function mountAppIntoPanel(): void {
   if (!body) {
     return;
   }
-  panelRoot = createScriptIdDiv().appendTo(body as unknown as JQuery);
-  destroyTeleport = teleportStyle(doc.head).destroy;
-  app = createApp(PresetAssistantApp);
-  app.use(createPinia());
-  app.mount(panelRoot[0]);
+  panelRoot = $(doc.createElement('div')).addClass('preset-assistant-app-root').appendTo(body as unknown as JQuery);
+  try {
+    destroyTeleport = teleportStyle(doc.head).destroy;
+    app = createApp(PresetAssistantApp);
+    app.use(createPinia());
+    app.mount(panelRoot[0]);
+  } catch (error) {
+    console.error('[PresetAssistant] mount app failed:', error);
+    toastr.error('预设助手初始化失败，请查看控制台报错', 'Preset Assistant');
+    app?.unmount();
+    app = null;
+    destroyTeleport?.();
+    destroyTeleport = null;
+    panelRoot.remove();
+    panelRoot = null;
+  }
 }
 
 function enablePanelDrag(panel: HTMLDivElement): void {
