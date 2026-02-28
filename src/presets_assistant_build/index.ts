@@ -28,6 +28,15 @@ function getHostDocument(): Document {
   return getHostWindow().document;
 }
 
+function resetHostArtifacts(): void {
+  const doc = getHostDocument();
+  $(doc).off(EVENT_NS);
+  $(`#${MENU_ID}`, doc).remove();
+  $(`#${PANEL_ID}`, doc).remove();
+  doc.querySelectorAll(`#${PANEL_STYLE_ID}`).forEach(style => style.remove());
+  panelVisible = false;
+}
+
 function claimSingleton(): void {
   const host = getHostWindow() as unknown as Record<string, unknown>;
   const existing = host[INSTANCE_KEY] as { token?: string; cleanup?: (() => void) | null } | undefined;
@@ -398,6 +407,7 @@ function stopMenuRetry(): void {
 }
 
 function init(): void {
+  resetHostArtifacts();
   claimSingleton();
   replaceScriptButtons([]);
   const doc = getHostDocument();

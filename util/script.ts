@@ -15,10 +15,14 @@ export function teleportStyle(
 ): { destroy: () => void } {
   const scriptId = getScriptId();
   const resetStyleSnippet = 'html,body{margin:0!important;padding:0;overflow:hidden!important;max-width:100%!important;}';
+  const appStyleMarkers = ['.preset-root', '.settings-panel', '.prompt-panel', '.edit-shell', '.guard-mask'];
   const $scriptStyles = $(`head > style[script_id="${scriptId}"]`, document);
   const $fallbackStyles = $(`head > style`, document).filter((_, element) => {
     const text = (element as HTMLStyleElement).textContent ?? '';
-    return !text.includes(resetStyleSnippet);
+    if (text.includes(resetStyleSnippet)) {
+      return false;
+    }
+    return appStyleMarkers.some(marker => text.includes(marker));
   });
   const $styles = $scriptStyles.length > 0 ? $scriptStyles : $fallbackStyles;
 

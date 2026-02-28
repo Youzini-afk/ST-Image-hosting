@@ -72,23 +72,52 @@ function normalizePromptEntry(prompt: PresetPrompt, fallbackIndex: number): Pres
 
 function getBuiltinPromptManager(): Record<string, unknown> | null {
   const root = globalThis as Record<string, unknown>;
-  const contexts: Array<Record<string, unknown> | null> = [
-    root,
-    (root.parent as Record<string, unknown>) ?? null,
-    (root.top as Record<string, unknown>) ?? null,
-    (root.window as Record<string, unknown>) ?? null,
-  ];
+  const contexts: Array<Record<string, unknown> | null> = [root];
+  for (const accessor of ['parent', 'top', 'window'] as const) {
+    try {
+      const context = root[accessor] as Record<string, unknown> | null | undefined;
+      if (context && typeof context === 'object') {
+        contexts.push(context);
+      }
+    } catch {
+      // Cross-origin frame access can throw; ignore and continue.
+    }
+  }
+
+  function pickPromptManagerFromContext(context: Record<string, unknown>): Record<string, unknown> | null {
+    const directBuiltin = context.builtin as Record<string, unknown> | undefined;
+    if (directBuiltin && typeof directBuiltin === 'object') {
+      const directPromptManager = directBuiltin.promptManager as Record<string, unknown> | undefined;
+      if (directPromptManager && typeof directPromptManager === 'object') {
+        return directPromptManager;
+      }
+    }
+
+    const helper = context.TavernHelper as Record<string, unknown> | undefined;
+    if (helper && typeof helper === 'object') {
+      const helperBuiltin = helper.builtin as Record<string, unknown> | undefined;
+      if (helperBuiltin && typeof helperBuiltin === 'object') {
+        const helperPromptManager = helperBuiltin.promptManager as Record<string, unknown> | undefined;
+        if (helperPromptManager && typeof helperPromptManager === 'object') {
+          return helperPromptManager;
+        }
+      }
+    }
+
+    return null;
+  }
+
   for (const context of contexts) {
     if (!context || typeof context !== 'object') {
       continue;
     }
-    const builtinValue = context.builtin as Record<string, unknown> | undefined;
-    if (!builtinValue || typeof builtinValue !== 'object') {
-      continue;
-    }
-    const promptManager = builtinValue.promptManager as Record<string, unknown> | undefined;
-    if (promptManager && typeof promptManager === 'object') {
-      return promptManager;
+    try {
+      const promptManager = pickPromptManagerFromContext(context);
+      if (promptManager) {
+        return promptManager;
+      }
+    } catch {
+      // Ignore invalid contexts and continue searching.
     }
   }
   return null;
@@ -227,15 +256,41 @@ function extractPromptsFromPresetSource(source: unknown): PresetPrompt[] {
       .map((item, index) => coercePromptFromUnknown(item, index))
       .filter((item): item is PresetPrompt => Boolean(item)),
   );
-  if (merged.length < 1) {
-    return [];
-  }
-
   const rawPromptOrder = Array.isArray(raw.prompt_order) ? raw.prompt_order : [];
   const orderContainer = rawPromptOrder.find(
     item => item && typeof item === 'object' && Array.isArray((item as Record<string, unknown>).order),
   ) as Record<string, unknown> | undefined;
   const rawOrder = orderContainer && Array.isArray(orderContainer.order) ? orderContainer.order : [];
+  if (merged.length < 1 && rawOrder.length > 0) {
+    return dedupePrompts(
+      rawOrder
+        .map((entry, index) => {
+          if (!entry || typeof entry !== 'object') {
+            return null;
+          }
+          const item = entry as Record<string, unknown>;
+          const identifier = typeof item.identifier === 'string' && item.identifier.trim() ? item.identifier : '';
+          if (!identifier) {
+            return null;
+          }
+          const prompt: PresetPrompt = {
+            id: identifier,
+            name: identifier,
+            enabled: typeof item.enabled === 'boolean' ? item.enabled : true,
+            role: 'system',
+            position: { type: 'relative' },
+            content: '',
+          };
+          return normalizePromptEntry(prompt, index);
+        })
+        .filter((item): item is PresetPrompt => Boolean(item)),
+    );
+  }
+
+  if (merged.length < 1) {
+    return [];
+  }
+
   if (rawOrder.length < 1) {
     return merged;
   }
