@@ -172,7 +172,7 @@ function emitBatch(enabled: boolean): void {
   border-radius: 14px;
   background: linear-gradient(160deg, rgba(8, 15, 30, 0.94), rgba(6, 11, 23, 0.94));
   display: grid;
-  grid-template-rows: auto auto minmax(180px, 1fr) auto;
+  grid-template-rows: auto auto auto auto;
   min-height: 0;
 }
 
@@ -263,7 +263,7 @@ function emitBatch(enabled: boolean): void {
 }
 
 .list {
-  overflow: auto;
+  overflow: visible;
   min-height: 0;
 }
 

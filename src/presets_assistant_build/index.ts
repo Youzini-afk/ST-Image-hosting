@@ -40,10 +40,10 @@ function ensurePanelStyle(): void {
   left: 50%;
   transform: translateX(-50%);
   top: 10px;
-  width: min(1080px, calc(100vw - 36px));
+  width: min(900px, calc(100vw - 24px));
   height: calc(100vh - 20px);
-  min-width: 720px;
-  min-height: 620px;
+  min-width: 620px;
+  min-height: 580px;
   max-width: calc(100vw - 12px);
   max-height: calc(100vh - 12px);
   display: none;
@@ -109,16 +109,12 @@ function ensurePanelStyle(): void {
 #${PANEL_BODY_ID} {
   flex: 1;
   min-height: 0;
-  overflow: hidden;
-}
-
-#${PANEL_BODY_ID} > div {
-  height: 100%;
+  overflow: auto;
 }
 
 #${PANEL_BODY_ID} .preset-assistant-app-root {
   width: 100%;
-  height: 100%;
+  min-height: 100%;
 }
 
 #${MENU_ID}.active {

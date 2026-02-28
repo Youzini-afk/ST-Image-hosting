@@ -70,7 +70,31 @@ function normalizePromptEntry(prompt: PresetPrompt, fallbackIndex: number): Pres
   return next as PresetPrompt;
 }
 
-function normalizePresetForAssistant(preset: Preset): Preset {
+function getFallbackPromptsFromHost(): PresetPrompt[] {
+  try {
+    const inUse = getPreset('in_use');
+    if (Array.isArray(inUse.prompts) && inUse.prompts.length > 0) {
+      return inUse.prompts.map((prompt, index) => normalizePromptEntry(prompt, index));
+    }
+    if (Array.isArray(inUse.prompts_unused) && inUse.prompts_unused.length > 0) {
+      return inUse.prompts_unused.map((prompt, index) => normalizePromptEntry(prompt, index));
+    }
+  } catch (error) {
+    console.warn('[PresetAssistant] fallback in_use prompts unavailable:', error);
+  }
+  const globalDefault = (globalThis as { default_preset?: Preset }).default_preset;
+  if (globalDefault) {
+    if (Array.isArray(globalDefault.prompts) && globalDefault.prompts.length > 0) {
+      return globalDefault.prompts.map((prompt, index) => normalizePromptEntry(prompt, index));
+    }
+    if (Array.isArray(globalDefault.prompts_unused) && globalDefault.prompts_unused.length > 0) {
+      return globalDefault.prompts_unused.map((prompt, index) => normalizePromptEntry(prompt, index));
+    }
+  }
+  return [];
+}
+
+function normalizePresetForAssistant(preset: Preset, fallbackPrompts: PresetPrompt[] = []): Preset {
   const next = clonePreset(preset);
   const activePrompts = Array.isArray(next.prompts) ? next.prompts : [];
   const unusedPrompts = Array.isArray(next.prompts_unused) ? next.prompts_unused : [];
@@ -83,6 +107,11 @@ function normalizePresetForAssistant(preset: Preset): Preset {
 
   if (unusedPrompts.length > 0) {
     next.prompts = unusedPrompts.map((prompt, index) => normalizePromptEntry(prompt, index));
+    return next;
+  }
+
+  if (fallbackPrompts.length > 0) {
+    next.prompts = fallbackPrompts.map((prompt, index) => normalizePromptEntry(prompt, index));
     return next;
   }
 
@@ -379,11 +408,12 @@ export const usePresetAssistantStore = defineStore('preset-assistant', () => {
     const names = [...getPresetNames()].sort((lhs, rhs) => lhs.localeCompare(rhs, 'zh-Hans-CN'));
     loadedPresetName.value = getLoadedPresetName();
     presetNames.value = names;
+    const fallbackPrompts = getFallbackPromptsFromHost();
 
     const nextPreviews: Record<string, PresetPreviewInfo> = {};
     for (const name of names) {
       try {
-        const preset = normalizePresetForAssistant(getPreset(name));
+        const preset = normalizePresetForAssistant(getPreset(name), fallbackPrompts);
         nextPreviews[name] = {
           prompt_count: preset.prompts.length,
           enabled_prompt_count: preset.prompts.filter(prompt => prompt.enabled).length,
@@ -415,7 +445,8 @@ export const usePresetAssistantStore = defineStore('preset-assistant', () => {
     }
     loadingPreset.value = true;
     try {
-      const preset = normalizePresetForAssistant(getPreset(name));
+      const fallbackPrompts = getFallbackPromptsFromHost();
+      const preset = normalizePresetForAssistant(getPreset(name), fallbackPrompts);
       selectedPresetName.value = name;
       selectedPreset.value = clonePreset(preset);
       resetBrowseSettingsDraftFromPreset(preset);
@@ -551,7 +582,8 @@ export const usePresetAssistantStore = defineStore('preset-assistant', () => {
       return;
     }
     try {
-      const hostPreset = normalizePresetForAssistant(getPreset(targetName));
+      const fallbackPrompts = getFallbackPromptsFromHost();
+      const hostPreset = normalizePresetForAssistant(getPreset(targetName), fallbackPrompts);
       selectedPreset.value = clonePreset(hostPreset);
       updatePresetPreview(targetName, hostPreset);
       clearBrowsePromptSelection();

@@ -196,7 +196,7 @@ function onBooleanInput(field: SettingField, event: Event): void {
   border-radius: 14px;
   background: linear-gradient(160deg, rgba(8, 15, 30, 0.94), rgba(6, 11, 23, 0.94));
   display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto auto auto;
   min-height: 0;
 }
 
@@ -252,7 +252,7 @@ function onBooleanInput(field: SettingField, event: Event): void {
 
 .groups {
   min-height: 0;
-  overflow: auto;
+  overflow: visible;
   padding: 8px;
   display: grid;
   gap: 8px;

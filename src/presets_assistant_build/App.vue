@@ -293,8 +293,8 @@ watch(
   --pa-danger: #e46574;
 
   min-height: 100%;
-  display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: 10px;
   padding: 10px;
   box-sizing: border-box;
@@ -413,7 +413,6 @@ watch(
 
 .browse-mode {
   min-height: 0;
-  height: 100%;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -422,22 +421,12 @@ watch(
 
 .browse-settings-shell {
   min-height: 180px;
-  max-height: min(46vh, 430px);
-  overflow: hidden;
-}
-
-.browse-settings-shell :deep(.settings-panel) {
-  height: 100%;
+  overflow: visible;
 }
 
 .browse-prompts-shell {
   min-height: 260px;
-  flex: 1;
-  overflow: hidden;
-}
-
-.browse-prompts-shell :deep(.prompt-panel) {
-  height: 100%;
+  overflow: visible;
 }
 
 .btn {
@@ -472,10 +461,6 @@ watch(
 }
 
 @media (max-width: 980px) {
-  .browse-settings-shell {
-    max-height: min(50vh, 470px);
-  }
-
   .mode-bar {
     width: 100%;
     justify-content: stretch;
