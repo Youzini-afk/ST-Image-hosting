@@ -8,9 +8,7 @@ export const coreSettingKeys: Array<keyof Preset['settings']> = [
   'temperature',
   'top_p',
   'top_k',
-  'min_p',
   'frequency_penalty',
-  'presence_penalty',
   'repetition_penalty',
 ];
 

@@ -231,7 +231,7 @@ function onBooleanInput(field: SettingField, event: Event): void {
   padding: 10px 14px;
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   border-bottom: 1px solid var(--pa-border);
 }
 
@@ -347,10 +347,16 @@ function onBooleanInput(field: SettingField, event: Event): void {
 
 @media (max-width: 1100px) {
   .core-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 860px) {
+  .core-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

@@ -56,38 +56,42 @@
 
     <main class="main">
       <section v-if="uiMode === 'browse'" class="browse-mode">
-        <BrowseSettingsPanel
-          :open="browseParamPanelOpen"
-          :expanded-group="browseParamExpandedGroup"
-          :base-settings="browseParamDraft.base_settings"
-          :staged-settings="browseParamDraft.staged_settings"
-          :dirty="browseParamDraft.dirty"
-          :applying="browseParamDraft.applying"
-          @toggle-open="setBrowsePanelOpen"
-          @set-expanded-group="setBrowseExpandedGroup"
-          @update-setting="store.setBrowseStagedSetting"
-          @apply="store.applyBrowseSettingsToPreset"
-          @reset="store.resetBrowseSettingsDraft"
-        />
+        <div class="browse-settings-shell">
+          <BrowseSettingsPanel
+            :open="browseParamPanelOpen"
+            :expanded-group="browseParamExpandedGroup"
+            :base-settings="browseParamDraft.base_settings"
+            :staged-settings="browseParamDraft.staged_settings"
+            :dirty="browseParamDraft.dirty"
+            :applying="browseParamDraft.applying"
+            @toggle-open="setBrowsePanelOpen"
+            @set-expanded-group="setBrowseExpandedGroup"
+            @update-setting="store.setBrowseStagedSetting"
+            @apply="store.applyBrowseSettingsToPreset"
+            @reset="store.resetBrowseSettingsDraft"
+          />
+        </div>
 
-        <PromptQuickToggleList
-          :items="filteredBrowsePromptItems"
-          :query="browseListState.query"
-          :selected-count="selectedBrowsePromptIndices.length"
-          :selected-indices="selectedBrowsePromptIndices"
-          :visible-indices="browseVisiblePromptIndices"
-          :all-visible-selected="allVisibleSelected"
-          :saving="browseListState.saving"
-          :last-saved-at="browseListState.last_saved_at"
-          :disabled="loadingPreset || switching"
-          @update-query="store.setBrowsePromptQuery"
-          @toggle="store.toggleBrowsePromptEnabledAndAutoSave"
-          @select="store.toggleBrowsePromptSelection"
-          @select-visible="store.setBrowsePromptSelectionForVisible"
-          @clear-selection="store.clearBrowsePromptSelection"
-          @reorder="onBrowseReorder"
-          @batch-set-enabled="onBatchSetEnabled"
-        />
+        <div class="browse-prompts-shell">
+          <PromptQuickToggleList
+            :items="filteredBrowsePromptItems"
+            :query="browseListState.query"
+            :selected-count="selectedBrowsePromptIndices.length"
+            :selected-indices="selectedBrowsePromptIndices"
+            :visible-indices="browseVisiblePromptIndices"
+            :all-visible-selected="allVisibleSelected"
+            :saving="browseListState.saving"
+            :last-saved-at="browseListState.last_saved_at"
+            :disabled="loadingPreset || switching"
+            @update-query="store.setBrowsePromptQuery"
+            @toggle="store.toggleBrowsePromptEnabledAndAutoSave"
+            @select="store.toggleBrowsePromptSelection"
+            @select-visible="store.setBrowsePromptSelectionForVisible"
+            @clear-selection="store.clearBrowsePromptSelection"
+            @reorder="onBrowseReorder"
+            @batch-set-enabled="onBatchSetEnabled"
+          />
+        </div>
       </section>
 
       <EditModeShell
@@ -410,10 +414,30 @@ watch(
 .browse-mode {
   min-height: 0;
   height: 100%;
-  display: grid;
-  grid-template-rows: minmax(240px, auto) minmax(280px, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: 10px;
   padding: 10px;
+}
+
+.browse-settings-shell {
+  min-height: 180px;
+  max-height: min(46vh, 430px);
+  overflow: hidden;
+}
+
+.browse-settings-shell :deep(.settings-panel) {
+  height: 100%;
+}
+
+.browse-prompts-shell {
+  min-height: 260px;
+  flex: 1;
+  overflow: hidden;
+}
+
+.browse-prompts-shell :deep(.prompt-panel) {
+  height: 100%;
 }
 
 .btn {
@@ -448,8 +472,8 @@ watch(
 }
 
 @media (max-width: 980px) {
-  .browse-mode {
-    grid-template-rows: minmax(280px, auto) minmax(260px, 1fr);
+  .browse-settings-shell {
+    max-height: min(50vh, 470px);
   }
 
   .mode-bar {
