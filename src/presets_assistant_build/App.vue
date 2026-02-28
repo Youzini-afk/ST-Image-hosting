@@ -3,20 +3,22 @@
     <header class="top">
       <div class="brand">
         <h1>Preset Assistant</h1>
-        <p>浏览优先 · 快速开关词条 · 参数应用提交</p>
+        <p>浏览优先 · 双模式重构 · 连接配置粘性可控</p>
       </div>
       <div class="top-actions">
         <button class="btn" type="button" @click="refreshAll">刷新</button>
-        <button class="btn primary" type="button" :disabled="switching" @click="switchSelectedPreset">
+        <button class="btn primary" type="button" :disabled="switching || !selectedPresetName" @click="switchSelectedPreset">
           {{ switching ? '切换中...' : '切换为当前预设' }}
-        </button>
-        <button class="btn" type="button" :class="{ active: editMode }" @click="store.setEditMode(!editMode)">
-          {{ editMode ? '退出编辑' : '进入编辑' }}
         </button>
       </div>
     </header>
 
-    <section class="controls">
+    <section class="mode-bar">
+      <button class="mode-btn" :class="{ active: uiMode === 'browse' }" type="button" @click="setMode('browse')">浏览模式</button>
+      <button class="mode-btn" :class="{ active: uiMode === 'edit' }" type="button" @click="setMode('edit')">编辑模式</button>
+    </section>
+
+    <section class="control-grid">
       <label class="field">
         <span>预设</span>
         <select :value="selectedPresetName" class="input" @change="onPresetSelect($event)">
@@ -26,143 +28,87 @@
           </option>
         </select>
       </label>
+
       <label class="field">
         <span>连接策略</span>
         <select :value="apiBindingMode" class="input" @change="onBindingModeChange($event)">
-          <option value="sticky_connection">连接粘性（默认）</option>
-          <option value="follow_preset">原生跟随</option>
+          <option value="sticky_connection">sticky_connection（默认）</option>
+          <option value="follow_preset">follow_preset</option>
         </select>
       </label>
-      <label class="field">
-        <span>浏览视图</span>
-        <select :value="viewMode" class="input" @change="onViewModeChange($event)">
-          <option value="cards">卡片</option>
-          <option value="list">列表</option>
-        </select>
-      </label>
-      <label class="field">
+
+      <label v-if="uiMode === 'edit'" class="field">
         <span>编辑提交</span>
         <select :value="editApplyMode" class="input" @change="onEditApplyModeChange($event)">
-          <option value="live">实时模式</option>
-          <option value="draft">草稿模式</option>
+          <option value="live">实时</option>
+          <option value="draft">草稿</option>
         </select>
       </label>
+
+      <div class="status">
+        <span>已加载：{{ loadedPresetName || '-' }}</span>
+        <span>当前查看：{{ selectedPresetName || '-' }}</span>
+        <span class="saving" :class="{ on: browseListState.saving }">
+          {{ browseListState.saving ? '自动保存中...' : '自动保存空闲' }}
+        </span>
+      </div>
     </section>
 
-    <section class="filters">
-      <input v-model="searchText" class="input" type="text" placeholder="搜索预设名 / 备注..." />
-      <input v-model="tagFilterText" class="input" type="text" placeholder="按标签筛选（逗号分隔）" />
-      <label class="check">
-        <input v-model="favoriteOnly" type="checkbox" />
-        <span>仅收藏</span>
-      </label>
-      <span class="summary">已加载: {{ loadedPresetName || '-' }} ｜ 当前查看: {{ selectedPresetName || '-' }}</span>
-    </section>
+    <main class="main">
+      <section v-if="uiMode === 'browse'" class="browse-mode">
+        <BrowseSettingsPanel
+          :open="browseParamPanelOpen"
+          :expanded-group="browseParamExpandedGroup"
+          :base-settings="browseParamDraft.base_settings"
+          :staged-settings="browseParamDraft.staged_settings"
+          :dirty="browseParamDraft.dirty"
+          :applying="browseParamDraft.applying"
+          @toggle-open="setBrowsePanelOpen"
+          @set-expanded-group="setBrowseExpandedGroup"
+          @update-setting="store.setBrowseStagedSetting"
+          @apply="store.applyBrowseSettingsToPreset"
+          @reset="store.resetBrowseSettingsDraft"
+        />
 
-    <main class="main" :class="{ browsing: !editMode }">
+        <PromptQuickToggleList
+          :items="filteredBrowsePromptItems"
+          :query="browseListState.query"
+          :selected-count="selectedBrowsePromptIndices.length"
+          :selected-indices="selectedBrowsePromptIndices"
+          :visible-indices="browseVisiblePromptIndices"
+          :all-visible-selected="allVisibleSelected"
+          :saving="browseListState.saving"
+          :last-saved-at="browseListState.last_saved_at"
+          :disabled="loadingPreset || switching"
+          @update-query="store.setBrowsePromptQuery"
+          @toggle="store.toggleBrowsePromptEnabledAndAutoSave"
+          @select="store.toggleBrowsePromptSelection"
+          @select-visible="store.setBrowsePromptSelectionForVisible"
+          @clear-selection="store.clearBrowsePromptSelection"
+          @reorder="onBrowseReorder"
+          @batch-set-enabled="onBatchSetEnabled"
+        />
+      </section>
+
       <EditModeShell
-        v-if="editMode"
+        v-else
         :draft-preset="editDraft"
         :dirty="editDraftDirty"
         :apply-mode="editApplyMode"
         :selected-prompt-index="editSelectedPromptIndex"
         :saving="editSaving"
+        :prompt-indices="editPromptIndices"
+        :prompt-query="editPromptQuery"
         @save="saveEditDraft"
         @discard="store.discardEditDraft"
         @append-prompt="store.appendPromptToEditDraft"
         @remove-prompt="store.removePromptFromEditDraft"
         @move-prompt="store.movePromptInEditDraft"
         @set-selected-prompt-index="setSelectedPromptIndex"
-        @update-apply-mode="setEditApplyMode"
+        @update-apply-mode="store.setEditApplyMode"
+        @update-prompt-query="store.setEditPromptQuery"
         @update-draft="store.updateEditDraft"
       />
-
-      <template v-else>
-        <section class="preset-list">
-          <PresetCardGrid
-            v-if="viewMode === 'cards'"
-            :presets="filteredSummaries"
-            @select="store.selectPreset"
-            @switch="switchPresetByName"
-            @toggle-favorite="store.setMetaFavorite"
-          />
-          <PresetListTable
-            v-else
-            :presets="filteredSummaries"
-            @select="store.selectPreset"
-            @switch="switchPresetByName"
-            @toggle-favorite="store.setMetaFavorite"
-          />
-        </section>
-
-        <section v-if="selectedPreset" class="detail">
-          <div class="detail-head">
-            <div>
-              <h2>{{ selectedPresetName }}</h2>
-              <p>
-                {{ selectedPreset.prompts.length }} 条词条
-                <span class="state" :class="{ loaded: selectedPresetName === loadedPresetName }">
-                  {{ selectedPresetName === loadedPresetName ? '当前生效' : '未生效' }}
-                </span>
-              </p>
-            </div>
-            <button
-              class="star"
-              type="button"
-              :title="selectedMeta.favorite ? '取消收藏' : '收藏'"
-              @click="store.setMetaFavorite(selectedPresetName, !selectedMeta.favorite)"
-            >
-              {{ selectedMeta.favorite ? '★' : '☆' }}
-            </button>
-          </div>
-
-          <div class="meta">
-            <label class="field">
-              <span>标签</span>
-              <input
-                :value="selectedMeta.tags.join(', ')"
-                class="input"
-                type="text"
-                placeholder="剧情, 通用, 角色扮演"
-                @change="store.setMetaTags(selectedPresetName, ($event.target as HTMLInputElement).value)"
-              />
-            </label>
-            <label class="field">
-              <span>备注</span>
-              <textarea
-                :value="selectedMeta.note"
-                class="input note"
-                placeholder="写点使用备注，方便浏览检索"
-                @change="store.setMetaNote(selectedPresetName, ($event.target as HTMLTextAreaElement).value)"
-              ></textarea>
-            </label>
-          </div>
-
-          <PromptQuickToggleList
-            :items="quickPromptItems"
-            :disabled="loadingPreset || switching"
-            @toggle="store.togglePromptEnabledAndAutoSave"
-          />
-
-          <BrowseSettingsPanel
-            :open="browseParamPanelOpen"
-            :expanded-group="browseParamExpandedGroup"
-            :base-settings="browseParamDraft.base_settings"
-            :staged-settings="browseParamDraft.staged_settings"
-            :dirty="browseParamDraft.dirty"
-            :applying="browseParamDraft.applying"
-            @toggle-open="setBrowsePanelOpen"
-            @set-expanded-group="setBrowseExpandedGroup"
-            @update-setting="store.setBrowseStagedSetting"
-            @apply="store.applyBrowseSettingsToPreset"
-            @reset="store.resetBrowseSettingsDraft"
-          />
-        </section>
-
-        <section v-else class="detail empty">
-          <p>暂无预设，请先在左侧选择一个预设。</p>
-        </section>
-      </template>
     </main>
 
     <UnsavedGuardDialog
@@ -177,15 +123,13 @@
 
 <script setup lang="ts">
 import { storeToRefs } from 'pinia';
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, watch } from 'vue';
 
 import BrowseSettingsPanel from './components/BrowseSettingsPanel.vue';
 import EditModeShell from './components/EditModeShell.vue';
-import PresetCardGrid from './components/PresetCardGrid.vue';
-import PresetListTable from './components/PresetListTable.vue';
 import PromptQuickToggleList from './components/PromptQuickToggleList.vue';
 import UnsavedGuardDialog from './components/UnsavedGuardDialog.vue';
-import type { ApiBindingMode, BrowseViewMode, EditApplyMode } from './types';
+import type { ApiBindingMode, EditApplyMode, UiMode } from './types';
 import { usePresetAssistantStore } from './store/presetAssistantStore';
 
 const DIRTY_STATE_KEY = '__PRESET_ASSISTANT_HAS_UNSAVED_CHANGES__';
@@ -193,58 +137,38 @@ const DIRTY_STATE_KEY = '__PRESET_ASSISTANT_HAS_UNSAVED_CHANGES__';
 const store = usePresetAssistantStore();
 const {
   presetNames,
-  presetSummaries,
   selectedPresetName,
-  selectedPreset,
   loadedPresetName,
   loadingPreset,
-  quickPromptItems,
-  selectedMeta,
-  browseParamDraft,
-  editMode,
-  editDraft,
-  editDraftDirty,
-  editSelectedPromptIndex,
-  editSaving,
-  unsavedDialogVisible,
-  unsavedDialogReason,
-  viewMode,
+  uiMode,
   apiBindingMode,
   editApplyMode,
   browseParamPanelOpen,
   browseParamExpandedGroup,
+  browseParamDraft,
+  browseListState,
+  filteredBrowsePromptItems,
+  browseVisiblePromptIndices,
+  selectedBrowsePromptIndices,
+  editDraft,
+  editDraftDirty,
+  editSelectedPromptIndex,
+  editPromptQuery,
+  editPromptIndices,
+  editSaving,
+  unsavedDialogVisible,
+  unsavedDialogReason,
   hasUnsavedChanges,
 } = storeToRefs(store);
 
-const searchText = ref('');
-const tagFilterText = ref('');
-const favoriteOnly = ref(false);
-const switching = ref(false);
+const switching = computed(() => loadingPreset.value || browseListState.value.saving);
 
-const filteredSummaries = computed(() => {
-  const keyword = searchText.value.trim().toLowerCase();
-  const tagTokens = [...new Set(tagFilterText.value.split(',').map(token => token.trim().toLowerCase()).filter(Boolean))];
-  return presetSummaries.value.filter(item => {
-    if (favoriteOnly.value && !item.favorite) {
-      return false;
-    }
-    if (keyword) {
-      const matched =
-        item.name.toLowerCase().includes(keyword) ||
-        item.note.toLowerCase().includes(keyword) ||
-        item.tags.some(tag => tag.toLowerCase().includes(keyword));
-      if (!matched) {
-        return false;
-      }
-    }
-    if (tagTokens.length > 0) {
-      const existing = item.tags.map(tag => tag.toLowerCase());
-      if (!tagTokens.every(token => existing.includes(token))) {
-        return false;
-      }
-    }
-    return true;
-  });
+const allVisibleSelected = computed(() => {
+  if (browseVisiblePromptIndices.value.length < 1) {
+    return false;
+  }
+  const selected = new Set(selectedBrowsePromptIndices.value);
+  return browseVisiblePromptIndices.value.every(index => selected.has(index));
 });
 
 function syncDirtyFlag(value: boolean): void {
@@ -265,20 +189,14 @@ function onBindingModeChange(event: Event): void {
   apiBindingMode.value = next;
 }
 
-function onViewModeChange(event: Event): void {
-  const target = event.target as HTMLSelectElement;
-  const next: BrowseViewMode = target.value === 'list' ? 'list' : 'cards';
-  viewMode.value = next;
-}
-
 function onEditApplyModeChange(event: Event): void {
   const target = event.target as HTMLSelectElement;
   const next: EditApplyMode = target.value === 'draft' ? 'draft' : 'live';
   editApplyMode.value = next;
 }
 
-function setEditApplyMode(mode: EditApplyMode): void {
-  editApplyMode.value = mode;
+function setMode(mode: UiMode): void {
+  store.setUiMode(mode);
 }
 
 function setSelectedPromptIndex(index: number): void {
@@ -293,22 +211,22 @@ function setBrowseExpandedGroup(groupId: string): void {
   browseParamExpandedGroup.value = groupId;
 }
 
-async function switchPresetByName(name: string): Promise<void> {
-  switching.value = true;
-  try {
-    await store.switchPresetWithConnectionPolicy(name);
-  } finally {
-    switching.value = false;
+function onBrowseReorder(fromIndex: number, toIndex: number): void {
+  if (toIndex < 0) {
+    return;
   }
+  void store.reorderBrowsePromptAndAutoSave(fromIndex, toIndex);
+}
+
+function onBatchSetEnabled(indices: number[], enabled: boolean): void {
+  void store.batchSetBrowsePromptEnabledAndAutoSave(indices, enabled);
 }
 
 async function switchSelectedPreset(): Promise<void> {
-  switching.value = true;
-  try {
-    await store.switchPresetWithConnectionPolicy(selectedPresetName.value);
-  } finally {
-    switching.value = false;
+  if (!selectedPresetName.value) {
+    return;
   }
+  await store.switchPresetWithConnectionPolicy(selectedPresetName.value);
 }
 
 async function saveEditDraft(): Promise<void> {
@@ -346,258 +264,207 @@ onUnmounted(() => {
   window.removeEventListener('preset-helper:discard', onPanelDiscard);
 });
 
-watch(hasUnsavedChanges, value => {
-  syncDirtyFlag(value);
-}, { immediate: true });
+watch(
+  hasUnsavedChanges,
+  value => {
+    syncDirtyFlag(value);
+  },
+  { immediate: true },
+);
 </script>
 
 <style scoped>
 .preset-root {
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
+  --pa-bg-0: #060b16;
+  --pa-bg-1: #091225;
+  --pa-bg-2: #0f1a31;
+  --pa-border: rgba(76, 102, 143, 0.52);
+  --pa-border-strong: rgba(98, 128, 176, 0.76);
+  --pa-text-1: #eaf2ff;
+  --pa-text-2: #bfd2f2;
+  --pa-text-3: #8ea9d1;
+  --pa-accent: #3d7ef2;
+  --pa-success: #30c58a;
+  --pa-warning: #f0b545;
+  --pa-danger: #e46574;
+
+  min-height: 100%;
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   gap: 10px;
   padding: 10px;
   box-sizing: border-box;
-  color: #e8f1ff;
+  color: var(--pa-text-1);
   font-size: 13px;
   line-height: 1.45;
-  font-family: 'HarmonyOS Sans SC', 'Noto Sans SC', 'Source Han Sans SC', sans-serif;
   background:
-    radial-gradient(circle at 16% 10%, rgba(30, 64, 175, 0.22), transparent 42%),
-    radial-gradient(circle at 82% 20%, rgba(8, 145, 178, 0.16), transparent 35%),
-    linear-gradient(168deg, #090f1f, #0a1328 42%, #0b1122);
+    radial-gradient(circle at 10% 8%, rgba(49, 89, 182, 0.25), transparent 42%),
+    radial-gradient(circle at 88% 16%, rgba(18, 96, 164, 0.2), transparent 35%),
+    linear-gradient(168deg, var(--pa-bg-0), var(--pa-bg-1) 44%, var(--pa-bg-2));
+}
+
+.top,
+.mode-bar,
+.control-grid,
+.browse-mode,
+:deep(.edit-shell) {
+  border: 1px solid var(--pa-border);
+  border-radius: 14px;
+  background: rgba(8, 15, 29, 0.78);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.36);
 }
 
 .top {
-  border: 1px solid rgba(77, 102, 139, 0.62);
-  border-radius: 12px;
-  background: rgba(11, 18, 34, 0.78);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
-  padding: 10px 12px;
+  padding: 11px 14px;
   display: flex;
   justify-content: space-between;
-  gap: 10px;
   align-items: center;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
 .brand h1 {
   margin: 0;
   font-size: 18px;
-  color: #f8fbff;
+  letter-spacing: 0.3px;
 }
 
 .brand p {
-  margin: 2px 0 0;
-  color: #9ec4f8;
+  margin: 4px 0 0;
+  color: var(--pa-text-3);
   font-size: 12px;
 }
 
 .top-actions {
   display: inline-flex;
   gap: 8px;
-  flex-wrap: wrap;
 }
 
-.controls,
-.filters {
-  border: 1px solid rgba(72, 95, 129, 0.58);
-  border-radius: 11px;
-  background: rgba(10, 16, 30, 0.72);
-  padding: 9px 10px;
-  display: grid;
-  gap: 9px;
+.mode-bar {
+  padding: 6px;
+  display: inline-flex;
+  gap: 6px;
+  width: fit-content;
 }
 
-.controls {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.filters {
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.1fr) auto 1fr;
-  align-items: center;
-}
-
-.main {
-  min-height: 0;
-  flex: 1;
-  display: grid;
-}
-
-.main > :deep(*) {
-  min-height: 0;
-}
-
-.main > .preset-list,
-.main > .detail {
-  min-height: 0;
-}
-
-.main.browsing {
-  grid-template-columns: minmax(320px, 44%) minmax(0, 1fr);
-  gap: 10px;
-}
-
-.preset-list,
-.detail {
-  border: 1px solid rgba(70, 93, 122, 0.7);
-  border-radius: 12px;
-  background: rgba(9, 14, 26, 0.74);
-  padding: 10px;
-  min-height: 0;
-  overflow: auto;
-}
-
-.detail {
-  display: grid;
-  gap: 10px;
-  align-content: start;
-}
-
-.detail-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  align-items: start;
-}
-
-.detail-head h2 {
-  margin: 0;
-  font-size: 16px;
-  color: #f8fbff;
-}
-
-.detail-head p {
-  margin: 2px 0 0;
-  color: #9ec4f8;
-  font-size: 12px;
-}
-
-.state {
-  margin-left: 8px;
-  color: #93a4be;
-}
-
-.state.loaded {
-  color: #34d399;
-}
-
-.star {
-  border: none;
-  background: transparent;
-  color: #fbbf24;
-  font-size: 24px;
-  line-height: 1;
+.mode-btn {
+  min-height: 34px;
+  min-width: 112px;
+  border: 1px solid var(--pa-border-strong);
+  border-radius: 9px;
+  background: rgba(16, 28, 52, 0.8);
+  color: var(--pa-text-2);
   cursor: pointer;
 }
 
-.meta {
+.mode-btn.active {
+  background: linear-gradient(135deg, #285bbf, #2f73df);
+  border-color: #3d7ef2;
+  color: #ffffff;
+}
+
+.control-grid {
+  padding: 10px 12px;
   display: grid;
-  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(260px, 1.2fr);
+  gap: 10px;
+  align-items: end;
 }
 
 .field {
   display: grid;
-  gap: 4px;
+  gap: 5px;
 }
 
 .field > span {
-  color: #b8d2f5;
+  color: var(--pa-text-2);
   font-size: 12px;
 }
 
-.input,
-.note {
-  border: 1px solid rgba(78, 105, 140, 0.72);
-  border-radius: 7px;
-  background: rgba(15, 23, 42, 0.9);
-  color: #f8fbff;
-  padding: 6px 8px;
+.input {
   min-height: 34px;
-  box-sizing: border-box;
+  border: 1px solid var(--pa-border-strong);
+  border-radius: 9px;
+  background: rgba(13, 24, 45, 0.9);
+  color: var(--pa-text-1);
+  padding: 0 10px;
   width: 100%;
 }
 
-.note {
-  min-height: 72px;
-}
-
-.check {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: #bfd4f2;
+.status {
+  display: grid;
+  gap: 4px;
+  justify-items: end;
+  color: var(--pa-text-3);
   font-size: 12px;
 }
 
-.summary {
-  justify-self: end;
-  color: #94b4de;
-  font-size: 12px;
+.status .saving.on {
+  color: var(--pa-warning);
+}
+
+.main {
+  min-height: 0;
+}
+
+.browse-mode {
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-rows: minmax(240px, auto) minmax(280px, 1fr);
+  gap: 10px;
+  padding: 10px;
 }
 
 .btn {
-  border: 1px solid rgba(91, 123, 175, 0.62);
-  border-radius: 8px;
-  background: #1f2a44;
-  color: #f5f8ff;
-  padding: 6px 12px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--pa-border-strong);
+  border-radius: 9px;
+  background: rgba(16, 28, 52, 0.8);
+  color: var(--pa-text-1);
   cursor: pointer;
 }
 
 .btn.primary {
-  background: #1e5ab8;
-  border-color: #3b82f6;
-}
-
-.btn.active {
-  border-color: #38bdf8;
-  background: rgba(30, 90, 184, 0.42);
+  background: linear-gradient(135deg, #285bbf, #2f73df);
+  border-color: #3d7ef2;
 }
 
 .btn:disabled {
-  opacity: 0.5;
-  cursor: default;
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
-.empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #8ba3c7;
-}
-
-@media (max-width: 1220px) {
-  .controls {
+@media (max-width: 1260px) {
+  .control-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .filters {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .summary {
-    justify-self: start;
+  .status {
+    justify-items: start;
     grid-column: 1 / -1;
   }
 }
 
-@media (max-width: 960px) {
-  .main.browsing {
-    grid-template-columns: 1fr;
+@media (max-width: 980px) {
+  .browse-mode {
+    grid-template-rows: minmax(280px, auto) minmax(260px, 1fr);
+  }
+
+  .mode-bar {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .mode-btn {
+    flex: 1;
   }
 }
 
 @media (max-width: 760px) {
-  .controls,
-  .filters {
+  .control-grid {
     grid-template-columns: 1fr;
-  }
-
-  .top {
-    align-items: start;
   }
 }
 </style>

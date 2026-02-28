@@ -1,6 +1,6 @@
 export type ApiBindingMode = 'sticky_connection' | 'follow_preset';
-export type BrowseViewMode = 'cards' | 'list';
 export type EditApplyMode = 'live' | 'draft';
+export type UiMode = 'browse' | 'edit';
 export type UnsavedDecision = 'save' | 'discard' | 'cancel';
 
 export interface ConnectionSnapshot {
@@ -29,10 +29,42 @@ export interface BrowseParamDraftState {
   applying: boolean;
 }
 
+export interface PromptSelectionState {
+  indices: Set<number>;
+}
+
+export interface BrowsePromptListState {
+  query: string;
+  selection: PromptSelectionState;
+  saving: boolean;
+  last_saved_at: number;
+  dragging: boolean;
+}
+
+export interface AutoSaveTask {
+  id: string;
+  target_preset: string;
+  description: string;
+}
+
 export interface PresetAssistantStateV1 {
   version: 1;
   ui: {
-    view_mode: BrowseViewMode;
+    browse_param_panel_open: boolean;
+    browse_param_last_expanded_group: string;
+    api_binding_mode: ApiBindingMode;
+    edit_apply_mode: EditApplyMode;
+    last_selected_preset: string;
+  };
+  meta_by_preset: Record<string, PresetAssistantMeta>;
+  tag_catalog: string[];
+  sticky_connection_snapshot: ConnectionSnapshot | null;
+}
+
+export interface PresetAssistantStateV2 {
+  version: 2;
+  ui: {
+    mode: UiMode;
     browse_param_panel_open: boolean;
     browse_param_last_expanded_group: string;
     api_binding_mode: ApiBindingMode;
@@ -73,6 +105,7 @@ export interface PromptQuickItem {
   role: PresetPrompt['role'];
   enabled: boolean;
   kind: 'normal' | 'system' | 'placeholder';
+  selected: boolean;
   is_saving: boolean;
   is_recently_saved: boolean;
 }

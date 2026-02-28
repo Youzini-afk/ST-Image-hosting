@@ -2,13 +2,25 @@ import { klona } from 'klona';
 
 import type { SettingGroup } from '../types';
 
+export const coreSettingKeys: Array<keyof Preset['settings']> = [
+  'max_context',
+  'max_completion_tokens',
+  'temperature',
+  'top_p',
+  'top_k',
+  'min_p',
+  'frequency_penalty',
+  'presence_penalty',
+  'repetition_penalty',
+];
+
 export const presetSettingGroups: SettingGroup[] = [
   {
     id: 'context',
     title: '上下文与输出',
     fields: [
       { key: 'max_context', label: '最大上下文', type: 'number', min: 256, step: 1 },
-      { key: 'max_completion_tokens', label: '最大回复', type: 'number', min: 16, step: 1 },
+      { key: 'max_completion_tokens', label: '最大回复 Token', type: 'number', min: 16, step: 1 },
       { key: 'reply_count', label: '回复数量', type: 'number', min: 1, max: 20, step: 1 },
       { key: 'should_stream', label: '流式输出', type: 'boolean' },
     ],
@@ -30,7 +42,7 @@ export const presetSettingGroups: SettingGroup[] = [
   },
   {
     id: 'reasoning',
-    title: '思维链与工具',
+    title: '推理与工具',
     fields: [
       {
         key: 'reasoning_effort',
@@ -48,7 +60,7 @@ export const presetSettingGroups: SettingGroup[] = [
       { key: 'request_thoughts', label: '请求思维链', type: 'boolean' },
       { key: 'request_images', label: '请求图片', type: 'boolean' },
       { key: 'enable_function_calling', label: '函数调用', type: 'boolean' },
-      { key: 'enable_web_search', label: '网络搜索', type: 'boolean' },
+      { key: 'enable_web_search', label: '联网搜索', type: 'boolean' },
       { key: 'squash_system_messages', label: '压缩系统消息', type: 'boolean' },
     ],
   },
@@ -58,7 +70,7 @@ export const presetSettingGroups: SettingGroup[] = [
     fields: [
       {
         key: 'allow_sending_images',
-        label: '图片传入',
+        label: '图像输入',
         type: 'select',
         options: [
           { label: 'disabled', value: 'disabled' },
@@ -67,7 +79,7 @@ export const presetSettingGroups: SettingGroup[] = [
           { label: 'high', value: 'high' },
         ],
       },
-      { key: 'allow_sending_videos', label: '视频传入', type: 'boolean' },
+      { key: 'allow_sending_videos', label: '视频输入', type: 'boolean' },
       {
         key: 'character_name_prefix',
         label: '角色名前缀',
@@ -93,7 +105,7 @@ export function cloneSettings(settings: Preset['settings']): Preset['settings'] 
 }
 
 export function buildPromptKey(prompt: PresetPrompt, index: number): string {
-  return `${prompt.id}::${prompt.name}::${index}`;
+  return `${prompt.id}::${prompt.role}::${prompt.name}::${index}`;
 }
 
 export function getPromptKind(prompt: PresetPrompt): 'normal' | 'system' | 'placeholder' {
@@ -121,7 +133,10 @@ export function normalizeTags(raw: string): string[] {
   return [...new Set(raw.split(',').map(item => item.trim()).filter(Boolean))];
 }
 
-export function parseSettingValue(field: SettingGroup['fields'][number], value: string): Preset['settings'][keyof Preset['settings']] {
+export function parseSettingValue(
+  field: SettingGroup['fields'][number],
+  value: string,
+): Preset['settings'][keyof Preset['settings']] {
   if (field.type === 'boolean') {
     return (value === 'true') as Preset['settings'][keyof Preset['settings']];
   }

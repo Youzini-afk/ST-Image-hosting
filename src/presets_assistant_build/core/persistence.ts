@@ -3,20 +3,21 @@ import _ from 'lodash';
 
 import type {
   ApiBindingMode,
-  BrowseViewMode,
   ConnectionSnapshot,
   EditApplyMode,
   PresetAssistantMeta,
   PresetAssistantStateV1,
+  PresetAssistantStateV2,
+  UiMode,
 } from '../types';
 
 const STORAGE_KEY = '__preset_assistant_state_v1__';
 
-export function createDefaultAssistantState(): PresetAssistantStateV1 {
+export function createDefaultAssistantState(): PresetAssistantStateV2 {
   return {
-    version: 1,
+    version: 2,
     ui: {
-      view_mode: 'cards',
+      mode: 'browse',
       browse_param_panel_open: true,
       browse_param_last_expanded_group: 'context',
       api_binding_mode: 'sticky_connection',
@@ -69,37 +70,35 @@ function normalizeBindingMode(value: unknown): ApiBindingMode {
   return value === 'follow_preset' ? 'follow_preset' : 'sticky_connection';
 }
 
-function normalizeViewMode(value: unknown): BrowseViewMode {
-  return value === 'list' ? 'list' : 'cards';
-}
-
 function normalizeEditApplyMode(value: unknown): EditApplyMode {
   return value === 'draft' ? 'draft' : 'live';
+}
+
+function normalizeUiMode(value: unknown): UiMode {
+  return value === 'edit' ? 'edit' : 'browse';
 }
 
 function normalizeConnectionSnapshot(value: unknown): ConnectionSnapshot | null {
   if (!_.isPlainObject(value)) {
     return null;
   }
+  const raw = value as Record<string, unknown>;
   return {
-    api_source: normalizeString((value as Record<string, unknown>).api_source),
-    profile_name: normalizeString((value as Record<string, unknown>).profile_name),
-    model_name: normalizeString((value as Record<string, unknown>).model_name),
-    api_url: normalizeString((value as Record<string, unknown>).api_url),
+    api_source: normalizeString(raw.api_source),
+    profile_name: normalizeString(raw.profile_name),
+    model_name: normalizeString(raw.model_name),
+    api_url: normalizeString(raw.api_url),
   };
 }
 
-export function normalizeAssistantState(input: unknown): PresetAssistantStateV1 {
-  if (!_.isPlainObject(input)) {
-    return createDefaultAssistantState();
-  }
-  const raw = input as Record<string, unknown>;
-  const uiRaw = _.isPlainObject(raw.ui) ? (raw.ui as Record<string, unknown>) : {};
+function normalizeV2State(input: Record<string, unknown>): PresetAssistantStateV2 {
   const base = createDefaultAssistantState();
+  const uiRaw = _.isPlainObject(input.ui) ? (input.ui as Record<string, unknown>) : {};
+
   return {
-    version: 1,
+    version: 2,
     ui: {
-      view_mode: normalizeViewMode(uiRaw.view_mode),
+      mode: normalizeUiMode(uiRaw.mode),
       browse_param_panel_open:
         typeof uiRaw.browse_param_panel_open === 'boolean'
           ? uiRaw.browse_param_panel_open
@@ -111,13 +110,66 @@ export function normalizeAssistantState(input: unknown): PresetAssistantStateV1 
       edit_apply_mode: normalizeEditApplyMode(uiRaw.edit_apply_mode),
       last_selected_preset: normalizeString(uiRaw.last_selected_preset),
     },
-    meta_by_preset: normalizeMetaMap(raw.meta_by_preset),
-    tag_catalog: normalizeStringArray(raw.tag_catalog),
-    sticky_connection_snapshot: normalizeConnectionSnapshot(raw.sticky_connection_snapshot),
+    meta_by_preset: normalizeMetaMap(input.meta_by_preset),
+    tag_catalog: normalizeStringArray(input.tag_catalog),
+    sticky_connection_snapshot: normalizeConnectionSnapshot(input.sticky_connection_snapshot),
   };
 }
 
-export function readAssistantState(): PresetAssistantStateV1 {
+function normalizeV1State(input: Record<string, unknown>): PresetAssistantStateV1 {
+  const base = createDefaultAssistantState();
+  const uiRaw = _.isPlainObject(input.ui) ? (input.ui as Record<string, unknown>) : {};
+  return {
+    version: 1,
+    ui: {
+      browse_param_panel_open:
+        typeof uiRaw.browse_param_panel_open === 'boolean'
+          ? uiRaw.browse_param_panel_open
+          : base.ui.browse_param_panel_open,
+      browse_param_last_expanded_group:
+        normalizeString(uiRaw.browse_param_last_expanded_group, base.ui.browse_param_last_expanded_group) ||
+        base.ui.browse_param_last_expanded_group,
+      api_binding_mode: normalizeBindingMode(uiRaw.api_binding_mode),
+      edit_apply_mode: normalizeEditApplyMode(uiRaw.edit_apply_mode),
+      last_selected_preset: normalizeString(uiRaw.last_selected_preset),
+    },
+    meta_by_preset: normalizeMetaMap(input.meta_by_preset),
+    tag_catalog: normalizeStringArray(input.tag_catalog),
+    sticky_connection_snapshot: normalizeConnectionSnapshot(input.sticky_connection_snapshot),
+  };
+}
+
+function migrateV1ToV2(v1: PresetAssistantStateV1): PresetAssistantStateV2 {
+  const base = createDefaultAssistantState();
+  return {
+    version: 2,
+    ui: {
+      mode: base.ui.mode,
+      browse_param_panel_open: v1.ui.browse_param_panel_open,
+      browse_param_last_expanded_group: v1.ui.browse_param_last_expanded_group,
+      api_binding_mode: v1.ui.api_binding_mode,
+      edit_apply_mode: v1.ui.edit_apply_mode,
+      last_selected_preset: v1.ui.last_selected_preset,
+    },
+    meta_by_preset: v1.meta_by_preset,
+    tag_catalog: v1.tag_catalog,
+    sticky_connection_snapshot: v1.sticky_connection_snapshot,
+  };
+}
+
+export function normalizeAssistantState(input: unknown): PresetAssistantStateV2 {
+  if (!_.isPlainObject(input)) {
+    return createDefaultAssistantState();
+  }
+  const raw = input as Record<string, unknown>;
+  const version = Number(raw.version);
+  if (version === 1) {
+    return migrateV1ToV2(normalizeV1State(raw));
+  }
+  return normalizeV2State(raw);
+}
+
+export function readAssistantState(): PresetAssistantStateV2 {
   try {
     const variables = getVariables({ type: 'script', script_id: getScriptId() });
     return normalizeAssistantState(variables[STORAGE_KEY]);
@@ -127,7 +179,7 @@ export function readAssistantState(): PresetAssistantStateV1 {
   }
 }
 
-export function writeAssistantState(state: PresetAssistantStateV1): void {
+export function writeAssistantState(state: PresetAssistantStateV2): void {
   try {
     const normalized = normalizeAssistantState(state);
     const variables = getVariables({ type: 'script', script_id: getScriptId() });
@@ -139,9 +191,9 @@ export function writeAssistantState(state: PresetAssistantStateV1): void {
 }
 
 export function mutateAssistantState(
-  state: PresetAssistantStateV1,
-  mutator: (draft: PresetAssistantStateV1) => void,
-): PresetAssistantStateV1 {
+  state: PresetAssistantStateV2,
+  mutator: (draft: PresetAssistantStateV2) => void,
+): PresetAssistantStateV2 {
   const draft = klona(state);
   mutator(draft);
   return normalizeAssistantState(draft);

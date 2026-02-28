@@ -14,11 +14,15 @@ import {
   normalizeTags,
 } from '../core/presetMapper';
 import type {
+  AutoSaveTask,
   BrowseParamDraftState,
+  BrowsePromptListState,
+  EditApplyMode,
   PendingAction,
   PresetSummary,
   PromptQuickItem,
   QuickPromptToggleState,
+  UiMode,
   UnsavedDecision,
 } from '../types';
 
@@ -60,10 +64,10 @@ export const usePresetAssistantStore = defineStore('preset-assistant', () => {
   const loadingPreset = ref(false);
   const initialized = ref(false);
 
-  const editMode = ref(false);
   const editDraft = ref<Preset | null>(null);
   const editDraftDirty = ref(false);
   const editSelectedPromptIndex = ref(0);
+  const editPromptQuery = ref('');
   const editSaving = ref(false);
   let editLiveApplyTimer: number | null = null;
 
@@ -76,6 +80,14 @@ export const usePresetAssistantStore = defineStore('preset-assistant', () => {
     last_saved_at_by_id: {},
   });
 
+  const browseListState = reactive<BrowsePromptListState>({
+    query: '',
+    selection: { indices: new Set<number>() },
+    saving: false,
+    last_saved_at: 0,
+    dragging: false,
+  });
+
   const browseParamDraft = reactive<BrowseParamDraftState>({
     base_settings: cloneSettings(initialSettings),
     staged_settings: cloneSettings(initialSettings),
@@ -84,12 +96,15 @@ export const usePresetAssistantStore = defineStore('preset-assistant', () => {
   });
 
   const subscriptions = ref<EventOnReturn[]>([]);
+  let browseAutoSaveChain: Promise<void> = Promise.resolve();
+  let browseAutoSaveRunning = 0;
+  let browseAutoSaveCounter = 0;
 
-  const viewMode = computed({
-    get: () => assistantState.value.ui.view_mode,
+  const uiMode = computed({
+    get: () => assistantState.value.ui.mode,
     set: value => {
       mutateState(draft => {
-        draft.ui.view_mode = value;
+        draft.ui.mode = value;
       });
     },
   });
@@ -151,11 +166,34 @@ export const usePresetAssistantStore = defineStore('preset-assistant', () => {
         role: prompt.role,
         enabled: prompt.enabled,
         kind: getPromptKind(prompt),
+        selected: browseListState.selection.indices.has(index),
         is_saving: quickPromptToggleState.saving_ids.has(key),
         is_recently_saved: _.isNumber(quickPromptToggleState.last_saved_at_by_id[key]),
       };
     });
   });
+
+  const filteredBrowsePromptItems = computed<PromptQuickItem[]>(() => {
+    const keyword = browseListState.query.trim().toLowerCase();
+    if (!keyword) {
+      return quickPromptItems.value;
+    }
+    return quickPromptItems.value.filter(item => {
+      return (
+        item.name.toLowerCase().includes(keyword) ||
+        item.id.toLowerCase().includes(keyword) ||
+        item.role.toLowerCase().includes(keyword)
+      );
+    });
+  });
+
+  const selectedBrowsePromptIndices = computed<number[]>(() => {
+    return [...browseListState.selection.indices]
+      .filter(index => selectedPreset.value?.prompts[index])
+      .sort((lhs, rhs) => lhs - rhs);
+  });
+
+  const browseVisiblePromptIndices = computed<number[]>(() => filteredBrowsePromptItems.value.map(item => item.index));
 
   const presetSummaries = computed<PresetSummary[]>(() => {
     return presetNames.value.map(name => {
@@ -172,6 +210,26 @@ export const usePresetAssistantStore = defineStore('preset-assistant', () => {
         is_selected: name === selectedPresetName.value,
       };
     });
+  });
+
+  const editPromptIndices = computed<number[]>(() => {
+    if (!editDraft.value) {
+      return [];
+    }
+    const keyword = editPromptQuery.value.trim().toLowerCase();
+    if (!keyword) {
+      return editDraft.value.prompts.map((_, index) => index);
+    }
+    return editDraft.value.prompts
+      .map((prompt, index) => ({ prompt, index }))
+      .filter(({ prompt }) => {
+        return (
+          prompt.name.toLowerCase().includes(keyword) ||
+          prompt.id.toLowerCase().includes(keyword) ||
+          prompt.role.toLowerCase().includes(keyword)
+        );
+      })
+      .map(item => item.index);
   });
 
   function mutateState(mutator: (draft: typeof assistantState.value) => void): void {
@@ -225,12 +283,6 @@ export const usePresetAssistantStore = defineStore('preset-assistant', () => {
     };
   }
 
-  function removePresetPreview(name: string): void {
-    const next = { ...presetPreviewMap.value };
-    delete next[name];
-    presetPreviewMap.value = next;
-  }
-
   function markPromptSaved(promptKey: string): void {
     quickPromptToggleState.last_saved_at_by_id[promptKey] = Date.now();
     window.setTimeout(() => {
@@ -252,6 +304,37 @@ export const usePresetAssistantStore = defineStore('preset-assistant', () => {
       0,
       Math.min(editSelectedPromptIndex.value, Math.max(0, editDraft.value.prompts.length - 1)),
     );
+  }
+
+  function clearBrowsePromptSelection(): void {
+    browseListState.selection.indices.clear();
+  }
+
+  function setBrowsePromptQuery(query: string): void {
+    browseListState.query = query;
+  }
+
+  function toggleBrowsePromptSelection(index: number, checked: boolean): void {
+    if (!selectedPreset.value?.prompts[index]) {
+      return;
+    }
+    if (checked) {
+      browseListState.selection.indices.add(index);
+      return;
+    }
+    browseListState.selection.indices.delete(index);
+  }
+
+  function setBrowsePromptSelectionForVisible(checked: boolean): void {
+    if (checked) {
+      for (const index of browseVisiblePromptIndices.value) {
+        browseListState.selection.indices.add(index);
+      }
+      return;
+    }
+    for (const index of browseVisiblePromptIndices.value) {
+      browseListState.selection.indices.delete(index);
+    }
   }
 
   async function refreshPresetNames(): Promise<void> {
@@ -289,6 +372,7 @@ export const usePresetAssistantStore = defineStore('preset-assistant', () => {
     if (!name) {
       selectedPresetName.value = '';
       selectedPreset.value = null;
+      clearBrowsePromptSelection();
       return false;
     }
     loadingPreset.value = true;
@@ -298,6 +382,8 @@ export const usePresetAssistantStore = defineStore('preset-assistant', () => {
       selectedPreset.value = clonePreset(preset);
       resetBrowseSettingsDraftFromPreset(preset);
       resetEditDraftFromPreset(preset);
+      clearBrowsePromptSelection();
+      browseListState.query = '';
       mutateState(draft => {
         draft.ui.last_selected_preset = name;
       });
@@ -317,6 +403,10 @@ export const usePresetAssistantStore = defineStore('preset-assistant', () => {
     unsavedDialogVisible.value = true;
   }
 
+  async function flushBrowseAutoSaveQueue(): Promise<void> {
+    await browseAutoSaveChain;
+  }
+
   async function selectPreset(name: string): Promise<void> {
     if (!name || name === selectedPresetName.value) {
       return;
@@ -325,6 +415,7 @@ export const usePresetAssistantStore = defineStore('preset-assistant', () => {
       queuePendingAction({ type: 'select', target_name: name }, '切换预设前有未保存改动');
       return;
     }
+    await flushBrowseAutoSaveQueue();
     await loadPresetForBrowse(name);
   }
 
@@ -344,9 +435,10 @@ export const usePresetAssistantStore = defineStore('preset-assistant', () => {
       return false;
     }
     if (hasUnsavedChanges.value) {
-      queuePendingAction({ type: 'switch', target_name: targetName }, '切换启用预设前有未保存改动');
+      queuePendingAction({ type: 'switch', target_name: targetName }, '切换生效预设前有未保存改动');
       return false;
     }
+    await flushBrowseAutoSaveQueue();
     return await performSwitchPreset(targetName);
   }
 
@@ -383,43 +475,213 @@ export const usePresetAssistantStore = defineStore('preset-assistant', () => {
     }
   }
 
-  async function persistSelectedPreset(nextPreset: Preset, render: ReplacePresetRender): Promise<void> {
-    if (!selectedPresetName.value) {
-      throw new Error('没有选中的预设');
-    }
-    await replacePreset(selectedPresetName.value, nextPreset, { render });
-    const isLoaded = selectedPresetName.value === loadedPresetName.value;
-    if (isLoaded) {
+  async function persistPresetByName(name: string, nextPreset: Preset, render: ReplacePresetRender): Promise<void> {
+    await replacePreset(name, nextPreset, { render });
+    if (name === loadedPresetName.value) {
       await replacePreset('in_use', clonePreset(nextPreset), { render: 'debounced' });
     }
   }
 
-  async function togglePromptEnabledAndAutoSave(index: number, enabled: boolean): Promise<void> {
+  async function enqueueBrowseAutoSave(
+    task: AutoSaveTask,
+    saver: () => Promise<void>,
+    onError: (error: unknown) => Promise<void> | void,
+  ): Promise<void> {
+    const queued = browseAutoSaveChain.then(async () => {
+      browseAutoSaveRunning += 1;
+      browseListState.saving = true;
+      try {
+        await saver();
+        browseListState.last_saved_at = Date.now();
+      } catch (error) {
+        console.warn('[PresetAssistant] browse auto save failed:', task, error);
+        await onError(error);
+      } finally {
+        browseAutoSaveRunning = Math.max(0, browseAutoSaveRunning - 1);
+        browseListState.saving = browseAutoSaveRunning > 0;
+      }
+    });
+    browseAutoSaveChain = queued.then(
+      () => undefined,
+      () => undefined,
+    );
+    return queued;
+  }
+
+  async function rollbackSelectedPresetFromHost(targetName: string): Promise<void> {
+    if (selectedPresetName.value !== targetName) {
+      return;
+    }
+    try {
+      const hostPreset = getPreset(targetName);
+      selectedPreset.value = clonePreset(hostPreset);
+      updatePresetPreview(targetName, hostPreset);
+      clearBrowsePromptSelection();
+      if (!editDraftDirty.value) {
+        resetEditDraftFromPreset(hostPreset);
+      }
+      if (!browseParamDraft.dirty) {
+        resetBrowseSettingsDraftFromPreset(hostPreset);
+      }
+    } catch (error) {
+      console.warn('[PresetAssistant] rollback selected preset failed:', error);
+    }
+  }
+
+  async function toggleBrowsePromptEnabledAndAutoSave(index: number, enabled: boolean): Promise<void> {
     if (!selectedPreset.value) {
       return;
     }
     const currentPrompt = selectedPreset.value.prompts[index];
-    if (!currentPrompt) {
+    if (!currentPrompt || currentPrompt.enabled === enabled) {
       return;
     }
 
-    const promptKey = buildPromptKey(currentPrompt, index);
+    const targetName = selectedPresetName.value;
+    if (!targetName) {
+      return;
+    }
+
     const rollbackPreset = clonePreset(selectedPreset.value);
-    const optimisticPreset = clonePreset(selectedPreset.value);
-    optimisticPreset.prompts[index].enabled = enabled;
-    selectedPreset.value = optimisticPreset;
+    const nextPreset = clonePreset(selectedPreset.value);
+    nextPreset.prompts[index].enabled = enabled;
+    const promptKey = buildPromptKey(nextPreset.prompts[index], index);
+
+    selectedPreset.value = nextPreset;
+    updatePresetPreview(targetName, nextPreset);
     quickPromptToggleState.saving_ids.add(promptKey);
 
+    const task: AutoSaveTask = {
+      id: `toggle-${browseAutoSaveCounter++}`,
+      target_preset: targetName,
+      description: `toggle:${index}`,
+    };
+
     try {
-      await persistSelectedPreset(clonePreset(optimisticPreset), 'none');
-      updatePresetPreview(selectedPresetName.value, optimisticPreset);
-      markPromptSaved(promptKey);
-    } catch (error) {
-      selectedPreset.value = rollbackPreset;
-      const message = error instanceof Error ? error.message : String(error);
-      toastr.error(`提示词开关保存失败: ${message}`, 'Preset Assistant');
+      await enqueueBrowseAutoSave(
+        task,
+        async () => {
+          await persistPresetByName(targetName, clonePreset(nextPreset), 'none');
+          markPromptSaved(promptKey);
+        },
+        async error => {
+          if (selectedPresetName.value === targetName) {
+            selectedPreset.value = rollbackPreset;
+            updatePresetPreview(targetName, rollbackPreset);
+          }
+          await rollbackSelectedPresetFromHost(targetName);
+          const message = error instanceof Error ? error.message : String(error);
+          toastr.error(`提示词开关保存失败: ${message}`, 'Preset Assistant');
+        },
+      );
     } finally {
       quickPromptToggleState.saving_ids.delete(promptKey);
+    }
+  }
+
+  async function reorderBrowsePromptAndAutoSave(fromIndex: number, toIndex: number): Promise<void> {
+    if (!selectedPreset.value || fromIndex === toIndex) {
+      return;
+    }
+    const prompts = selectedPreset.value.prompts;
+    if (!prompts[fromIndex] || !prompts[toIndex]) {
+      return;
+    }
+    const targetName = selectedPresetName.value;
+    if (!targetName) {
+      return;
+    }
+
+    const rollbackPreset = clonePreset(selectedPreset.value);
+    const nextPreset = clonePreset(selectedPreset.value);
+    const [moving] = nextPreset.prompts.splice(fromIndex, 1);
+    nextPreset.prompts.splice(toIndex, 0, moving);
+
+    selectedPreset.value = nextPreset;
+    updatePresetPreview(targetName, nextPreset);
+    clearBrowsePromptSelection();
+
+    const task: AutoSaveTask = {
+      id: `reorder-${browseAutoSaveCounter++}`,
+      target_preset: targetName,
+      description: `reorder:${fromIndex}->${toIndex}`,
+    };
+
+    await enqueueBrowseAutoSave(
+      task,
+      async () => {
+        await persistPresetByName(targetName, clonePreset(nextPreset), 'none');
+      },
+      async error => {
+        if (selectedPresetName.value === targetName) {
+          selectedPreset.value = rollbackPreset;
+          updatePresetPreview(targetName, rollbackPreset);
+        }
+        await rollbackSelectedPresetFromHost(targetName);
+        const message = error instanceof Error ? error.message : String(error);
+        toastr.error(`排序保存失败: ${message}`, 'Preset Assistant');
+      },
+    );
+  }
+
+  async function batchSetBrowsePromptEnabledAndAutoSave(indices: number[], enabled: boolean): Promise<void> {
+    if (!selectedPreset.value || indices.length < 1) {
+      return;
+    }
+    const targetName = selectedPresetName.value;
+    if (!targetName) {
+      return;
+    }
+    const uniqueIndices = [...new Set(indices)].filter(index => selectedPreset.value?.prompts[index]);
+    if (uniqueIndices.length < 1) {
+      return;
+    }
+
+    const rollbackPreset = clonePreset(selectedPreset.value);
+    const nextPreset = clonePreset(selectedPreset.value);
+    const affectedKeys: string[] = [];
+    for (const index of uniqueIndices) {
+      const prompt = nextPreset.prompts[index];
+      prompt.enabled = enabled;
+      affectedKeys.push(buildPromptKey(prompt, index));
+    }
+
+    for (const key of affectedKeys) {
+      quickPromptToggleState.saving_ids.add(key);
+    }
+    selectedPreset.value = nextPreset;
+    updatePresetPreview(targetName, nextPreset);
+    clearBrowsePromptSelection();
+
+    const task: AutoSaveTask = {
+      id: `batch-${browseAutoSaveCounter++}`,
+      target_preset: targetName,
+      description: `${enabled ? 'enable' : 'disable'}:${uniqueIndices.join(',')}`,
+    };
+
+    try {
+      await enqueueBrowseAutoSave(
+        task,
+        async () => {
+          await persistPresetByName(targetName, clonePreset(nextPreset), 'none');
+          for (const key of affectedKeys) {
+            markPromptSaved(key);
+          }
+        },
+        async error => {
+          if (selectedPresetName.value === targetName) {
+            selectedPreset.value = rollbackPreset;
+            updatePresetPreview(targetName, rollbackPreset);
+          }
+          await rollbackSelectedPresetFromHost(targetName);
+          const message = error instanceof Error ? error.message : String(error);
+          toastr.error(`批量操作保存失败: ${message}`, 'Preset Assistant');
+        },
+      );
+    } finally {
+      for (const key of affectedKeys) {
+        quickPromptToggleState.saving_ids.delete(key);
+      }
     }
   }
 
@@ -435,14 +697,15 @@ export const usePresetAssistantStore = defineStore('preset-assistant', () => {
   }
 
   async function applyBrowseSettingsToPreset(): Promise<boolean> {
-    if (!selectedPreset.value || !browseParamDraft.dirty || browseParamDraft.applying) {
+    if (!selectedPreset.value || !selectedPresetName.value || !browseParamDraft.dirty || browseParamDraft.applying) {
       return true;
     }
     browseParamDraft.applying = true;
     try {
+      await flushBrowseAutoSaveQueue();
       const nextPreset = clonePreset(selectedPreset.value);
       nextPreset.settings = cloneSettings(browseParamDraft.staged_settings);
-      await persistSelectedPreset(nextPreset, 'none');
+      await persistPresetByName(selectedPresetName.value, nextPreset, 'none');
       selectedPreset.value = nextPreset;
       browseParamDraft.base_settings = cloneSettings(nextPreset.settings);
       browseParamDraft.staged_settings = cloneSettings(nextPreset.settings);
@@ -484,11 +747,16 @@ export const usePresetAssistantStore = defineStore('preset-assistant', () => {
     });
   }
 
-  function setEditMode(next: boolean): void {
-    editMode.value = next;
-    if (next && selectedPreset.value && !editDraft.value) {
-      resetEditDraftFromPreset(selectedPreset.value);
-    }
+  function setUiMode(next: UiMode): void {
+    uiMode.value = next;
+  }
+
+  function setEditApplyMode(mode: EditApplyMode): void {
+    editApplyMode.value = mode;
+  }
+
+  function setEditPromptQuery(query: string): void {
+    editPromptQuery.value = query;
   }
 
   function updateEditDraft(nextPreset: Preset): void {
@@ -520,6 +788,7 @@ export const usePresetAssistantStore = defineStore('preset-assistant', () => {
     const next = clonePreset(editDraft.value);
     next.prompts.splice(index, 1);
     updateEditDraft(next);
+    editSelectedPromptIndex.value = Math.max(0, Math.min(editSelectedPromptIndex.value, next.prompts.length - 1));
   }
 
   function movePromptInEditDraft(index: number, direction: -1 | 1): void {
@@ -567,7 +836,8 @@ export const usePresetAssistantStore = defineStore('preset-assistant', () => {
     }
     editSaving.value = true;
     try {
-      await persistSelectedPreset(clonePreset(editDraft.value), 'none');
+      await flushBrowseAutoSaveQueue();
+      await persistPresetByName(selectedPresetName.value, clonePreset(editDraft.value), 'none');
       selectedPreset.value = clonePreset(editDraft.value);
       editDraftDirty.value = false;
       updatePresetPreview(selectedPresetName.value, selectedPreset.value);
@@ -591,6 +861,7 @@ export const usePresetAssistantStore = defineStore('preset-assistant', () => {
   }
 
   async function saveAllPendingChanges(): Promise<boolean> {
+    await flushBrowseAutoSaveQueue();
     if (browseParamDraft.dirty) {
       const ok = await applyBrowseSettingsToPreset();
       if (!ok) {
@@ -630,6 +901,7 @@ export const usePresetAssistantStore = defineStore('preset-assistant', () => {
     const action = pendingAction.value;
     pendingAction.value = null;
     unsavedDialogVisible.value = false;
+    await flushBrowseAutoSaveQueue();
 
     if (!action) {
       return;
@@ -646,7 +918,7 @@ export const usePresetAssistantStore = defineStore('preset-assistant', () => {
   async function refreshFromHost(): Promise<void> {
     const current = selectedPresetName.value;
     await refreshPresetNames();
-    if (hasUnsavedChanges.value) {
+    if (hasUnsavedChanges.value || browseListState.saving) {
       return;
     }
     if (!current) {
@@ -752,37 +1024,50 @@ export const usePresetAssistantStore = defineStore('preset-assistant', () => {
     selectedPreset,
     loadedPresetName,
     loadingPreset,
-    editMode,
-    editDraft,
-    editDraftDirty,
-    editSelectedPromptIndex,
-    editSaving,
-    browseParamDraft,
+    uiMode,
+    apiBindingMode,
+    editApplyMode,
+    browseParamPanelOpen,
+    browseParamExpandedGroup,
     quickPromptItems,
+    filteredBrowsePromptItems,
+    browseVisiblePromptIndices,
+    selectedBrowsePromptIndices,
+    browseListState,
+    browseParamDraft,
     selectedMeta,
     hasUnsavedChanges,
     unsavedDialogVisible,
     unsavedDialogReason,
     pendingAction,
-    viewMode,
-    apiBindingMode,
-    editApplyMode,
-    browseParamPanelOpen,
-    browseParamExpandedGroup,
+    editDraft,
+    editDraftDirty,
+    editSelectedPromptIndex,
+    editPromptQuery,
+    editPromptIndices,
+    editSaving,
     initialize,
     teardown,
     refreshFromHost,
     selectPreset,
     switchPresetWithConnectionPolicy,
     resolveUnsavedDecision,
-    togglePromptEnabledAndAutoSave,
+    setBrowsePromptQuery,
+    toggleBrowsePromptSelection,
+    setBrowsePromptSelectionForVisible,
+    clearBrowsePromptSelection,
+    toggleBrowsePromptEnabledAndAutoSave,
+    reorderBrowsePromptAndAutoSave,
+    batchSetBrowsePromptEnabledAndAutoSave,
     setBrowseStagedSetting,
     applyBrowseSettingsToPreset,
     resetBrowseSettingsDraft,
     setMetaFavorite,
     setMetaTags,
     setMetaNote,
-    setEditMode,
+    setUiMode,
+    setEditApplyMode,
+    setEditPromptQuery,
     updateEditDraft,
     appendPromptToEditDraft,
     removePromptFromEditDraft,

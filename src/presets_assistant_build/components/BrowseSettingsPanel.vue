@@ -1,16 +1,62 @@
 <template>
   <section class="settings-panel">
-    <div class="head">
-      <h3>生成参数（浏览态）</h3>
-      <label class="collapse-toggle">
-        <input :checked="open" type="checkbox" @change="$emit('toggle-open', ($event.target as HTMLInputElement).checked)" />
-        <span>展开</span>
+    <header class="head">
+      <div class="title-wrap">
+        <h3>生成参数</h3>
+        <p>核心参数可直接调节，高级参数折叠显示，点击“应用”提交</p>
+      </div>
+      <span v-if="dirty" class="dirty-dot">未应用</span>
+    </header>
+
+    <div class="core-grid">
+      <label v-for="field in coreFields" :key="String(field.key)" class="field">
+        <span>
+          {{ field.label }}
+          <i v-if="isFieldChanged(field)">已改</i>
+        </span>
+
+        <input
+          v-if="field.type === 'number'"
+          :value="toNumberInputValue(stagedSettings[field.key])"
+          type="number"
+          class="input"
+          :min="field.min"
+          :max="field.max"
+          :step="field.step ?? 1"
+          @input="onNumberInput(field, $event)"
+        />
+
+        <select
+          v-else-if="field.type === 'select'"
+          class="input"
+          :value="String(stagedSettings[field.key])"
+          @change="onSelectInput(field, $event)"
+        >
+          <option v-for="option in field.options" :key="option.value" :value="option.value">
+            {{ option.label }}
+          </option>
+        </select>
+
+        <label v-else class="check">
+          <input
+            :checked="Boolean(stagedSettings[field.key])"
+            type="checkbox"
+            @change="onBooleanInput(field, $event)"
+          />
+          <span>{{ Boolean(stagedSettings[field.key]) ? '开启' : '关闭' }}</span>
+        </label>
       </label>
+    </div>
+
+    <div class="advanced-head">
+      <button class="toggle-btn" type="button" @click="$emit('toggle-open', !open)">
+        {{ open ? '收起高级参数' : '展开高级参数' }}
+      </button>
     </div>
 
     <div v-if="open" class="groups">
       <details
-        v-for="group in groups"
+        v-for="group in advancedGroups"
         :key="group.id"
         :open="group.id === expandedGroup"
         class="group"
@@ -59,19 +105,20 @@
       </details>
     </div>
 
-    <div v-if="open" class="actions">
+    <footer class="actions">
       <button class="btn" type="button" :disabled="!dirty || applying" @click="$emit('reset')">重置</button>
       <button class="btn primary" type="button" :disabled="!dirty || applying" @click="$emit('apply')">
         {{ applying ? '应用中...' : '应用' }}
       </button>
-    </div>
+    </footer>
   </section>
 </template>
 
 <script setup lang="ts">
 import _ from 'lodash';
+import { computed } from 'vue';
 
-import { presetSettingGroups } from '../core/presetMapper';
+import { coreSettingKeys, presetSettingGroups } from '../core/presetMapper';
 import type { SettingField } from '../types';
 
 const props = defineProps<{
@@ -91,7 +138,19 @@ const emit = defineEmits<{
   'update-setting': [key: keyof Preset['settings'], value: Preset['settings'][keyof Preset['settings']]];
 }>();
 
-const groups = presetSettingGroups;
+const coreFields = computed(() => {
+  const allFields = presetSettingGroups.flatMap(group => group.fields);
+  return coreSettingKeys.map(key => allFields.find(field => field.key === key)).filter(Boolean) as SettingField[];
+});
+
+const advancedGroups = computed(() => {
+  return presetSettingGroups
+    .map(group => ({
+      ...group,
+      fields: group.fields.filter(field => !coreSettingKeys.includes(field.key)),
+    }))
+    .filter(group => group.fields.length > 0);
+});
 
 function isFieldChanged(field: SettingField): boolean {
   return !_.isEqual(props.baseSettings[field.key], props.stagedSettings[field.key]);
@@ -133,129 +192,173 @@ function onBooleanInput(field: SettingField, event: Event): void {
 
 <style scoped>
 .settings-panel {
-  border: 1px solid rgba(70, 93, 122, 0.7);
-  border-radius: 12px;
-  background: linear-gradient(145deg, rgba(17, 24, 39, 0.9), rgba(8, 13, 24, 0.95));
-  display: flex;
-  flex-direction: column;
+  border: 1px solid var(--pa-border-strong);
+  border-radius: 14px;
+  background: linear-gradient(160deg, rgba(8, 15, 30, 0.94), rgba(6, 11, 23, 0.94));
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
   min-height: 0;
 }
 
 .head {
-  padding: 10px 12px;
-  border-bottom: 1px solid rgba(70, 93, 122, 0.65);
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--pa-border);
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: start;
+  gap: 10px;
 }
 
-.head h3 {
+.title-wrap h3 {
   margin: 0;
-  font-size: 14px;
-  color: #f8fbff;
+  color: var(--pa-text-1);
+  font-size: 15px;
 }
 
-.collapse-toggle {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-  color: #a8c6f0;
+.title-wrap p {
+  margin: 4px 0 0;
+  color: var(--pa-text-3);
   font-size: 12px;
 }
 
+.dirty-dot {
+  align-self: center;
+  color: var(--pa-warning);
+  font-size: 12px;
+}
+
+.core-grid {
+  padding: 10px 14px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-bottom: 1px solid var(--pa-border);
+}
+
+.advanced-head {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--pa-border);
+}
+
+.toggle-btn {
+  border: 1px solid var(--pa-border-strong);
+  background: rgba(22, 36, 66, 0.72);
+  color: var(--pa-text-2);
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
 .groups {
+  min-height: 0;
   overflow: auto;
-  max-height: 420px;
   padding: 8px;
   display: grid;
   gap: 8px;
 }
 
 .group {
-  border: 1px solid rgba(57, 79, 110, 0.62);
-  border-radius: 8px;
-  background: rgba(15, 23, 42, 0.68);
+  border: 1px solid var(--pa-border);
+  border-radius: 10px;
+  background: rgba(10, 20, 39, 0.7);
 }
 
 .group > summary {
-  cursor: pointer;
   list-style: none;
-  padding: 8px 10px;
-  color: #dbeafe;
-  font-size: 13px;
-  border-bottom: 1px solid rgba(57, 79, 110, 0.5);
+  cursor: pointer;
+  padding: 9px 10px;
+  color: var(--pa-text-1);
+  border-bottom: 1px solid rgba(72, 98, 138, 0.45);
 }
 
 .fields {
+  padding: 10px;
   display: grid;
-  gap: 8px;
-  padding: 9px;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .field {
   display: grid;
-  gap: 4px;
+  gap: 5px;
 }
 
 .field > span {
+  color: var(--pa-text-2);
+  font-size: 12px;
   display: inline-flex;
   gap: 8px;
-  align-items: center;
-  color: #b8d2f5;
-  font-size: 12px;
 }
 
 .field > span i {
+  color: var(--pa-warning);
   font-style: normal;
-  color: #fbbf24;
   font-size: 11px;
 }
 
 .input {
-  border: 1px solid rgba(78, 105, 140, 0.72);
-  border-radius: 7px;
-  background: rgba(15, 23, 42, 0.9);
-  color: #f8fbff;
-  padding: 5px 8px;
-  min-height: 32px;
+  border: 1px solid var(--pa-border-strong);
+  border-radius: 8px;
+  background: rgba(13, 24, 45, 0.9);
+  color: var(--pa-text-1);
+  min-height: 34px;
+  padding: 0 9px;
 }
 
 .check {
+  min-height: 34px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: #f4f8ff;
-  font-size: 12px;
+  color: var(--pa-text-1);
 }
 
 .actions {
   position: sticky;
   bottom: 0;
-  display: flex;
+  display: inline-flex;
   justify-content: flex-end;
   gap: 8px;
-  padding: 10px 12px;
-  border-top: 1px solid rgba(70, 93, 122, 0.65);
-  background: rgba(6, 10, 20, 0.9);
-  backdrop-filter: blur(6px);
+  padding: 10px 14px;
+  border-top: 1px solid var(--pa-border);
+  background: rgba(6, 12, 24, 0.9);
 }
 
 .btn {
-  border: 1px solid rgba(91, 123, 175, 0.62);
+  border: 1px solid var(--pa-border-strong);
   border-radius: 8px;
-  background: #1f2a44;
-  color: #f5f8ff;
-  padding: 6px 12px;
+  min-height: 34px;
+  padding: 0 14px;
+  color: var(--pa-text-1);
+  background: rgba(22, 36, 66, 0.75);
   cursor: pointer;
 }
 
 .btn.primary {
-  background: #1e5ab8;
-  border-color: #3b82f6;
+  background: linear-gradient(135deg, #2a5ec4, #2f73df);
+  border-color: #3c7bf1;
 }
 
 .btn:disabled {
-  opacity: 0.5;
-  cursor: default;
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (max-width: 1100px) {
+  .core-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .core-grid,
+  .fields {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

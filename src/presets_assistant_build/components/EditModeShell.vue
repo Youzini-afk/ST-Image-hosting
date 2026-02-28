@@ -1,15 +1,24 @@
 <template>
   <section class="edit-shell">
     <header class="toolbar">
-      <div class="mode">
-        <span>编辑模式</span>
-        <select :value="applyMode" class="select" @change="emitApplyMode(($event.target as HTMLSelectElement).value)">
-          <option value="live">实时模式</option>
-          <option value="draft">草稿模式</option>
-        </select>
+      <div class="toolbar-left">
+        <label class="mode">
+          <span>提交策略</span>
+          <select :value="applyMode" class="input" @change="emitApplyMode(($event.target as HTMLSelectElement).value)">
+            <option value="live">实时</option>
+            <option value="draft">草稿</option>
+          </select>
+        </label>
+        <input
+          class="input search"
+          :value="promptQuery"
+          type="text"
+          placeholder="搜索 Prompt name / id / role"
+          @input="$emit('update-prompt-query', ($event.target as HTMLInputElement).value)"
+        />
       </div>
       <div class="actions">
-        <button class="btn" type="button" :disabled="!dirty || saving" @click="$emit('discard')">丢弃改动</button>
+        <button class="btn" type="button" :disabled="!dirty || saving" @click="$emit('discard')">丢弃</button>
         <button class="btn primary" type="button" :disabled="!dirty || saving" @click="$emit('save')">
           {{ saving ? '保存中...' : '保存到预设' }}
         </button>
@@ -17,27 +26,28 @@
     </header>
 
     <div v-if="draftPreset" class="content">
-      <aside class="prompt-list">
-        <div class="prompt-list-head">
-          <strong>提示词词条</strong>
+      <aside class="sidebar">
+        <div class="sidebar-head">
+          <strong>Prompt 条目</strong>
           <button class="btn mini" type="button" @click="$emit('append-prompt')">新增</button>
         </div>
         <button
-          v-for="(prompt, index) in draftPreset.prompts"
-          :key="`${prompt.id}-${index}`"
+          v-for="index in promptIndices"
+          :key="`${draftPreset.prompts[index]?.id || 'prompt'}-${index}`"
           class="prompt-item"
           :class="{ active: index === selectedPromptIndex }"
           type="button"
           @click="$emit('set-selected-prompt-index', index)"
         >
-          <span>{{ prompt.name || prompt.id }}</span>
-          <small>{{ prompt.id }}</small>
+          <span>{{ draftPreset.prompts[index]?.name || draftPreset.prompts[index]?.id || `Prompt ${index + 1}` }}</span>
+          <small>{{ draftPreset.prompts[index]?.id }} · {{ draftPreset.prompts[index]?.role }}</small>
         </button>
+        <div v-if="promptIndices.length < 1" class="empty-side">无匹配条目</div>
       </aside>
 
       <main v-if="selectedPrompt" class="editor">
         <section class="panel">
-          <h4>提示词编辑</h4>
+          <h4>Prompt 详情</h4>
           <label class="field">
             <span>名称</span>
             <input class="input" :value="selectedPrompt.name" type="text" @input="updatePromptName($event)" />
@@ -65,7 +75,7 @@
           </div>
           <div v-if="selectedPositionType === 'in_chat'" class="row">
             <label class="field">
-              <span>深度</span>
+              <span>Depth</span>
               <input
                 class="input"
                 :value="selectedPrompt.position.type === 'in_chat' ? selectedPrompt.position.depth : 0"
@@ -75,7 +85,7 @@
               />
             </label>
             <label class="field">
-              <span>顺序</span>
+              <span>Order</span>
               <input
                 class="input"
                 :value="selectedPrompt.position.type === 'in_chat' ? selectedPrompt.position.order : 0"
@@ -87,7 +97,7 @@
           </div>
           <label class="check">
             <input :checked="selectedPrompt.enabled" type="checkbox" @change="updatePromptEnabled($event)" />
-            <span>启用此词条</span>
+            <span>启用此条目</span>
           </label>
           <label class="field">
             <span>内容</span>
@@ -101,7 +111,7 @@
         </section>
 
         <section class="panel">
-          <h4>参数编辑（完整）</h4>
+          <h4>完整参数编辑</h4>
           <details v-for="group in groups" :key="group.id" class="group">
             <summary>{{ group.title }}</summary>
             <div class="fields">
@@ -140,7 +150,7 @@
           </details>
         </section>
       </main>
-      <div v-else class="empty">当前预设没有可编辑词条</div>
+      <div v-else class="empty">当前预设没有可编辑的 Prompt</div>
     </div>
 
     <div v-else class="empty">请先选择预设</div>
@@ -159,6 +169,8 @@ const props = defineProps<{
   applyMode: EditApplyMode;
   selectedPromptIndex: number;
   saving: boolean;
+  promptIndices: number[];
+  promptQuery: string;
 }>();
 
 const emit = defineEmits<{
@@ -169,6 +181,7 @@ const emit = defineEmits<{
   'move-prompt': [index: number, direction: -1 | 1];
   'set-selected-prompt-index': [index: number];
   'update-apply-mode': [mode: EditApplyMode];
+  'update-prompt-query': [query: string];
   'update-draft': [preset: Preset];
 }>();
 
@@ -327,41 +340,52 @@ function updateSettingBoolean(key: keyof Preset['settings'], event: Event): void
 
 <style scoped>
 .edit-shell {
-  border: 1px solid rgba(70, 93, 122, 0.7);
-  border-radius: 12px;
-  overflow: hidden;
-  background: linear-gradient(160deg, rgba(17, 24, 39, 0.88), rgba(9, 14, 26, 0.95));
+  border: 1px solid var(--pa-border-strong);
+  border-radius: 14px;
+  background: linear-gradient(160deg, rgba(8, 15, 30, 0.94), rgba(6, 11, 23, 0.94));
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
 
 .toolbar {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--pa-border);
   display: flex;
   justify-content: space-between;
   gap: 10px;
   align-items: center;
-  padding: 10px 12px;
-  border-bottom: 1px solid rgba(70, 93, 122, 0.65);
   flex-wrap: wrap;
+}
+
+.toolbar-left {
+  min-width: 320px;
+  flex: 1;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
 }
 
 .mode {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: #bfd4f2;
+  color: var(--pa-text-2);
   font-size: 12px;
 }
 
-.select,
 .input,
 .textarea {
-  border: 1px solid rgba(78, 105, 140, 0.72);
-  border-radius: 7px;
-  background: rgba(15, 23, 42, 0.9);
-  color: #f8fbff;
-  padding: 5px 8px;
+  border: 1px solid var(--pa-border-strong);
+  border-radius: 8px;
+  background: rgba(13, 24, 45, 0.9);
+  color: var(--pa-text-1);
+  min-height: 34px;
+  padding: 0 9px;
+}
+
+.search {
+  width: 100%;
 }
 
 .actions {
@@ -369,15 +393,46 @@ function updateSettingBoolean(key: keyof Preset['settings'], event: Event): void
   gap: 8px;
 }
 
+.btn {
+  border: 1px solid var(--pa-border-strong);
+  border-radius: 8px;
+  min-height: 34px;
+  padding: 0 12px;
+  color: var(--pa-text-1);
+  background: rgba(22, 36, 66, 0.75);
+  cursor: pointer;
+}
+
+.btn.primary {
+  background: linear-gradient(135deg, #2a5ec4, #2f73df);
+  border-color: #3c7bf1;
+}
+
+.btn.danger {
+  background: rgba(108, 25, 40, 0.75);
+  border-color: #d64d5e;
+}
+
+.btn.mini {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .content {
   min-height: 0;
   flex: 1;
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: 300px minmax(0, 1fr);
 }
 
-.prompt-list {
-  border-right: 1px solid rgba(70, 93, 122, 0.65);
+.sidebar {
+  border-right: 1px solid var(--pa-border);
   padding: 10px;
   display: flex;
   flex-direction: column;
@@ -385,33 +440,33 @@ function updateSettingBoolean(key: keyof Preset['settings'], event: Event): void
   overflow: auto;
 }
 
-.prompt-list-head {
+.sidebar-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  color: #bfd4f2;
+  color: var(--pa-text-2);
 }
 
 .prompt-item {
-  border: 1px solid rgba(62, 84, 114, 0.8);
-  border-radius: 8px;
-  background: rgba(15, 23, 42, 0.82);
-  color: #e8f2ff;
+  border: 1px solid var(--pa-border);
+  border-radius: 9px;
+  background: rgba(14, 24, 44, 0.8);
+  color: var(--pa-text-1);
   text-align: left;
-  padding: 7px 8px;
+  padding: 8px 9px;
   display: grid;
   gap: 2px;
   cursor: pointer;
 }
 
 .prompt-item small {
-  color: #8fb2df;
+  color: var(--pa-text-3);
   font-size: 11px;
 }
 
 .prompt-item.active {
-  border-color: #60a5fa;
-  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.32) inset;
+  border-color: #3c7bf1;
+  box-shadow: 0 0 0 1px rgba(60, 123, 241, 0.34) inset;
 }
 
 .editor {
@@ -419,125 +474,107 @@ function updateSettingBoolean(key: keyof Preset['settings'], event: Event): void
   overflow: auto;
   padding: 10px;
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .panel {
-  border: 1px solid rgba(62, 84, 114, 0.8);
-  border-radius: 9px;
-  padding: 9px;
-  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid var(--pa-border);
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(10, 20, 39, 0.7);
   display: grid;
   gap: 8px;
 }
 
 .panel h4 {
   margin: 0;
-  color: #dbeafe;
-  font-size: 13px;
+  color: var(--pa-text-1);
+  font-size: 14px;
 }
 
 .field {
   display: grid;
-  gap: 4px;
+  gap: 5px;
 }
 
 .field > span {
-  color: #b8d2f5;
+  color: var(--pa-text-2);
   font-size: 12px;
 }
 
 .row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
 .textarea {
-  min-height: 140px;
+  min-height: 160px;
+  padding: 8px 9px;
 }
 
 .check {
+  min-height: 34px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: #f4f8ff;
-  font-size: 12px;
+  color: var(--pa-text-1);
 }
 
 .ops {
   display: inline-flex;
-  gap: 8px;
   flex-wrap: wrap;
+  gap: 8px;
 }
 
 .group {
-  border: 1px solid rgba(57, 79, 110, 0.62);
-  border-radius: 8px;
-  background: rgba(15, 23, 42, 0.68);
+  border: 1px solid var(--pa-border);
+  border-radius: 9px;
+  background: rgba(14, 24, 44, 0.7);
 }
 
 .group > summary {
-  cursor: pointer;
   list-style: none;
-  padding: 8px 10px;
-  color: #dbeafe;
-  font-size: 12px;
+  cursor: pointer;
+  padding: 8px 9px;
+  border-bottom: 1px solid rgba(72, 98, 138, 0.45);
+  color: var(--pa-text-1);
 }
 
 .group .fields {
   display: grid;
   gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   padding: 8px;
 }
 
-.btn {
-  border: 1px solid rgba(91, 123, 175, 0.62);
-  border-radius: 8px;
-  background: #1f2a44;
-  color: #f5f8ff;
-  padding: 6px 12px;
-  cursor: pointer;
+.empty,
+.empty-side {
+  color: var(--pa-text-3);
+  text-align: center;
+  padding: 18px;
 }
 
-.btn.primary {
-  background: #1e5ab8;
-  border-color: #3b82f6;
-}
-
-.btn.danger {
-  background: #42212a;
-  border-color: #fb7185;
-}
-
-.btn.mini {
-  padding: 4px 10px;
-  font-size: 12px;
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.empty {
-  padding: 16px;
-  color: #8ba3c7;
-  font-size: 12px;
-}
-
-@media (max-width: 1100px) {
+@media (max-width: 1120px) {
   .content {
     grid-template-columns: 1fr;
   }
 
-  .prompt-list {
+  .sidebar {
     border-right: none;
-    border-bottom: 1px solid rgba(70, 93, 122, 0.65);
-    max-height: 220px;
+    border-bottom: 1px solid var(--pa-border);
+    max-height: 260px;
+  }
+}
+
+@media (max-width: 760px) {
+  .toolbar-left {
+    min-width: 0;
+    grid-template-columns: 1fr;
   }
 
-  .row {
+  .row,
+  .group .fields {
     grid-template-columns: 1fr;
   }
 }

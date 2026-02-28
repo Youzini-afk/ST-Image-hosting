@@ -37,19 +37,19 @@ function ensurePanelStyle(): void {
 #${PANEL_ID} {
   position: fixed;
   z-index: 10020;
-  left: 48px;
+  left: 40px;
   top: 10px;
-  width: min(1520px, calc(100vw - 96px));
+  width: min(1640px, calc(100vw - 80px));
   height: calc(100vh - 20px);
-  min-width: 920px;
-  min-height: 560px;
+  min-width: 980px;
+  min-height: 620px;
   max-width: calc(100vw - 12px);
   max-height: calc(100vh - 12px);
   display: none;
-  border: 1px solid #334155;
-  border-radius: 12px;
-  background: #0a1222;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+  border: 1px solid #334866;
+  border-radius: 14px;
+  background: #070f1f;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
   overflow: hidden;
   resize: both;
 }
@@ -65,14 +65,14 @@ function ensurePanelStyle(): void {
   align-items: center;
   justify-content: space-between;
   padding: 0 10px 0 12px;
-  background: #111827;
-  border-bottom: 1px solid #334155;
+  background: #101a2f;
+  border-bottom: 1px solid #334866;
   cursor: move;
   user-select: none;
 }
 
 #${PANEL_ID} .preset-assistant-header-title {
-  color: #e2e8f0;
+  color: #e7efff;
   font-size: 14px;
   font-weight: 600;
 }
@@ -82,13 +82,14 @@ function ensurePanelStyle(): void {
   gap: 6px;
 }
 
-#${PANEL_ID} .preset-assistant-tool {
+#${PANEL_ID} .preset-assistant-tool,
+#${PANEL_ID} .preset-assistant-close {
   width: 30px;
   height: 30px;
-  border: 1px solid #475569;
-  border-radius: 6px;
-  background: #1f2937;
-  color: #e2e8f0;
+  border: 1px solid #4b6389;
+  border-radius: 7px;
+  background: #1a2743;
+  color: #e7efff;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -97,21 +98,11 @@ function ensurePanelStyle(): void {
 }
 
 #${PANEL_ID} .preset-assistant-tool:hover {
-  border-color: #38bdf8;
-}
-
-#${PANEL_ID} .preset-assistant-close {
-  width: 30px;
-  height: 30px;
-  border: 1px solid #475569;
-  border-radius: 6px;
-  background: #1f2937;
-  color: #e2e8f0;
-  cursor: pointer;
+  border-color: #4f85ee;
 }
 
 #${PANEL_ID} .preset-assistant-close:hover {
-  border-color: #f43f5e;
+  border-color: #de5f74;
 }
 
 #${PANEL_BODY_ID} {
@@ -130,7 +121,7 @@ function ensurePanelStyle(): void {
 }
 
 #${MENU_ID}.active {
-  background-color: rgba(56, 189, 248, 0.18) !important;
+  background-color: rgba(63, 123, 240, 0.16) !important;
 }
 
 @media (max-width: 960px) {
@@ -240,20 +231,19 @@ function ensurePanelElement(): JQuery {
     return $panel;
   }
   ensurePanelStyle();
-  const html = `
+  $('body', doc).append(`
 <div id="${PANEL_ID}">
   <div class="preset-assistant-header">
     <div class="preset-assistant-header-title">预设助手</div>
     <div class="preset-assistant-header-actions">
       <button type="button" class="preset-assistant-tool preset-assistant-refresh" title="刷新">↻</button>
       <button type="button" class="preset-assistant-tool preset-assistant-save" title="保存">💾</button>
-      <button type="button" class="preset-assistant-close" title="关闭">×</button>
+      <button type="button" class="preset-assistant-close" title="关闭">✕</button>
     </div>
   </div>
   <div id="${PANEL_BODY_ID}"></div>
 </div>
-`;
-  $('body', doc).append(html);
+`);
   $panel = $(`#${PANEL_ID}`, doc);
   enablePanelDrag($panel[0] as HTMLDivElement);
   $panel.off(`click${EVENT_NS}`, '.preset-assistant-refresh').on(`click${EVENT_NS}`, '.preset-assistant-refresh', () => {
@@ -271,10 +261,9 @@ function ensurePanelElement(): JQuery {
 function setMenuActive(active: boolean): void {
   const doc = getHostDocument();
   const $menuItem = $(`#${MENU_ID}`, doc);
-  if (!$menuItem.length) {
-    return;
+  if ($menuItem.length) {
+    $menuItem.toggleClass('active', active);
   }
-  $menuItem.toggleClass('active', active);
 }
 
 function showPanel(): void {
@@ -305,8 +294,7 @@ function hidePanel(): boolean {
     current[DIRTY_STATE_KEY] = false;
     host[DIRTY_STATE_KEY] = false;
   }
-  const doc = getHostDocument();
-  $(`#${PANEL_ID}`, doc).removeClass('active');
+  $(`#${PANEL_ID}`, getHostDocument()).removeClass('active');
   panelVisible = false;
   setMenuActive(false);
   return true;
@@ -314,7 +302,7 @@ function hidePanel(): boolean {
 
 function togglePanel(): void {
   if (panelVisible) {
-    void hidePanel();
+    hidePanel();
     return;
   }
   showPanel();
@@ -326,19 +314,17 @@ function ensureMenuItem(): boolean {
   if (!$menu.length) {
     return false;
   }
-
   const $existing = $(`#${MENU_ID}`, doc);
   if ($existing.length && !$existing.closest('#extensionsMenu').length) {
     $existing.remove();
   }
   if (!$(`#${MENU_ID}`, doc).length) {
-    const menuHtml = `
+    $menu.append(`
 <div id="${MENU_ID}" class="list-group-item flex-container flexGap5 interactable" title="预设助手" tabIndex="0">
   <i class="fa-solid fa-sliders"></i>
   <span>预设助手</span>
 </div>
-`;
-    $menu.append(menuHtml);
+`);
   }
   setMenuActive(panelVisible);
   return true;
@@ -393,7 +379,7 @@ function init(): void {
     ensureMenuRetry();
   }
   startMenuObserver();
-  toastr.success('预设助手已挂载到魔法棒菜单', 'Preset Assistant');
+  toastr.success('预设助手已挂载到扩展菜单', 'Preset Assistant');
 }
 
 function cleanup(): void {
