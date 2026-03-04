@@ -67,6 +67,10 @@ defineEmits<{
 }
 
 .ew-panel {
+  /* Plugin-local default palette: cool gray */
+  --SmartThemeQuoteColor: #7e8c9f;
+  --SmartThemeBodyColor: #e8edf5;
+
   width: min(1120px, calc(100vw - 24px));
   max-height: calc(100vh - 24px);
   border-radius: 1.2rem;
