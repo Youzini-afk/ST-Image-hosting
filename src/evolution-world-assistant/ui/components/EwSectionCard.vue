@@ -60,6 +60,8 @@ function toggleOpen() {
 
 <style scoped>
 .ew-section-card {
+  position: relative;
+  z-index: 1;
   border-radius: 1rem;
   border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 44%, transparent);
   background: color-mix(in srgb, var(--SmartThemeQuoteColor, #334457) 12%, rgba(8, 12, 18, 0.62));
@@ -69,6 +71,11 @@ function toggleOpen() {
   backdrop-filter: blur(12px) saturate(120%);
   -webkit-backdrop-filter: blur(12px) saturate(120%);
   overflow: visible;
+}
+
+.ew-section-card:hover,
+.ew-section-card:focus-within {
+  z-index: 12;
 }
 
 .ew-section-card__header {
