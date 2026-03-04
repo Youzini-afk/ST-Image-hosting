@@ -7,9 +7,7 @@ const BOOTSTRAP_POLL_MS = 100;
 const REQUIRED_GLOBALS = [
   'getScriptId',
   'getVariables',
-  'updateVariablesWith',
   'eventOn',
-  'eventMakeFirst',
   'tavern_events',
 ] as const;
 

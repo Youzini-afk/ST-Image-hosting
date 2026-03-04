@@ -59,13 +59,33 @@ function readScriptStorage(): ScriptStorageShape {
 }
 
 function writeScriptStorage(updater: (storage: ScriptStorageShape) => ScriptStorageShape) {
-  updateVariablesWith(variables => {
-    const previous = _.isPlainObject(_.get(variables, SCRIPT_STORAGE_KEY))
+  const option = { type: 'script', script_id: getScriptId() } as const;
+  const runtime = globalThis as Record<string, unknown>;
+
+  const readPrevious = (variables: Record<string, any>) => {
+    return _.isPlainObject(_.get(variables, SCRIPT_STORAGE_KEY))
       ? (_.get(variables, SCRIPT_STORAGE_KEY) as ScriptStorageShape)
       : {};
-    _.set(variables, SCRIPT_STORAGE_KEY, updater(previous));
-    return variables;
-  }, { type: 'script', script_id: getScriptId() });
+  };
+
+  if (typeof runtime.updateVariablesWith === 'function') {
+    updateVariablesWith(variables => {
+      const previous = readPrevious(variables);
+      _.set(variables, SCRIPT_STORAGE_KEY, updater(previous));
+      return variables;
+    }, option);
+    return;
+  }
+
+  if (typeof runtime.insertOrAssignVariables === 'function') {
+    const variables = getVariables(option);
+    const previous = readPrevious(variables);
+    const nextStorage = updater(previous);
+    insertOrAssignVariables({ [SCRIPT_STORAGE_KEY]: nextStorage }, option);
+    return;
+  }
+
+  throw new Error('script storage API unavailable: updateVariablesWith/insertOrAssignVariables');
 }
 
 function normalizeSettings(raw: unknown): EwSettings {

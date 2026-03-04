@@ -13,6 +13,24 @@ import { runWorkflow } from './pipeline';
 
 const listenerStops: EventOnReturn[] = [];
 const domCleanup: Array<() => void> = [];
+let warnedEventMakeFirstFallback = false;
+
+function registerGenerationAfterCommands(
+  handler: (type: string, params: Record<string, any>, dryRun: boolean) => Promise<void>,
+): EventOnReturn {
+  const runtime = globalThis as Record<string, unknown>;
+  const makeFirst = runtime.eventMakeFirst;
+  if (typeof makeFirst === 'function') {
+    return (makeFirst as typeof eventOn)(tavern_events.GENERATION_AFTER_COMMANDS, handler);
+  }
+
+  if (!warnedEventMakeFirstFallback) {
+    warnedEventMakeFirstFallback = true;
+    console.warn('[Evolution World] eventMakeFirst unavailable, fallback to eventOn for GENERATION_AFTER_COMMANDS');
+  }
+
+  return eventOn(tavern_events.GENERATION_AFTER_COMMANDS, handler);
+}
 
 function getSendTextareaValue(): string {
   const textarea = document.getElementById('send_textarea') as HTMLTextAreaElement | null;
@@ -128,7 +146,7 @@ export function initRuntimeEvents() {
   );
 
   listenerStops.push(
-    eventMakeFirst(tavern_events.GENERATION_AFTER_COMMANDS, async (type, params, dryRun) => {
+    registerGenerationAfterCommands(async (type, params, dryRun) => {
       await onGenerationAfterCommands(type, params ?? {}, dryRun);
     }),
   );
