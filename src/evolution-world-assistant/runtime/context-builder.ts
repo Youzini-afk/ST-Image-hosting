@@ -96,6 +96,9 @@ export async function buildFlowRequest(input: BuildRequestInput): Promise<FlowRe
       name: input.flow.name,
       priority: input.flow.priority,
       timeout_ms: input.flow.timeout_ms,
+      generation_options: input.flow.generation_options,
+      behavior_options: input.flow.behavior_options,
+      prompt_items: input.flow.prompt_items,
     },
     context: {
       messages: contextMessages,

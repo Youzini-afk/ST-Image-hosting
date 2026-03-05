@@ -46,6 +46,7 @@ function makeDefaultApiPreset(index: number): EwApiPreset {
 
 function makeDefaultFlow(index: number, apiPresetId: string): EwFlowConfig {
   const id = `flow_${index}_${simpleHash(`${index}-${Date.now()}`)}`;
+  const promptSeed = `${id}-prompt`;
   return EwFlowConfigSchema.parse({
     id,
     name: `工作流 ${index}`,
@@ -53,6 +54,45 @@ function makeDefaultFlow(index: number, apiPresetId: string): EwFlowConfig {
     priority: 100,
     timeout_ms: 8000,
     api_preset_id: apiPresetId,
+    generation_options: {
+      unlock_context_length: false,
+      max_context_tokens: 200000,
+      max_reply_tokens: 65535,
+      n_candidates: 1,
+      stream: true,
+      temperature: 1.2,
+      frequency_penalty: 0.85,
+      presence_penalty: 0.5,
+      top_p: 0.92,
+    },
+    behavior_options: {
+      name_behavior: 'default',
+      continue_prefill: false,
+      squash_system_messages: false,
+      enable_function_calling: false,
+      send_inline_media: false,
+      request_thinking: false,
+      reasoning_effort: 'auto',
+      verbosity: 'auto',
+    },
+    prompt_items: [
+      {
+        id: `prompt_${simpleHash(`${promptSeed}-0`)}`,
+        name: '输出格式',
+        enabled: true,
+        role: 'system',
+        position: 'before',
+        content: '',
+      },
+      {
+        id: `prompt_${simpleHash(`${promptSeed}-1`)}`,
+        name: '回复风格',
+        enabled: true,
+        role: 'system',
+        position: 'before',
+        content: '',
+      },
+    ],
     // Legacy fields retained for backward compatibility.
     api_url: '',
     api_key: '',

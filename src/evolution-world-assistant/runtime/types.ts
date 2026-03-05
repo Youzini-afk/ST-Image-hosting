@@ -8,6 +8,38 @@ export const EwApiPresetSchema = z.object({
   headers_json: z.string().default(''),
 });
 
+export const EwFlowGenerationOptionsSchema = z.object({
+  unlock_context_length: z.boolean().default(false),
+  max_context_tokens: z.coerce.number().int().positive().default(200000),
+  max_reply_tokens: z.coerce.number().int().positive().default(65535),
+  n_candidates: z.coerce.number().int().min(1).default(1),
+  stream: z.boolean().default(true),
+  temperature: z.coerce.number().min(0).max(2).default(1.2),
+  frequency_penalty: z.coerce.number().min(0).max(2).default(0.85),
+  presence_penalty: z.coerce.number().min(0).max(2).default(0.5),
+  top_p: z.coerce.number().min(0).max(1).default(0.92),
+});
+
+export const EwFlowBehaviorOptionsSchema = z.object({
+  name_behavior: z.enum(['none', 'default', 'complete_target', 'message_content']).default('default'),
+  continue_prefill: z.boolean().default(false),
+  squash_system_messages: z.boolean().default(false),
+  enable_function_calling: z.boolean().default(false),
+  send_inline_media: z.boolean().default(false),
+  request_thinking: z.boolean().default(false),
+  reasoning_effort: z.enum(['auto', 'low', 'medium', 'high']).default('auto'),
+  verbosity: z.enum(['auto', 'low', 'medium', 'high']).default('auto'),
+});
+
+export const EwFlowPromptItemSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().default('提示词'),
+  enabled: z.boolean().default(true),
+  role: z.enum(['system', 'user', 'assistant']).default('system'),
+  position: z.enum(['before', 'after']).default('before'),
+  content: z.string().default(''),
+});
+
 export const EwFlowConfigSchema = z.object({
   id: z.string().min(1),
   name: z.string().default('Flow'),
@@ -15,6 +47,9 @@ export const EwFlowConfigSchema = z.object({
   priority: z.coerce.number().int().default(100),
   timeout_ms: z.coerce.number().int().positive().default(8000),
   api_preset_id: z.string().default(''),
+  generation_options: EwFlowGenerationOptionsSchema.default({}),
+  behavior_options: EwFlowBehaviorOptionsSchema.default({}),
+  prompt_items: z.array(EwFlowPromptItemSchema).default([]),
   // Legacy fields kept for backward-compatible migration from old configs.
   api_url: z.string().default(''),
   api_key: z.string().default(''),
@@ -89,6 +124,9 @@ export const LastIoSummarySchema = z.object({
 
 export type EwFlowConfig = z.infer<typeof EwFlowConfigSchema>;
 export type EwApiPreset = z.infer<typeof EwApiPresetSchema>;
+export type EwFlowGenerationOptions = z.infer<typeof EwFlowGenerationOptionsSchema>;
+export type EwFlowBehaviorOptions = z.infer<typeof EwFlowBehaviorOptionsSchema>;
+export type EwFlowPromptItem = z.infer<typeof EwFlowPromptItemSchema>;
 export type EwSettings = z.infer<typeof EwSettingsSchema>;
 export type RunSummary = z.infer<typeof RunSummarySchema>;
 export type LastIoSummary = z.infer<typeof LastIoSummarySchema>;
