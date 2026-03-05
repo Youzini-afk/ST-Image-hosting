@@ -253,7 +253,7 @@ const FIELD_HELP_LIST: FieldHelpMeta[] = [
     key: 'flow.prompt_items',
     label: '提示词配置',
     shortHelp: '按条目管理工作流提示词，可独立启停与排序。',
-    detailHelp: '每条提示词可指定角色、前后位置和文本内容，最终由外部工作流按顺序消费。',
+    detailHelp: '每条提示词可指定角色、触发器、插入位置和文本内容，最终由外部工作流按顺序消费。',
   },
   {
     key: 'flow.prompt_item.name',
@@ -270,8 +270,14 @@ const FIELD_HELP_LIST: FieldHelpMeta[] = [
   {
     key: 'flow.prompt_item.position',
     label: '插入位置',
-    shortHelp: '决定提示词插入在上下文前置或后置。',
-    detailHelp: '前置常用于全局约束，后置常用于本轮补充指令。',
+    shortHelp: '决定提示词以“相对”或“聊天中”方式插入。',
+    detailHelp: '相对模式更适合稳定的全局约束；聊天中模式更适合随对话动态变化的提示。',
+  },
+  {
+    key: 'flow.prompt_item.trigger_types',
+    label: '触发器',
+    shortHelp: '限制该提示词在什么触发类型下生效。',
+    detailHelp: '默认 All types 表示所有触发都生效，也可以按发送、继续、重试等类型单独限制。',
   },
   {
     key: 'flow.prompt_item.content',

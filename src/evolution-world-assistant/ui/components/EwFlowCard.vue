@@ -61,53 +61,52 @@
         <section class="ew-flow-card__section">
           <div class="ew-flow-card__section-head">
             <h4>生成参数</h4>
-            <EwHelpTip v-if="help('flow.generation')" :meta="help('flow.generation')!" />
           </div>
 
           <div class="ew-grid ew-grid--two">
-            <EwFieldRow label="解锁上下文长度" :help="help('flow.generation.unlock_context_length')">
+            <EwFieldRow label="解锁上下文长度">
               <label class="ew-checkbox">
                 <input :checked="flow.generation_options.unlock_context_length" type="checkbox" @change="setGenerationBool('unlock_context_length', $event)" />
                 <span>启用</span>
               </label>
             </EwFieldRow>
-            <EwFieldRow label="流式传输" :help="help('flow.generation.stream')">
+            <EwFieldRow label="流式传输">
               <label class="ew-checkbox">
                 <input :checked="flow.generation_options.stream" type="checkbox" @change="setGenerationBool('stream', $event)" />
                 <span>{{ flow.generation_options.stream ? '已启用' : '已关闭' }}</span>
               </label>
             </EwFieldRow>
-            <EwFieldRow label="上下文长度（词符）" :help="help('flow.generation.max_context_tokens')">
+            <EwFieldRow label="上下文长度（词符）">
               <div class="ew-range">
                 <input :value="flow.generation_options.max_context_tokens" type="range" min="16000" max="500000" step="1000" :disabled="!flow.generation_options.unlock_context_length" @input="setGenerationNumber('max_context_tokens', $event)" />
                 <input :value="flow.generation_options.max_context_tokens" type="number" min="16000" step="1000" :disabled="!flow.generation_options.unlock_context_length" @input="setGenerationNumber('max_context_tokens', $event)" />
               </div>
             </EwFieldRow>
-            <EwFieldRow label="最大回复长度（词符）" :help="help('flow.generation.max_reply_tokens')">
+            <EwFieldRow label="最大回复长度（词符）">
               <input :value="flow.generation_options.max_reply_tokens" type="number" min="1" step="32" @input="setGenerationNumber('max_reply_tokens', $event)" />
             </EwFieldRow>
-            <EwFieldRow label="备选回复数" :help="help('flow.generation.n_candidates')">
+            <EwFieldRow label="备选回复数">
               <input :value="flow.generation_options.n_candidates" type="number" min="1" step="1" @input="setGenerationNumber('n_candidates', $event)" />
             </EwFieldRow>
-            <EwFieldRow label="温度" :help="help('flow.generation.temperature')">
+            <EwFieldRow label="温度">
               <div class="ew-range">
                 <input :value="flow.generation_options.temperature" type="range" min="0" max="2" step="0.01" @input="setGenerationNumber('temperature', $event)" />
                 <input :value="flow.generation_options.temperature" type="number" min="0" max="2" step="0.01" @input="setGenerationNumber('temperature', $event)" />
               </div>
             </EwFieldRow>
-            <EwFieldRow label="频率惩罚" :help="help('flow.generation.frequency_penalty')">
+            <EwFieldRow label="频率惩罚">
               <div class="ew-range">
                 <input :value="flow.generation_options.frequency_penalty" type="range" min="0" max="2" step="0.01" @input="setGenerationNumber('frequency_penalty', $event)" />
                 <input :value="flow.generation_options.frequency_penalty" type="number" min="0" max="2" step="0.01" @input="setGenerationNumber('frequency_penalty', $event)" />
               </div>
             </EwFieldRow>
-            <EwFieldRow label="存在惩罚" :help="help('flow.generation.presence_penalty')">
+            <EwFieldRow label="存在惩罚">
               <div class="ew-range">
                 <input :value="flow.generation_options.presence_penalty" type="range" min="0" max="2" step="0.01" @input="setGenerationNumber('presence_penalty', $event)" />
                 <input :value="flow.generation_options.presence_penalty" type="number" min="0" max="2" step="0.01" @input="setGenerationNumber('presence_penalty', $event)" />
               </div>
             </EwFieldRow>
-            <EwFieldRow label="Top P" :help="help('flow.generation.top_p')">
+            <EwFieldRow label="Top P">
               <div class="ew-range">
                 <input :value="flow.generation_options.top_p" type="range" min="0" max="1" step="0.01" @input="setGenerationNumber('top_p', $event)" />
                 <input :value="flow.generation_options.top_p" type="number" min="0" max="1" step="0.01" @input="setGenerationNumber('top_p', $event)" />
@@ -118,11 +117,10 @@
         <section class="ew-flow-card__section">
           <div class="ew-flow-card__section-head">
             <h4>行为参数</h4>
-            <EwHelpTip v-if="help('flow.behavior')" :meta="help('flow.behavior')!" />
           </div>
 
           <div class="ew-grid ew-grid--two">
-            <EwFieldRow label="角色名称行为" :help="help('flow.behavior.name_behavior')">
+            <EwFieldRow label="角色名称行为">
               <div class="ew-radio-group">
                 <label class="ew-radio"><input :name="nameBehaviorGroupName" :checked="flow.behavior_options.name_behavior === 'none'" type="radio" @change="setBehaviorSelect('name_behavior', 'none')" /><span>无</span></label>
                 <label class="ew-radio"><input :name="nameBehaviorGroupName" :checked="flow.behavior_options.name_behavior === 'default'" type="radio" @change="setBehaviorSelect('name_behavior', 'default')" /><span>默认</span></label>
@@ -130,12 +128,12 @@
                 <label class="ew-radio"><input :name="nameBehaviorGroupName" :checked="flow.behavior_options.name_behavior === 'message_content'" type="radio" @change="setBehaviorSelect('name_behavior', 'message_content')" /><span>消息内容</span></label>
               </div>
             </EwFieldRow>
-            <EwFieldRow label="推理强度" :help="help('flow.behavior.reasoning_effort')">
+            <EwFieldRow label="推理强度">
               <select :value="flow.behavior_options.reasoning_effort" @change="setBehaviorSelectByEvent('reasoning_effort', $event)">
                 <option value="auto">自动</option><option value="low">低</option><option value="medium">中</option><option value="high">高</option>
               </select>
             </EwFieldRow>
-            <EwFieldRow label="Verbosity" :help="help('flow.behavior.verbosity')">
+            <EwFieldRow label="Verbosity">
               <select :value="flow.behavior_options.verbosity" @change="setBehaviorSelectByEvent('verbosity', $event)">
                 <option value="auto">Auto</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option>
               </select>
@@ -180,7 +178,8 @@
                 <label class="ew-checkbox"><input :checked="item.enabled" type="checkbox" @change="setPromptEnabled(item.id, $event)" /></label>
                 <strong class="ew-prompt-item__name">{{ item.name || `提示词 ${itemIndex + 1}` }}</strong>
                 <span class="ew-flow-card__chip">{{ item.role }}</span>
-                <span class="ew-flow-card__chip">{{ item.position === 'before' ? '前置' : '后置' }}</span>
+                <span class="ew-flow-card__chip">{{ item.position === 'relative' ? '相对' : '聊天中' }}</span>
+                <span class="ew-flow-card__chip">{{ promptTriggerSummary(item) }}</span>
                 <div class="ew-inline">
                   <button type="button" class="ew-mini-btn" :disabled="itemIndex === 0" @click="movePromptItem(item.id, -1)">上移</button>
                   <button type="button" class="ew-mini-btn" :disabled="itemIndex >= flow.prompt_items.length - 1" @click="movePromptItem(item.id, 1)">下移</button>
@@ -199,7 +198,14 @@
                   </EwFieldRow>
                   <EwFieldRow label="插入位置" :help="help('flow.prompt_item.position')">
                     <select :value="item.position" @change="patchPromptPosition(item.id, $event)">
-                      <option value="before">before</option><option value="after">after</option>
+                      <option value="relative">相对</option><option value="in_chat">聊天中</option>
+                    </select>
+                  </EwFieldRow>
+                  <EwFieldRow label="触发器">
+                    <select :value="getPromptPrimaryTrigger(item)" @change="patchPromptTriggerTypes(item.id, $event)">
+                      <option v-for="option in PROMPT_TRIGGER_OPTIONS" :key="option.value" :value="option.value">
+                        {{ option.label }}
+                      </option>
                     </select>
                   </EwFieldRow>
                 </div>
@@ -230,6 +236,7 @@ type GenerationNumberKey = 'max_context_tokens' | 'max_reply_tokens' | 'n_candid
 type GenerationBoolKey = 'unlock_context_length' | 'stream';
 type BehaviorBoolKey = 'continue_prefill' | 'squash_system_messages' | 'enable_function_calling' | 'send_inline_media' | 'request_thinking';
 type BehaviorSelectKey = 'name_behavior' | 'reasoning_effort' | 'verbosity';
+type PromptTriggerType = EwFlowPromptItem['trigger_types'][number];
 
 const props = defineProps<{ modelValue: EwFlowConfig; apiPresets: EwApiPreset[]; index: number; expanded: boolean }>();
 const emit = defineEmits<{ (event: 'toggle-expand'): void; (event: 'remove'): void; (event: 'update:modelValue', value: EwFlowConfig): void }>();
@@ -244,6 +251,14 @@ const endpointSummary = computed(() => {
 });
 const presetLabel = computed(() => selectedPreset.value?.name?.trim() || '未绑定');
 const nameBehaviorGroupName = computed(() => `name_behavior_${flow.value.id}`);
+const PROMPT_TRIGGER_OPTIONS: Array<{ value: PromptTriggerType; label: string }> = [
+  { value: 'all', label: 'All types (default)' },
+  { value: 'send', label: '发送' },
+  { value: 'continue', label: '继续' },
+  { value: 'regenerate', label: '重试/重生' },
+  { value: 'quiet', label: '静默' },
+  { value: 'manual', label: '手动' },
+];
 
 watch(() => flow.value.prompt_items.map(item => item.id), ids => {
   if (expandedPromptId.value && !ids.includes(expandedPromptId.value)) expandedPromptId.value = null;
@@ -277,7 +292,15 @@ function setBehaviorSelectByEvent(key: Exclude<BehaviorSelectKey, 'name_behavior
   patchBehavior({ [key]: (event.target as HTMLSelectElement).value as EwFlowConfig['behavior_options'][typeof key] } as Partial<EwFlowConfig['behavior_options']>);
 }
 function makePromptItem(index: number): EwFlowPromptItem {
-  return { id: `prompt_${simpleHash(`${flow.value.id}-${index}-${Date.now()}`)}`, name: `提示词 ${index + 1}`, enabled: true, role: 'system', position: 'before', content: '' };
+  return {
+    id: `prompt_${simpleHash(`${flow.value.id}-${index}-${Date.now()}`)}`,
+    name: `提示词 ${index + 1}`,
+    enabled: true,
+    role: 'system',
+    position: 'relative',
+    trigger_types: ['all'],
+    content: '',
+  };
 }
 function addPromptItem() {
   const nextItems = [...flow.value.prompt_items, makePromptItem(flow.value.prompt_items.length)];
@@ -304,6 +327,19 @@ function setPromptEnabled(promptId: string, event: Event) { patchPromptItem(prom
 function patchPromptText(promptId: string, key: 'name' | 'content', event: Event) { patchPromptItem(promptId, { [key]: (event.target as HTMLInputElement | HTMLTextAreaElement).value }); }
 function patchPromptRole(promptId: string, event: Event) { patchPromptItem(promptId, { role: (event.target as HTMLSelectElement).value as EwFlowPromptItem['role'] }); }
 function patchPromptPosition(promptId: string, event: Event) { patchPromptItem(promptId, { position: (event.target as HTMLSelectElement).value as EwFlowPromptItem['position'] }); }
+function getPromptPrimaryTrigger(item: EwFlowPromptItem): PromptTriggerType {
+  const [first] = item.trigger_types;
+  return first ?? 'all';
+}
+function patchPromptTriggerTypes(promptId: string, event: Event) {
+  const value = (event.target as HTMLSelectElement).value as PromptTriggerType;
+  patchPromptItem(promptId, { trigger_types: [value] });
+}
+function promptTriggerSummary(item: EwFlowPromptItem) {
+  const value = getPromptPrimaryTrigger(item);
+  const matched = PROMPT_TRIGGER_OPTIONS.find(option => option.value === value);
+  return matched?.label ?? value;
+}
 </script>
 
 <style scoped>
@@ -335,7 +371,7 @@ function patchPromptPosition(promptId: string, event: Event) { patchPromptItem(p
 .ew-empty { border-radius: 0.72rem; border: 1px dashed color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 44%, transparent); padding: 0.58rem 0.64rem; font-size: 0.78rem; color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 76%, transparent); }
 .ew-prompt-list { display: flex; flex-direction: column; gap: 0.54rem; }
 .ew-prompt-item { border-radius: 0.78rem; border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 38%, transparent); background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 10%, rgba(0, 0, 0, 0.14)); padding: 0.48rem 0.54rem; }
-.ew-prompt-item__head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto auto; align-items: center; gap: 0.46rem; }
+.ew-prompt-item__head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto auto auto; align-items: center; gap: 0.46rem; }
 .ew-prompt-item__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.82rem; color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 94%, transparent); }
 .ew-prompt-item__body { margin-top: 0.54rem; display: flex; flex-direction: column; gap: 0.56rem; }
 .ew-mini-btn { border-radius: 0.52rem; border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 46%, transparent); background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 18%, transparent); color: var(--SmartThemeBodyColor, #edf2f9); font-size: 0.67rem; padding: 0.14rem 0.42rem; cursor: pointer; }

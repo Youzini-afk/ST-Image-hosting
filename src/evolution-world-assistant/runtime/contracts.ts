@@ -56,7 +56,11 @@ export const FlowRequestSchema = z.object({
           name: z.string().default('提示词'),
           enabled: z.boolean().default(true),
           role: z.enum(['system', 'user', 'assistant']).default('system'),
-          position: z.enum(['before', 'after']).default('before'),
+          position: z.enum(['relative', 'in_chat']).default('relative'),
+          trigger_types: z
+            .array(z.enum(['all', 'send', 'continue', 'regenerate', 'quiet', 'manual']))
+            .min(1)
+            .default(['all']),
           content: z.string().default(''),
         }),
       )

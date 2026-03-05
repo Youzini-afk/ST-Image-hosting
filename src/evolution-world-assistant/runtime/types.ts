@@ -31,12 +31,51 @@ export const EwFlowBehaviorOptionsSchema = z.object({
   verbosity: z.enum(['auto', 'low', 'medium', 'high']).default('auto'),
 });
 
+export const EwFlowPromptTriggerTypeSchema = z.enum([
+  'all',
+  'send',
+  'continue',
+  'regenerate',
+  'quiet',
+  'manual',
+]);
+
+const EwFlowPromptPositionSchema = z.preprocess(
+  value => {
+    if (value === 'before') {
+      return 'relative';
+    }
+    if (value === 'after') {
+      return 'in_chat';
+    }
+    return value;
+  },
+  z.enum(['relative', 'in_chat']),
+);
+
+const EwFlowPromptTriggerListSchema = z.preprocess(
+  value => {
+    if (Array.isArray(value)) {
+      if (value.length === 0) {
+        return undefined;
+      }
+      return value;
+    }
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return [value];
+    }
+    return undefined;
+  },
+  z.array(EwFlowPromptTriggerTypeSchema).min(1).default(['all']),
+);
+
 export const EwFlowPromptItemSchema = z.object({
   id: z.string().min(1),
   name: z.string().default('提示词'),
   enabled: z.boolean().default(true),
   role: z.enum(['system', 'user', 'assistant']).default('system'),
-  position: z.enum(['before', 'after']).default('before'),
+  position: EwFlowPromptPositionSchema.default('relative'),
+  trigger_types: EwFlowPromptTriggerListSchema,
   content: z.string().default(''),
 });
 
@@ -127,6 +166,7 @@ export type EwApiPreset = z.infer<typeof EwApiPresetSchema>;
 export type EwFlowGenerationOptions = z.infer<typeof EwFlowGenerationOptionsSchema>;
 export type EwFlowBehaviorOptions = z.infer<typeof EwFlowBehaviorOptionsSchema>;
 export type EwFlowPromptItem = z.infer<typeof EwFlowPromptItemSchema>;
+export type EwFlowPromptTriggerType = z.infer<typeof EwFlowPromptTriggerTypeSchema>;
 export type EwSettings = z.infer<typeof EwSettingsSchema>;
 export type RunSummary = z.infer<typeof RunSummarySchema>;
 export type LastIoSummary = z.infer<typeof LastIoSummarySchema>;
