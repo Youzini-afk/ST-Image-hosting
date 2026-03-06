@@ -30,14 +30,14 @@
               class="ew-mini-btn"
               title="编辑"
               @click="toggleEdit(entry.identifier)"
-            >✏️</button>
+            >✎</button>
             <button
               v-if="canDelete(entry)"
               type="button"
               class="ew-mini-btn ew-mini-btn--danger"
               title="删除"
               @click="removeEntry(entry.identifier)"
-            >🗑</button>
+            >✕</button>
             <label class="ew-switch ew-prompt-order__toggle">
               <input type="checkbox" :checked="entry.enabled" @change="toggleEnabled(entry.identifier)" />
               <span class="ew-switch__slider"></span>
@@ -262,6 +262,33 @@ function onDragEnd() {
   gap: 4px;
   flex-shrink: 0;
   margin-left: auto;
+}
+
+.ew-mini-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ew-text-muted, #888);
+  font-size: 14px;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  line-height: 1;
+}
+
+.ew-mini-btn:hover {
+  color: var(--ew-text, #ddd);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.ew-mini-btn--danger:hover {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.1);
 }
 
 .ew-prompt-order__toggle {
