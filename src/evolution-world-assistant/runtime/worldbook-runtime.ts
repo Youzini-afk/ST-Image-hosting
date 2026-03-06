@@ -86,8 +86,9 @@ export async function getFullWorldbookContext(preloadedTarget?: TargetWorldbook)
   try {
     const character = await getCharacter('current');
     charDescription = character.description ?? '';
-  } catch {
-    // Character not available — proceed with empty description.
+  } catch (e) {
+    console.debug('[Evolution World] character data unavailable:', e);
+    // Proceed with empty description.
   }
 
   // Reuse preloaded target if available, otherwise read from scratch.
@@ -103,7 +104,8 @@ export async function getFullWorldbookContext(preloadedTarget?: TargetWorldbook)
     if (charWb.primary) {
       try {
         charEntries = toEntrySnapshot(await getWorldbook(charWb.primary));
-      } catch {
+      } catch (e) {
+        console.debug(`[Evolution World] cannot read char worldbook '${charWb.primary}':`, e);
         // Cannot read — proceed with empty.
       }
     }
@@ -119,7 +121,8 @@ export async function getFullWorldbookContext(preloadedTarget?: TargetWorldbook)
         worldbook_name: wbName,
         entries: toEntrySnapshot(entries),
       });
-    } catch {
+    } catch (e) {
+      console.debug(`[Evolution World] cannot read global worldbook '${wbName}':`, e);
       // Skip unreadable worldbooks.
     }
   }

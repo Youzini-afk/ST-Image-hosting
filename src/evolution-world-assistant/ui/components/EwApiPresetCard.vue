@@ -190,22 +190,31 @@ async function loadModels() {
 <style scoped>
 .ew-api-card {
   border-radius: 1rem;
-  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 42%, transparent);
-  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #2f4158) 13%, rgba(10, 14, 20, 0.64));
+  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 35%, transparent);
+  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #2f4158) 12%, rgba(10, 14, 20, 0.45));
   box-shadow:
-    0 14px 30px rgba(0, 0, 0, 0.22),
-    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
-  backdrop-filter: blur(10px) saturate(120%);
-  -webkit-backdrop-filter: blur(10px) saturate(120%);
+    0 8px 24px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  backdrop-filter: blur(12px) saturate(120%);
+  -webkit-backdrop-filter: blur(12px) saturate(120%);
   overflow: visible;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.ew-api-card[data-expanded='1'] {
+  border-color: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 60%, transparent);
+  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #2f4158) 16%, rgba(10, 14, 20, 0.65));
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset;
 }
 
 .ew-api-card__head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 0.8rem;
-  padding: 0.78rem 0.86rem;
+  gap: 0.9rem;
+  padding: 0.9rem 1rem;
 }
 
 .ew-api-card__summary {
@@ -215,32 +224,35 @@ async function loadModels() {
 .ew-api-card__name {
   display: block;
   margin: 0;
-  font-size: 0.96rem;
-  line-height: 1.2;
-  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 95%, transparent);
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 98%, transparent);
+  letter-spacing: 0.01em;
 }
 
 .ew-api-card__chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.36rem;
-  margin-top: 0.44rem;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
 }
 
 .ew-api-card__chip {
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 52%, transparent);
-  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 22%, transparent);
-  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 88%, transparent);
-  font-size: 0.7rem;
-  padding: 0.14rem 0.48rem;
+  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 45%, transparent);
+  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 15%, transparent);
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 85%, transparent);
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 0.15rem 0.6rem;
 }
 
 .ew-api-card__endpoint {
-  margin: 0.44rem 0 0;
-  font-size: 0.74rem;
-  line-height: 1.3;
-  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 72%, transparent);
+  margin: 0.5rem 0 0;
+  font-size: 0.76rem;
+  line-height: 1.35;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 65%, transparent);
   word-break: break-all;
 }
 
@@ -249,47 +261,55 @@ async function loadModels() {
   align-items: center;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 0.4rem;
+  gap: 0.45rem;
 }
 
 .ew-api-card__action {
-  border-radius: 0.65rem;
-  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 56%, transparent);
-  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 28%, transparent);
+  border-radius: 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 45%, transparent);
+  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 20%, transparent);
   color: var(--SmartThemeBodyColor, #edf2f9);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 600;
-  padding: 0.24rem 0.52rem;
+  padding: 0.35rem 0.65rem;
   cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .ew-api-card__action:hover,
 .ew-api-card__action:focus-visible {
-  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 42%, transparent);
+  border-color: var(--ew-accent);
+  background: color-mix(in srgb, var(--ew-accent) 25%, transparent);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px var(--ew-accent-glow);
   outline: none;
 }
 
 .ew-api-card__action--danger {
-  border-color: color-mix(in srgb, #d76872 56%, transparent);
-  background: color-mix(in srgb, #d76872 24%, transparent);
-  color: #ffe5e8;
+  border-color: color-mix(in srgb, var(--ew-danger) 45%, transparent);
+  background: color-mix(in srgb, var(--ew-danger) 15%, transparent);
+  color: color-mix(in srgb, var(--ew-danger) 90%, #fff);
 }
 
 .ew-api-card__action--danger:hover,
 .ew-api-card__action--danger:focus-visible {
-  background: color-mix(in srgb, #d76872 38%, transparent);
+  background: color-mix(in srgb, var(--ew-danger) 80%, transparent);
+  border-color: var(--ew-danger);
+  color: #fff;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--ew-danger) 30%, transparent);
 }
 
 .ew-api-card__body {
-  padding: 0 0.86rem 0.88rem;
+  padding: 0 1rem 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.86rem;
+  gap: 0.9rem;
 }
 
 .ew-api-card__grid {
   display: grid;
-  gap: 0.68rem;
+  gap: 0.75rem;
 }
 
 .ew-api-card__grid.two {
@@ -299,7 +319,7 @@ async function loadModels() {
 .ew-api-card__model-wrap {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 0.52rem;
+  gap: 0.55rem;
 }
 
 .ew-api-card__model-wrap datalist {
@@ -307,26 +327,27 @@ async function loadModels() {
 }
 
 .ew-api-card__hint {
-  border-radius: 0.72rem;
-  border: 1px dashed color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 44%, transparent);
-  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 10%, rgba(8, 12, 18, 0.46));
-  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 78%, transparent);
-  font-size: 0.8rem;
-  line-height: 1.4;
-  padding: 0.54rem 0.62rem;
+  border-radius: 0.8rem;
+  border: 1px dashed color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 40%, transparent);
+  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 12%, rgba(8, 12, 18, 0.2));
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 85%, transparent);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  padding: 0.65rem 0.75rem;
 }
 
 .ew-api-expand-enter-active,
 .ew-api-expand-leave-active {
   transition:
-    opacity 0.2s ease,
-    transform 0.2s ease;
+    opacity 0.3s ease,
+    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: top center;
 }
 
 .ew-api-expand-enter-from,
 .ew-api-expand-leave-to {
   opacity: 0;
-  transform: translateY(-4px);
+  transform: translateY(-8px) scaleY(0.98);
 }
 
 @supports not ((backdrop-filter: blur(1px))) {
@@ -355,6 +376,8 @@ async function loadModels() {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .ew-api-card,
+  .ew-api-card__action,
   .ew-api-expand-enter-active,
   .ew-api-expand-leave-active {
     transition: none;

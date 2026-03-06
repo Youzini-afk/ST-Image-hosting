@@ -34,19 +34,25 @@ function applyDeclarativeDiff(
 ): WorldbookEntry[] {
   // Step 1: Remove entries.
   const removeSet = new Set(removeEntries.map(e => e.name));
-  let result = currentEntries.filter(entry => !removeSet.has(entry.name));
+  const result = klona(currentEntries.filter(entry => !removeSet.has(entry.name)));
 
-  // Step 2: Apply desired state.
+  // Step 2: Build an index for O(1) lookups.
+  const indexByName = new Map<string, number>();
+  for (let i = 0; i < result.length; i++) {
+    indexByName.set(result[i].name, i);
+  }
+
+  // Step 3: Apply desired state (in-place on the already-cloned array).
   for (const desired of desiredEntries) {
-    const cloned = klona(result);
-    const existing = cloned.find(entry => entry.name === desired.name);
+    const existingIndex = indexByName.get(desired.name);
 
-    if (existing) {
-      existing.content = desired.content;
-      existing.enabled = desired.enabled;
-      result = cloned;
+    if (existingIndex !== undefined) {
+      result[existingIndex].content = desired.content;
+      result[existingIndex].enabled = desired.enabled;
     } else {
-      result = [...result, ensureDefaultEntry(desired.name, desired.content, desired.enabled, result)];
+      const newEntry = ensureDefaultEntry(desired.name, desired.content, desired.enabled, result);
+      indexByName.set(desired.name, result.length);
+      result.push(newEntry);
     }
   }
 

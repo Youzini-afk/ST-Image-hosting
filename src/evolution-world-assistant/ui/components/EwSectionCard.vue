@@ -62,29 +62,46 @@ function toggleOpen() {
 .ew-section-card {
   position: relative;
   z-index: 1;
-  border-radius: 1rem;
-  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 44%, transparent);
-  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #334457) 12%, rgba(8, 12, 18, 0.62));
+  border-radius: 1.15rem;
+  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 30%, transparent);
+  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #334457) 10%, rgba(8, 12, 18, 0.45));
   box-shadow:
-    0 14px 32px rgba(0, 0, 0, 0.24),
-    0 0 0 1px rgba(255, 255, 255, 0.06) inset;
-  backdrop-filter: blur(12px) saturate(120%);
-  -webkit-backdrop-filter: blur(12px) saturate(120%);
+    0 10px 30px rgba(0, 0, 0, 0.25),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  backdrop-filter: blur(14px) saturate(130%);
+  -webkit-backdrop-filter: blur(14px) saturate(130%);
   overflow: visible;
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
 }
 
 .ew-section-card:hover,
 .ew-section-card:focus-within {
   z-index: 12;
+  border-color: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 45%, transparent);
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
 }
 
 .ew-section-card__header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.85rem 0.9rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 26%, transparent);
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 15%, transparent);
+  position: relative;
+}
+
+/* Subtle glow at the bottom of the header */
+.ew-section-card__header::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--SmartThemeQuoteColor) 30%, transparent), transparent);
 }
 
 .ew-section-card__title-group {
@@ -93,68 +110,79 @@ function toggleOpen() {
 
 .ew-section-card__title {
   margin: 0;
-  font-size: 1rem;
-  line-height: 1.2;
-  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 94%, transparent);
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 98%, transparent);
+  letter-spacing: 0.01em;
 }
 
 .ew-section-card__subtitle {
-  margin: 0.3rem 0 0;
-  font-size: 0.78rem;
-  line-height: 1.35;
-  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 70%, transparent);
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.4;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 65%, transparent);
 }
 
 .ew-section-card__actions {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.5rem;
   flex-wrap: wrap;
 }
 
 .ew-section-card__toggle {
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 56%, transparent);
-  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 28%, transparent);
-  color: var(--SmartThemeBodyColor, #edf2f9);
-  font-size: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 40%, transparent);
+  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 15%, transparent);
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 90%, transparent);
+  font-size: 0.78rem;
   font-weight: 600;
-  padding: 0.24rem 0.62rem;
+  padding: 0.3rem 0.8rem;
   cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .ew-section-card__toggle:hover,
 .ew-section-card__toggle:focus-visible {
-  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 44%, transparent);
+  border-color: var(--ew-accent);
+  background: color-mix(in srgb, var(--ew-accent) 25%, transparent);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px var(--ew-accent-glow);
   outline: none;
 }
 
 .ew-section-card__body {
-  padding: 0.9rem;
+  padding: 1.1rem;
 }
 
 .ew-fold-enter-active,
 .ew-fold-leave-active {
   transition:
-    opacity 0.2s ease,
-    transform 0.2s ease;
+    opacity 0.3s ease,
+    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: top center;
 }
 
 .ew-fold-enter-from,
 .ew-fold-leave-to {
   opacity: 0;
-  transform: translateY(-4px);
+  transform: translateY(-8px) scaleY(0.98);
 }
 
 @supports not ((backdrop-filter: blur(1px))) {
   .ew-section-card {
-    background: color-mix(in srgb, var(--SmartThemeQuoteColor, #334457) 18%, rgba(8, 12, 18, 0.92));
+    background: color-mix(in srgb, var(--SmartThemeQuoteColor, #334457) 18%, rgba(10, 14, 20, 0.94));
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .ew-fold-enter-active,
-  .ew-fold-leave-active {
+  .ew-fold-leave-active,
+  .ew-section-card__toggle,
+  .ew-section-card {
     transition: none;
   }
 }

@@ -116,7 +116,9 @@ export function shouldHandleGenerationAfter(
   if (params?.automatic_trigger) {
     return { ok: false, reason: 'automatic_trigger' };
   }
-  if (type !== 'normal') {
+  // Allow the standard generation types that users can configure trigger_types for.
+  const allowedTypes = new Set(['normal', 'continue', 'regenerate', 'swipe']);
+  if (!allowedTypes.has(type)) {
     return { ok: false, reason: `unsupported_type:${type}` };
   }
 

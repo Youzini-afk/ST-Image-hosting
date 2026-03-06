@@ -1,13 +1,9 @@
 import {
-  EwApiPreset,
-  EwApiPresetSchema,
-  EwFlowConfig,
-  EwFlowConfigSchema,
   EwSettings,
   LastIoSummary,
   RunSummary,
 } from '../runtime/types';
-import { simpleHash } from '../runtime/helpers';
+import { createDefaultApiPreset, createDefaultFlow } from '../runtime/factory';
 import type { TabKey } from './help-meta';
 import {
   getLastIo,
@@ -22,81 +18,9 @@ import {
 import { runWorkflow } from '../runtime/pipeline';
 import { showEwNotice } from './notice';
 
-function createApiPreset(index: number): EwApiPreset {
-  return EwApiPresetSchema.parse({
-    id: `api_${index}_${simpleHash(`ui-api-${index}-${Date.now()}`)}`,
-    name: `API配置 ${index}`,
-    mode: 'workflow_http',
-    use_main_api: false,
-    api_url: '',
-    api_key: '',
-    model: '',
-    api_source: 'openai',
-    model_candidates: [],
-    headers_json: '',
-  });
-}
-
-function createFlow(index: number, apiPresetId: string): EwFlowConfig {
-  const flowId = `flow_${index}_${simpleHash(`ui-flow-${index}-${Date.now()}`)}`;
-  const promptSeed = `${flowId}-prompt`;
-  return EwFlowConfigSchema.parse({
-    id: flowId,
-    name: `工作流 ${index}`,
-    enabled: true,
-    priority: 100,
-    timeout_ms: 8000,
-    api_preset_id: apiPresetId,
-    generation_options: {
-      unlock_context_length: false,
-      max_context_tokens: 200000,
-      max_reply_tokens: 65535,
-      n_candidates: 1,
-      stream: true,
-      temperature: 1.2,
-      frequency_penalty: 0.85,
-      presence_penalty: 0.5,
-      top_p: 0.92,
-    },
-    behavior_options: {
-      name_behavior: 'default',
-      continue_prefill: false,
-      squash_system_messages: false,
-      enable_function_calling: false,
-      send_inline_media: false,
-      request_thinking: false,
-      reasoning_effort: 'auto',
-      verbosity: 'auto',
-    },
-    prompt_items: [
-      {
-        id: `prompt_${simpleHash(`${promptSeed}-0`)}`,
-        name: '输出格式',
-        enabled: true,
-        role: 'system',
-        position: 'relative',
-        trigger_types: ['all'],
-        content: '',
-      },
-      {
-        id: `prompt_${simpleHash(`${promptSeed}-1`)}`,
-        name: '回复风格',
-        enabled: true,
-        role: 'system',
-        position: 'relative',
-        trigger_types: ['all'],
-        content: '',
-      },
-    ],
-    api_url: '',
-    api_key: '',
-    context_turns: 8,
-    extract_rules: [],
-    exclude_rules: [],
-    request_template: '',
-    headers_json: '',
-  });
-}
+// M-3: Use shared factory functions instead of duplicating definitions.
+const createApiPreset = (index: number) => createDefaultApiPreset(index);
+const createFlow = (index: number, apiPresetId: string) => createDefaultFlow(index, apiPresetId);
 
 export const useEwStore = defineStore('evolution-world-store', () => {
   const settings = ref<EwSettings>(getSettings());
@@ -121,9 +45,13 @@ export const useEwStore = defineStore('evolution-world-store', () => {
   const syncIo = subscribeLastIo(next => {
     lastIo.value = next;
   });
-  void syncFromRuntime;
-  void syncRun;
-  void syncIo;
+
+  // L-3: Properly clean up subscriptions when the store's scope is disposed.
+  onScopeDispose(() => {
+    syncFromRuntime.stop();
+    syncRun.stop();
+    syncIo.stop();
+  });
 
   const persistDebounced = _.debounce((next: EwSettings) => {
     replaceSettings(next);

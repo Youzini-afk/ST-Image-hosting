@@ -165,20 +165,24 @@
               <button type="button" class="ew-mini-btn" @click="addCustomRegex">新增</button>
             </div>
             <div v-if="flow.custom_regex_rules.length === 0" class="ew-empty">暂无自定义正则。</div>
-            <div v-else class="ew-regex-list">
-              <article v-for="(rule, ruleIndex) in flow.custom_regex_rules" :key="rule.id" class="ew-regex-item">
-                <header class="ew-regex-item__head">
-                  <label class="ew-checkbox"><input :checked="rule.enabled" type="checkbox" @change="setRegexEnabled(ruleIndex, $event)" /></label>
-                  <span class="ew-regex-item__name">{{ rule.name || `正则 ${ruleIndex + 1}` }}</span>
-                  <button type="button" class="ew-mini-btn ew-mini-btn--danger" @click="removeCustomRegex(ruleIndex)">删除</button>
-                </header>
-                <div class="ew-regex-item__body">
-                  <EwFieldRow label="名称"><input :value="rule.name" type="text" placeholder="例：去掉OOC标记" @input="patchRegexText(ruleIndex, 'name', $event)" /></EwFieldRow>
-                  <EwFieldRow label="正则表达式"><input :value="rule.find_regex" type="text" placeholder="例：\[OOC\].*?\[\/OOC\]" @input="patchRegexText(ruleIndex, 'find_regex', $event)" /></EwFieldRow>
-                  <EwFieldRow label="替换为"><input :value="rule.replace_string" type="text" placeholder="留空则删除匹配内容" @input="patchRegexText(ruleIndex, 'replace_string', $event)" /></EwFieldRow>
-                </div>
-              </article>
-            </div>
+          <transition-group v-else name="ew-list" tag="div" class="ew-regex-list">
+            <article
+              v-for="(rule, ruleIndex) in flow.custom_regex_rules"
+              :key="rule.id"
+              class="ew-regex-item"
+            >
+              <header class="ew-regex-item__head">
+                <label class="ew-checkbox"><input :checked="rule.enabled" type="checkbox" @change="setRegexEnabled(ruleIndex, $event)" /></label>
+                <span class="ew-regex-item__name" :title="rule.name">{{ rule.name || `规则 ${ruleIndex + 1}` }}</span>
+                <button type="button" class="ew-mini-btn ew-mini-btn--danger" @click="removeCustomRegex(ruleIndex)">删除</button>
+              </header>
+              <div class="ew-regex-item__body">
+                <EwFieldRow label="名称"><input :value="rule.name" type="text" placeholder="起个名字..." @input="patchRegexText(ruleIndex, 'name', $event)" /></EwFieldRow>
+                <EwFieldRow label="正则表达式"><input :value="rule.find_regex" type="text" placeholder="/pattern/gi" @input="patchRegexText(ruleIndex, 'find_regex', $event)" /></EwFieldRow>
+                <EwFieldRow label="替换文本"><input :value="rule.replace_string" type="text" placeholder="留空则删除" @input="patchRegexText(ruleIndex, 'replace_string', $event)" /></EwFieldRow>
+              </div>
+            </article>
+          </transition-group>
           </div>
 
           <div class="ew-flow-card__subsection">
@@ -208,47 +212,49 @@
           </div>
 
           <div v-if="flow.prompt_items.length === 0" class="ew-empty">暂无提示词，点击“新增提示词”开始配置。</div>
-          <div v-else class="ew-prompt-list">
+          <transition-group v-else name="ew-list" tag="div" class="ew-prompt-list">
             <article v-for="(item, itemIndex) in flow.prompt_items" :key="item.id" class="ew-prompt-item">
               <header class="ew-prompt-item__head">
                 <label class="ew-checkbox"><input :checked="item.enabled" type="checkbox" @change="setPromptEnabled(item.id, $event)" /></label>
-                <strong class="ew-prompt-item__name">{{ item.name || `提示词 ${itemIndex + 1}` }}</strong>
+                <strong class="ew-prompt-item__name" :title="item.name">{{ item.name || `提示词 ${itemIndex + 1}` }}</strong>
                 <span class="ew-flow-card__chip">{{ item.role }}</span>
                 <span class="ew-flow-card__chip">{{ item.position === 'relative' ? '相对' : '聊天中' }}</span>
                 <span class="ew-flow-card__chip">{{ promptTriggerSummary(item) }}</span>
-                <div class="ew-inline">
-                  <button type="button" class="ew-mini-btn" :disabled="itemIndex === 0" @click="movePromptItem(item.id, -1)">上移</button>
-                  <button type="button" class="ew-mini-btn" :disabled="itemIndex >= flow.prompt_items.length - 1" @click="movePromptItem(item.id, 1)">下移</button>
+                <div class="ew-inline ew-prompt-item__controls">
+                  <button type="button" class="ew-mini-btn" :disabled="itemIndex === 0" @click="movePromptItem(item.id, -1)">↑</button>
+                  <button type="button" class="ew-mini-btn" :disabled="itemIndex >= flow.prompt_items.length - 1" @click="movePromptItem(item.id, 1)">↓</button>
                   <button type="button" class="ew-mini-btn" @click="togglePromptExpand(item.id)">{{ expandedPromptId === item.id ? '收起' : '编辑' }}</button>
                   <button type="button" class="ew-mini-btn ew-mini-btn--danger" @click="removePromptItem(item.id)">删除</button>
                 </div>
               </header>
 
-              <div v-if="expandedPromptId === item.id" class="ew-prompt-item__body">
-                <div class="ew-grid ew-grid--two">
-                  <EwFieldRow label="名称" :help="help('flow.prompt_item.name')"><input :value="item.name" type="text" @input="patchPromptText(item.id, 'name', $event)" /></EwFieldRow>
-                  <EwFieldRow label="角色" :help="help('flow.prompt_item.role')">
-                    <select :value="item.role" @change="patchPromptRole(item.id, $event)">
-                      <option value="system">system</option><option value="user">user</option><option value="assistant">assistant</option>
-                    </select>
-                  </EwFieldRow>
-                  <EwFieldRow label="插入位置" :help="help('flow.prompt_item.position')">
-                    <select :value="item.position" @change="patchPromptPosition(item.id, $event)">
-                      <option value="relative">相对</option><option value="in_chat">聊天中</option>
-                    </select>
-                  </EwFieldRow>
-                  <EwFieldRow label="触发器">
-                    <select :value="getPromptPrimaryTrigger(item)" @change="patchPromptTriggerTypes(item.id, $event)">
-                      <option v-for="option in PROMPT_TRIGGER_OPTIONS" :key="option.value" :value="option.value">
-                        {{ option.label }}
-                      </option>
-                    </select>
-                  </EwFieldRow>
+              <transition name="ew-expand">
+                <div v-if="expandedPromptId === item.id" class="ew-prompt-item__body">
+                  <div class="ew-grid ew-grid--two">
+                    <EwFieldRow label="名称" :help="help('flow.prompt_item.name')"><input :value="item.name" type="text" @input="patchPromptText(item.id, 'name', $event)" /></EwFieldRow>
+                    <EwFieldRow label="角色" :help="help('flow.prompt_item.role')">
+                      <select :value="item.role" @change="patchPromptRole(item.id, $event)">
+                        <option value="system">system</option><option value="user">user</option><option value="assistant">assistant</option>
+                      </select>
+                    </EwFieldRow>
+                    <EwFieldRow label="插入位置" :help="help('flow.prompt_item.position')">
+                      <select :value="item.position" @change="patchPromptPosition(item.id, $event)">
+                        <option value="relative">相对</option><option value="in_chat">聊天中</option>
+                      </select>
+                    </EwFieldRow>
+                    <EwFieldRow label="触发器">
+                      <select :value="getPromptPrimaryTrigger(item)" @change="patchPromptTriggerTypes(item.id, $event)">
+                        <option v-for="option in PROMPT_TRIGGER_OPTIONS" :key="option.value" :value="option.value">
+                          {{ option.label }}
+                        </option>
+                      </select>
+                    </EwFieldRow>
+                  </div>
+                  <EwFieldRow label="内容" :help="help('flow.prompt_item.content')"><textarea :value="item.content" rows="4" @input="patchPromptText(item.id, 'content', $event)" /></EwFieldRow>
                 </div>
-                <EwFieldRow label="内容" :help="help('flow.prompt_item.content')"><textarea :value="item.content" rows="4" @input="patchPromptText(item.id, 'content', $event)" /></EwFieldRow>
-              </div>
+              </transition>
             </article>
-          </div>
+          </transition-group>
         </section>
 
         <EwFieldRow label="请求模板(JSON merge)" :help="help('flow.request_template')">
@@ -424,59 +430,458 @@ function patchRegexText(index: number, key: 'name' | 'find_regex' | 'replace_str
 </script>
 
 <style scoped>
-.ew-flow-card { border-radius: 1rem; border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 42%, transparent); background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 12%, rgba(8, 12, 18, 0.32)); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.26), 0 0 0 1px rgba(255, 255, 255, 0.04) inset; }
-.ew-flow-card__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.72rem; padding: 0.76rem 0.82rem; }
-.ew-flow-card__summary { min-width: 0; }
-.ew-flow-card__name { display: block; margin: 0; font-size: 1rem; line-height: 1.2; color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 95%, transparent); }
-.ew-flow-card__chips { display: flex; flex-wrap: wrap; gap: 0.36rem; margin-top: 0.42rem; }
-.ew-flow-card__chip { border-radius: 999px; border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 54%, transparent); background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 22%, transparent); color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 88%, transparent); font-size: 0.7rem; padding: 0.14rem 0.5rem; }
-.ew-flow-card__endpoint { margin: 0.44rem 0 0; font-size: 0.74rem; line-height: 1.28; color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 70%, transparent); word-break: break-all; }
-.ew-flow-card__actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 0.42rem; }
-.ew-flow-card__enabled { border-radius: 999px; border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 42%, transparent); background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 14%, transparent); padding: 0.2rem 0.5rem; }
-.ew-flow-card__action { border-radius: 0.68rem; border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 56%, transparent); background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 24%, transparent); color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 95%, transparent); font-size: 0.73rem; font-weight: 600; padding: 0.24rem 0.54rem; cursor: pointer; }
-.ew-flow-card__action--danger { border-color: color-mix(in srgb, #de6f78 62%, transparent); background: color-mix(in srgb, #de6f78 24%, transparent); color: #ffe8eb; }
-.ew-flow-card__body { display: flex; flex-direction: column; gap: 0.82rem; padding: 0 0.82rem 0.82rem; }
-.ew-flow-card__section { border-radius: 0.86rem; border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 34%, transparent); background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 8%, rgba(0, 0, 0, 0.12)); padding: 0.62rem; }
-.ew-flow-card__section h4 { margin: 0 0 0.58rem; font-size: 0.88rem; color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 92%, transparent); }
-.ew-flow-card__section-head { display: flex; align-items: center; justify-content: space-between; gap: 0.52rem; margin-bottom: 0.58rem; }
-.ew-flow-card__desc { margin: 0 0 0.56rem; font-size: 0.76rem; line-height: 1.4; color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 62%, transparent); }
-.ew-flow-card__hint-text { margin: 0.22rem 0 0.46rem; font-size: 0.72rem; line-height: 1.35; color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 56%, transparent); }
-.ew-flow-card__subsection { border-radius: 0.72rem; border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 24%, transparent); background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 5%, rgba(0, 0, 0, 0.08)); padding: 0.52rem; margin-bottom: 0.56rem; }
-.ew-flow-card__subsection h5 { margin: 0 0 0.42rem; font-size: 0.84rem; color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 88%, transparent); }
-.ew-flow-card__custom-regex-head { display: flex; align-items: center; justify-content: space-between; gap: 0.42rem; margin: 0.52rem 0 0.36rem; }
-.ew-flow-card__custom-regex-head h6 { margin: 0; font-size: 0.78rem; color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 82%, transparent); }
-.ew-regex-list { display: flex; flex-direction: column; gap: 0.42rem; }
-.ew-regex-item { border-radius: 0.64rem; border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 32%, transparent); background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 8%, rgba(0, 0, 0, 0.1)); padding: 0.42rem 0.5rem; }
-.ew-regex-item__head { display: flex; align-items: center; gap: 0.42rem; margin-bottom: 0.36rem; }
-.ew-regex-item__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.78rem; color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 88%, transparent); }
-.ew-regex-item__body { display: flex; flex-direction: column; gap: 0.36rem; }
-.ew-grid { display: grid; gap: 0.66rem; }
-.ew-grid--two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.ew-checkbox { display: inline-flex; align-items: center; gap: 0.42rem; font-size: 0.8rem; color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 86%, transparent); }
-.ew-radio-group { display: flex; flex-wrap: wrap; gap: 0.44rem; }
-.ew-radio { display: inline-flex; align-items: center; gap: 0.3rem; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 42%, transparent); background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 14%, transparent); padding: 0.22rem 0.48rem; font-size: 0.78rem; }
-.ew-range { display: grid; grid-template-columns: 1fr 6.4rem; align-items: center; gap: 0.56rem; }
-.ew-check-list { display: flex; flex-direction: column; gap: 0.42rem; padding: 0.16rem 0; }
-.ew-subhead { display: flex; align-items: center; justify-content: space-between; gap: 0.46rem; margin-bottom: 0.46rem; }
-.ew-subhead h5 { margin: 0; font-size: 0.82rem; color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 90%, transparent); }
-.ew-subhead h6 { margin: 0; font-size: 0.78rem; color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 86%, transparent); }
-.ew-inline { display: inline-flex; align-items: center; gap: 0.4rem; }
-.ew-empty { border-radius: 0.72rem; border: 1px dashed color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 44%, transparent); padding: 0.58rem 0.64rem; font-size: 0.78rem; color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 76%, transparent); }
-.ew-prompt-list { display: flex; flex-direction: column; gap: 0.54rem; }
-.ew-prompt-item { border-radius: 0.78rem; border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 38%, transparent); background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 10%, rgba(0, 0, 0, 0.14)); padding: 0.48rem 0.54rem; }
-.ew-prompt-item__head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto auto auto; align-items: center; gap: 0.46rem; }
-.ew-prompt-item__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.82rem; color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 94%, transparent); }
-.ew-prompt-item__body { margin-top: 0.54rem; display: flex; flex-direction: column; gap: 0.56rem; }
-.ew-mini-btn { border-radius: 0.52rem; border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 46%, transparent); background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 18%, transparent); color: var(--SmartThemeBodyColor, #edf2f9); font-size: 0.67rem; padding: 0.14rem 0.42rem; cursor: pointer; }
-.ew-mini-btn[disabled] { opacity: 0.45; cursor: not-allowed; }
-.ew-mini-btn--danger { border-color: color-mix(in srgb, #de6f78 58%, transparent); background: color-mix(in srgb, #de6f78 22%, transparent); }
-.ew-expand-enter-active, .ew-expand-leave-active { transition: opacity 0.2s ease, transform 0.2s ease; }
-.ew-expand-enter-from, .ew-expand-leave-to { opacity: 0; transform: translateY(-4px); }
-@media (max-width: 1200px) { .ew-prompt-item__head { grid-template-columns: auto minmax(0, 1fr); } }
+.ew-flow-card {
+  border-radius: 1.15rem;
+  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 35%, transparent);
+  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 10%, rgba(8, 12, 18, 0.45));
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.25),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  backdrop-filter: blur(14px) saturate(130%);
+  -webkit-backdrop-filter: blur(14px) saturate(130%);
+  overflow: visible;
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.ew-flow-card:focus-within {
+  border-color: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 45%, transparent);
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+}
+
+.ew-flow-card__header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  border-radius: 1.15rem 1.15rem 0 0;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--SmartThemeQuoteColor, #2f4158) 25%, rgba(10, 14, 20, 0.85)),
+    color-mix(in srgb, var(--SmartThemeQuoteColor, #2f4158) 15%, rgba(10, 14, 20, 0.75))
+  );
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 15%, transparent);
+}
+
+.ew-flow-card__summary {
+  min-width: 0;
+}
+
+.ew-flow-card__name {
+  display: block;
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 98%, transparent);
+  letter-spacing: 0.01em;
+}
+
+.ew-flow-card__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.ew-flow-card__chip {
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 45%, transparent);
+  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 15%, transparent);
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 85%, transparent);
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 0.15rem 0.6rem;
+}
+
+.ew-flow-card__endpoint {
+  margin: 0.5rem 0 0;
+  font-size: 0.76rem;
+  line-height: 1.35;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 65%, transparent);
+  word-break: break-all;
+}
+
+.ew-flow-card__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.ew-flow-card__enabled {
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 40%, transparent);
+  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 15%, transparent);
+  padding: 0.25rem 0.65rem;
+}
+
+.ew-flow-card__action {
+  border-radius: 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 45%, transparent);
+  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 20%, transparent);
+  color: var(--SmartThemeBodyColor, #edf2f9);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.35rem 0.75rem;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.ew-flow-card__action:hover,
+.ew-flow-card__action:focus-visible {
+  border-color: var(--ew-accent);
+  background: color-mix(in srgb, var(--ew-accent) 25%, transparent);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px var(--ew-accent-glow);
+  outline: none;
+}
+
+.ew-flow-card__action--danger {
+  border-color: color-mix(in srgb, var(--ew-danger) 45%, transparent);
+  background: color-mix(in srgb, var(--ew-danger) 15%, transparent);
+  color: color-mix(in srgb, var(--ew-danger) 90%, #fff);
+}
+
+.ew-flow-card__action--danger:hover,
+.ew-flow-card__action--danger:focus-visible {
+  background: color-mix(in srgb, var(--ew-danger) 80%, transparent);
+  border-color: var(--ew-danger);
+  color: #fff;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--ew-danger) 30%, transparent);
+}
+
+.ew-flow-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 0 1.1rem 1.1rem;
+  margin-top: 1rem;
+}
+
+.ew-flow-card__section {
+  border-radius: 1rem;
+  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 30%, transparent);
+  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 5%, rgba(0, 0, 0, 0.15));
+  padding: 0.8rem 0.9rem;
+}
+
+.ew-flow-card__section h4 {
+  margin: 0 0 0.65rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 95%, transparent);
+}
+
+.ew-flow-card__section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.65rem;
+}
+
+.ew-flow-card__desc {
+  margin: 0 0 0.65rem;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 70%, transparent);
+}
+
+.ew-flow-card__hint-text {
+  margin: 0.3rem 0 0.5rem;
+  font-size: 0.76rem;
+  line-height: 1.4;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 65%, transparent);
+}
+
+.ew-flow-card__subsection {
+  border-radius: 0.8rem;
+  border: 1px dashed color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 30%, transparent);
+  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 5%, rgba(0, 0, 0, 0.05));
+  padding: 0.65rem 0.75rem;
+  margin-bottom: 0.65rem;
+}
+
+.ew-flow-card__subsection h5 {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 90%, transparent);
+}
+
+.ew-flow-card__custom-regex-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0.6rem 0 0.4rem; /* Reduced top margin and added bottom space */
+}
+
+.ew-flow-card__custom-regex-head h6 {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 85%, transparent);
+}
+
+.ew-regex-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  position: relative;
+}
+
+.ew-regex-item {
+  border-radius: 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 30%, transparent);
+  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 8%, rgba(0, 0, 0, 0.15));
+  padding: 0.6rem 0.7rem;
+}
+
+.ew-regex-item__head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.ew-regex-item__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 95%, transparent);
+}
+
+.ew-regex-item__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.ew-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.ew-grid--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ew-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 90%, transparent);
+}
+
+.ew-radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.ew-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 40%, transparent);
+  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 15%, transparent);
+  padding: 0.25rem 0.6rem;
+  font-size: 0.8rem;
+}
+
+.ew-range {
+  display: grid;
+  grid-template-columns: 1fr 6.4rem;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.ew-check-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.2rem 0;
+}
+
+.ew-subhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.ew-subhead h5 {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 95%, transparent);
+}
+
+.ew-subhead h6 {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 90%, transparent);
+}
+
+.ew-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.ew-empty {
+  border-radius: 0.8rem;
+  border: 1px dashed color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 45%, transparent);
+  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 10%, rgba(8, 12, 18, 0.2));
+  padding: 0.65rem 0.75rem;
+  font-size: 0.82rem;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 80%, transparent);
+}
+
+.ew-prompt-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  position: relative;
+}
+
+.ew-prompt-item {
+  border-radius: 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 35%, transparent);
+  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 8%, rgba(0, 0, 0, 0.18));
+  padding: 0.6rem;
+}
+
+.ew-prompt-item__head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ew-prompt-item__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 98%, transparent);
+}
+
+.ew-prompt-item__body {
+  margin-top: 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.ew-mini-btn {
+  border-radius: 0.6rem;
+  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 45%, transparent);
+  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 15%, transparent);
+  color: var(--SmartThemeBodyColor, #edf2f9);
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.ew-mini-btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.ew-mini-btn:hover:not([disabled]) {
+  border-color: var(--ew-accent);
+  background: color-mix(in srgb, var(--ew-accent) 25%, transparent);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.ew-mini-btn--danger {
+  border-color: color-mix(in srgb, var(--ew-danger) 45%, transparent);
+  background: color-mix(in srgb, var(--ew-danger) 15%, transparent);
+}
+
+.ew-mini-btn--danger:hover:not([disabled]) {
+  background: color-mix(in srgb, var(--ew-danger) 80%, transparent);
+  border-color: var(--ew-danger);
+  color: #fff;
+}
+
+.ew-expand-enter-active,
+.ew-expand-leave-active {
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: top center;
+}
+
+.ew-expand-enter-from,
+.ew-expand-leave-to {
+  opacity: 0;
+  transform: translateY(-8px) scaleY(0.98);
+}
+
+@supports not ((backdrop-filter: blur(1px))) {
+  .ew-flow-card__header {
+    background: color-mix(in srgb, var(--SmartThemeQuoteColor, #2f4158) 18%, rgba(10, 14, 20, 0.98));
+  }
+}
+
+@media (max-width: 1200px) {
+  .ew-prompt-item__head {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .ew-prompt-item__controls {
+    grid-column: 1 / -1;
+    margin-top: 0.5rem;
+  }
+}
+
 @media (max-width: 900px) {
-  .ew-flow-card__header { flex-direction: column; }
-  .ew-flow-card__actions { width: 100%; justify-content: flex-start; }
-  .ew-grid--two { grid-template-columns: 1fr; }
-  .ew-range { grid-template-columns: 1fr; }
+  .ew-flow-card__header {
+    flex-direction: column;
+  }
+  .ew-flow-card__actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .ew-grid--two {
+    grid-template-columns: 1fr;
+  }
+  .ew-range {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ew-flow-card,
+  .ew-flow-card__action,
+  .ew-mini-btn,
+  .ew-expand-enter-active,
+  .ew-expand-leave-active {
+    transition: none;
+  }
 }
 </style>

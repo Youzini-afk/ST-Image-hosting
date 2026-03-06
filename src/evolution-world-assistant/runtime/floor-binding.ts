@@ -139,10 +139,15 @@ export function initFloorBindingEvents(getSettings: () => EwSettings): void {
 
   floorBindingListenerStops.push(
     eventOn(tavern_events.CHAT_CHANGED, () => {
-      const settings = getSettings();
-      if (settings.enabled && settings.floor_binding_enabled) {
-        // Delay to allow chat to fully load.
-        setTimeout(() => onChatChanged(settings), 500);
+      const currentSettings = getSettings();
+      if (currentSettings.enabled && currentSettings.floor_binding_enabled) {
+        // Delay to allow chat to fully load, then re-read settings to avoid stale closure.
+        setTimeout(() => {
+          const freshSettings = getSettings();
+          if (freshSettings.enabled && freshSettings.floor_binding_enabled) {
+            onChatChanged(freshSettings);
+          }
+        }, 500);
       }
     }),
   );

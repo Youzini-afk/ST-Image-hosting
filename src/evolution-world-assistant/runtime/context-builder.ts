@@ -30,7 +30,8 @@ function applyRegexProcessing(text: string, flow: EwFlowConfig): string {
   if (flow.use_tavern_regex && typeof formatAsTavernRegexedString === 'function') {
     try {
       result = formatAsTavernRegexedString(result, 'ai_output', 'prompt') ?? result;
-    } catch {
+    } catch (e) {
+      console.debug('[Evolution World] tavern regex failed:', e);
       // Tavern regex failed — proceed with unmodified text.
     }
   }
@@ -43,7 +44,8 @@ function applyRegexProcessing(text: string, flow: EwFlowConfig): string {
     try {
       const regex = new RegExp(rule.find_regex, 'g');
       result = result.replace(regex, rule.replace_string);
-    } catch {
+    } catch (e) {
+      console.debug(`[Evolution World] custom regex rule '${rule.name}' invalid:`, e);
       // Invalid regex — skip this rule silently.
     }
   }
@@ -121,7 +123,8 @@ export async function buildFlowRequest(input: BuildRequestInput): Promise<FlowRe
       enabled: entry.enabled,
       content: entry.content,
     }));
-  } catch {
+  } catch (e) {
+    console.debug('[Evolution World] worldbook resolution failed in buildFlowRequest:', e);
     // Proceed with empty worldbook snapshot.
   }
 

@@ -44,7 +44,7 @@ async function rollbackController(): Promise<{ ok: boolean; reason?: string }> {
       return { ok: false, reason: 'no backup found for current chat' };
     }
 
-    const entries = await getWorldbook(backup.worldbook_name);
+    const entries = klona(await getWorldbook(backup.worldbook_name));
     const controller = entries.find(entry => entry.name === settings.controller_entry_name);
     if (controller) {
       controller.content = backup.controller_content;

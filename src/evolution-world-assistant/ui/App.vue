@@ -88,7 +88,7 @@
             <button type="button" class="ew-btn" @click="store.addApiPreset">新增API配置</button>
           </template>
 
-          <div class="ew-api-list">
+          <transition-group name="ew-list" tag="div" class="ew-api-list">
             <EwApiPresetCard
               v-for="(preset, index) in store.settings.api_presets"
               :key="preset.id"
@@ -100,7 +100,7 @@
               @remove="store.removeApiPreset(preset.id)"
               @update:model-value="value => updateApiPreset(index, value)"
             />
-          </div>
+          </transition-group>
         </EwSectionCard>
       </template>
 
@@ -172,7 +172,7 @@
             <button type="button" class="ew-btn" @click="store.addFlow">新增工作流</button>
           </template>
 
-          <div class="ew-flow-list">
+          <transition-group name="ew-list" tag="div" class="ew-flow-list">
             <EwFlowCard
               v-for="(flow, index) in store.settings.flows"
               :key="flow.id"
@@ -184,7 +184,7 @@
               @remove="store.removeFlow(flow.id)"
               @update:model-value="value => updateFlow(index, value)"
             />
-          </div>
+          </transition-group>
         </EwSectionCard>
       </template>
 
@@ -322,18 +322,18 @@ onUnmounted(() => {
 .ew-content-stack {
   display: flex;
   flex-direction: column;
-  gap: 0.86rem;
+  gap: 1rem;
   font-family:
+    'Inter',
     'Noto Sans SC',
     'PingFang SC',
     'Microsoft YaHei UI',
-    'Microsoft YaHei',
     sans-serif;
 }
 
 .ew-grid {
   display: grid;
-  gap: 0.74rem;
+  gap: 0.85rem;
 }
 
 .ew-grid.two {
@@ -343,87 +343,93 @@ onUnmounted(() => {
 .ew-summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.64rem;
+  gap: 0.8rem;
 }
 
 .ew-summary-card {
-  border-radius: 0.9rem;
-  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 40%, transparent);
-  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 12%, rgba(0, 0, 0, 0.12));
-  padding: 0.62rem 0.68rem;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 30%, transparent);
+  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 10%, rgba(0, 0, 0, 0.2));
+  padding: 0.8rem 0.9rem;
   display: flex;
   flex-direction: column;
-  gap: 0.32rem;
+  gap: 0.35rem;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05);
 }
 
 .ew-summary-card h4 {
   margin: 0;
   font-size: 0.77rem;
-  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 74%, transparent);
+  font-weight: 500;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 65%, transparent);
+  letter-spacing: 0.02em;
 }
 
 .ew-summary-card strong {
-  font-size: 1.2rem;
+  font-size: 1.4rem;
   line-height: 1;
+  font-weight: 700;
   color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 95%, transparent);
 }
 
 .ew-summary-card small {
-  font-size: 0.7rem;
-  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 64%, transparent);
+  font-size: 0.72rem;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 55%, transparent);
 }
 
-.ew-flow-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.74rem;
-}
-
+.ew-flow-list,
 .ew-api-list {
   display: flex;
   flex-direction: column;
-  gap: 0.74rem;
+  gap: 0.85rem;
+  position: relative;
 }
 
 .ew-actions-wrap {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.46rem;
+  gap: 0.55rem;
 }
 
 .ew-btn {
-  border-radius: 0.7rem;
-  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 56%, transparent);
-  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 24%, transparent);
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 45%, transparent);
+  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 20%, transparent);
   color: var(--SmartThemeBodyColor, #edf2f9);
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  padding: 0.32rem 0.68rem;
+  padding: 0.4rem 0.85rem;
   cursor: pointer;
   transition:
     background 0.2s ease,
     border-color 0.2s ease,
-    transform 0.14s ease;
+    color 0.2s ease,
+    transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.2s ease;
 }
 
 .ew-btn:hover,
 .ew-btn:focus-visible {
-  border-color: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 78%, transparent);
-  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 38%, transparent);
-  transform: translateY(-1px);
+  border-color: var(--ew-accent);
+  background: color-mix(in srgb, var(--ew-accent) 25%, transparent);
+  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--ew-accent-glow);
   outline: none;
 }
 
 .ew-btn--danger {
-  border-color: color-mix(in srgb, #d76872 58%, transparent);
-  background: color-mix(in srgb, #d76872 24%, transparent);
-  color: #ffe5e8;
+  border-color: color-mix(in srgb, var(--ew-danger) 45%, transparent);
+  background: color-mix(in srgb, var(--ew-danger) 15%, transparent);
+  color: color-mix(in srgb, var(--ew-danger) 90%, #fff);
 }
 
 .ew-btn--danger:hover,
 .ew-btn--danger:focus-visible {
-  background: color-mix(in srgb, #d76872 38%, transparent);
-  border-color: color-mix(in srgb, #d76872 74%, transparent);
+  background: color-mix(in srgb, var(--ew-danger) 80%, transparent);
+  border-color: var(--ew-danger);
+  color: #fff;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--ew-danger) 30%, transparent);
 }
 
 .ew-hidden-file-input {
@@ -433,7 +439,7 @@ onUnmounted(() => {
 .ew-switch {
   display: inline-flex;
   align-items: center;
-  gap: 0.58rem;
+  gap: 0.65rem;
   border: none;
   background: none;
   padding: 0;
@@ -441,8 +447,8 @@ onUnmounted(() => {
 }
 
 .ew-switch__track {
-  width: 2.7rem;
-  height: 1.56rem;
+  width: 2.8rem;
+  height: 1.6rem;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 58%, transparent);
   background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 18%, rgba(7, 10, 15, 0.4));
@@ -453,43 +459,48 @@ onUnmounted(() => {
   align-items: center;
   padding: 0.15rem;
   transition:
-    border-color 0.2s ease,
-    background 0.2s ease;
+    border-color 0.3s ease,
+    background 0.3s ease,
+    box-shadow 0.3s ease;
 }
 
 .ew-switch__track[data-enabled='1'] {
-  border-color: color-mix(in srgb, #55cb84 62%, transparent);
-  background: color-mix(in srgb, #55cb84 36%, rgba(7, 10, 15, 0.4));
+  border-color: color-mix(in srgb, var(--ew-success) 65%, transparent);
+  background: color-mix(in srgb, var(--ew-success) 45%, rgba(7, 10, 15, 0.4));
+  box-shadow:
+    inset 0 1px 4px rgba(0, 0, 0, 0.2),
+    0 0 10px color-mix(in srgb, var(--ew-success) 25%, transparent);
 }
 
 .ew-switch__thumb {
-  width: 1.2rem;
-  height: 1.2rem;
+  width: 1.25rem;
+  height: 1.25rem;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--SmartThemeBodyColor, #eef3f9) 96%, transparent);
+  background: color-mix(in srgb, var(--SmartThemeBodyColor, #eef3f9) 90%, transparent);
   box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.38),
-    0 0 0 1px rgba(0, 0, 0, 0.12);
+    0 2px 5px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(0, 0, 0, 0.1);
   transform: translateX(0);
   transition:
-    transform 0.2s ease,
-    background 0.2s ease;
+    transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background 0.3s ease;
 }
 
 .ew-switch__track[data-enabled='1'] .ew-switch__thumb {
-  transform: translateX(1.12rem);
-  background: #f8fffb;
+  transform: translateX(1.15rem);
+  background: #ffffff;
 }
 
 .ew-switch__text {
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   font-weight: 600;
-  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 86%, transparent);
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 85%, transparent);
+  transition: color 0.2s ease;
 }
 
 .ew-switch:hover .ew-switch__track,
 .ew-switch:focus-visible .ew-switch__track {
-  border-color: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 78%, transparent);
+  border-color: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 85%, transparent);
 }
 
 .ew-switch:focus-visible {
@@ -499,30 +510,62 @@ onUnmounted(() => {
 .ew-debug-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.72rem;
+  gap: 0.85rem;
 }
 
 .ew-pre-box {
-  border-radius: 0.9rem;
-  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 42%, transparent);
-  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 12%, rgba(0, 0, 0, 0.12));
-  padding: 0.66rem;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 30%, transparent);
+  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 8%, rgba(0, 0, 0, 0.25));
+  padding: 0.8rem;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
 .ew-pre-box strong {
-  font-size: 0.8rem;
-  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 88%, transparent);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 90%, transparent);
 }
 
 .ew-pre-box pre {
-  margin: 0.46rem 0 0;
-  max-height: 16rem;
+  margin: 0.55rem 0 0;
+  max-height: 18rem;
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-word;
-  font-size: 0.73rem;
-  line-height: 1.42;
-  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 84%, transparent);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 75%, transparent);
+  font-family: 'Fira Code', 'Consolas', monospace;
+}
+.ew-pre-box pre::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.ew-pre-box pre::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 40%, transparent);
+  border-radius: 4px;
+}
+
+/* --- Global List Transition Animations --- */
+.ew-list-move,
+.ew-list-enter-active,
+.ew-list-leave-active {
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.ew-list-enter-from {
+  opacity: 0;
+  transform: translateY(15px) scale(0.98);
+}
+
+.ew-list-leave-to {
+  opacity: 0;
+  transform: translateY(-15px) scale(0.98);
+}
+
+.ew-list-leave-active {
+  position: absolute;
 }
 
 @media (max-width: 1100px) {
@@ -535,11 +578,9 @@ onUnmounted(() => {
   .ew-grid.two {
     grid-template-columns: 1fr;
   }
-
   .ew-debug-grid {
     grid-template-columns: 1fr;
   }
-
   .ew-summary-grid {
     grid-template-columns: 1fr 1fr;
   }
@@ -552,7 +593,12 @@ onUnmounted(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ew-btn {
+  .ew-btn,
+  .ew-switch__track,
+  .ew-switch__thumb,
+  .ew-list-move,
+  .ew-list-enter-active,
+  .ew-list-leave-active {
     transition: none;
   }
 }

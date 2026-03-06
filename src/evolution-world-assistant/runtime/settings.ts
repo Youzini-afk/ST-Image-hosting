@@ -11,6 +11,7 @@ import {
   RunSummarySchema,
 } from './types';
 import { simpleHash } from './helpers';
+import { createDefaultApiPreset, createDefaultFlow } from './factory';
 
 type SettingsListener = (settings: EwSettings) => void;
 type RunListener = (summary: RunSummary | null) => void;
@@ -33,83 +34,9 @@ let cachedSettings: EwSettings | null = null;
 let cachedLastRun: RunSummary | null = null;
 let cachedLastIo: LastIoSummary | null = null;
 
-function makeDefaultApiPreset(index: number): EwApiPreset {
-  const id = `api_${index}_${simpleHash(`api-${index}-${Date.now()}`)}`;
-  return EwApiPresetSchema.parse({
-    id,
-    name: `API配置 ${index}`,
-    mode: 'workflow_http',
-    use_main_api: false,
-    api_url: '',
-    api_key: '',
-    model: '',
-    api_source: 'openai',
-    model_candidates: [],
-    headers_json: '',
-  });
-}
-
-function makeDefaultFlow(index: number, apiPresetId: string): EwFlowConfig {
-  const id = `flow_${index}_${simpleHash(`${index}-${Date.now()}`)}`;
-  const promptSeed = `${id}-prompt`;
-  return EwFlowConfigSchema.parse({
-    id,
-    name: `工作流 ${index}`,
-    enabled: true,
-    priority: 100,
-    timeout_ms: 8000,
-    api_preset_id: apiPresetId,
-    generation_options: {
-      unlock_context_length: false,
-      max_context_tokens: 200000,
-      max_reply_tokens: 65535,
-      n_candidates: 1,
-      stream: true,
-      temperature: 1.2,
-      frequency_penalty: 0.85,
-      presence_penalty: 0.5,
-      top_p: 0.92,
-    },
-    behavior_options: {
-      name_behavior: 'default',
-      continue_prefill: false,
-      squash_system_messages: false,
-      enable_function_calling: false,
-      send_inline_media: false,
-      request_thinking: false,
-      reasoning_effort: 'auto',
-      verbosity: 'auto',
-    },
-    prompt_items: [
-      {
-        id: `prompt_${simpleHash(`${promptSeed}-0`)}`,
-        name: '输出格式',
-        enabled: true,
-        role: 'system',
-        position: 'relative',
-        trigger_types: ['all'],
-        content: '',
-      },
-      {
-        id: `prompt_${simpleHash(`${promptSeed}-1`)}`,
-        name: '回复风格',
-        enabled: true,
-        role: 'system',
-        position: 'relative',
-        trigger_types: ['all'],
-        content: '',
-      },
-    ],
-    // Legacy fields retained for backward compatibility.
-    api_url: '',
-    api_key: '',
-    context_turns: 8,
-    extract_rules: [],
-    exclude_rules: [],
-    request_template: '',
-    headers_json: '',
-  });
-}
+// M-3: Use shared factory functions from factory.ts.
+const makeDefaultApiPreset = createDefaultApiPreset;
+const makeDefaultFlow = createDefaultFlow;
 
 function readScriptStorage(): ScriptStorageShape {
   const variables = getVariables({ type: 'script', script_id: getScriptId() });
@@ -318,8 +245,11 @@ export function replaceSettings(nextSettings: EwSettings): EwSettings {
 }
 
 export function patchSettings(partial: Partial<EwSettings>): EwSettings {
-  const merged = _.merge({}, getSettings(), partial);
-  return replaceSettings(merged as EwSettings);
+  // Use spread (shallow merge) instead of _.merge to avoid array-by-index corruption.
+  // _.merge would keep old array entries when the new array is shorter.
+  const current = getSettings();
+  const merged: EwSettings = { ...current, ...partial };
+  return replaceSettings(merged);
 }
 
 export function subscribeSettings(listener: SettingsListener): { stop: () => void } {

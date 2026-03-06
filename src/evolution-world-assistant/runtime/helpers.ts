@@ -1,6 +1,22 @@
 import { TextSliceRule } from './contracts';
 
 export function uuidv4(): string {
+  // Prefer the native crypto API for correctness and collision resistance.
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  // Fallback: crypto.getRandomValues-based UUID v4.
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+    bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant 10
+    const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
+
+  // Last resort: Math.random (non-cryptographic, kept for edge-case environments).
   const random = () => Math.floor(Math.random() * 0x100000000).toString(16).padStart(8, '0');
   return `${random().slice(0, 8)}-${random().slice(0, 4)}-4${random().slice(0, 3)}-a${random().slice(0, 3)}-${random()}${random().slice(0, 4)}`;
 }
@@ -37,7 +53,7 @@ export function parseJsonObject(input: string): Record<string, string> {
       throw new Error('must be a JSON object');
     }
 
-    const pairs = _.toPairs(parsed as Record<string, unknown>).map(([key, value]) => [key, String(value)] as const);
+    const pairs = _.toPairs(parsed as Record<string, unknown>).map(([key, value]) => [key, String(value)]);
     return _.fromPairs(pairs);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -68,6 +84,8 @@ export function removeSlices(text: string, rules: TextSliceRule[]): string {
       output += result.slice(cursor, startIndex);
       const endIndex = result.indexOf(rule.end, startIndex + rule.start.length);
       if (endIndex === -1) {
+        // No matching end marker — preserve the remaining text from startIndex onward.
+        output += result.slice(startIndex);
         break;
       }
       cursor = endIndex + rule.end.length;

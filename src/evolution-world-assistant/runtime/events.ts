@@ -103,6 +103,7 @@ async function onGenerationAfterCommands(
   const messageId = getRuntimeState().last_send?.message_id ?? getLastMessageId();
   const userInput = getRuntimeState().last_send?.user_input ?? getRuntimeState().last_send_intent?.user_input ?? '';
   if (!userInput.trim()) {
+    console.debug('[Evolution World] skipped workflow: user input is empty (continue/regen may not capture input)');
     return;
   }
   clearSendContext();

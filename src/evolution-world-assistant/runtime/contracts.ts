@@ -1,3 +1,5 @@
+// NOTE: .prefault() is a SillyTavern-specific extension to Zod, not part of standard Zod.
+// It sets a default value for the entire object when used in array contexts.
 export const TextSliceRuleSchema = z
   .object({
     start: z.string().default(''),
