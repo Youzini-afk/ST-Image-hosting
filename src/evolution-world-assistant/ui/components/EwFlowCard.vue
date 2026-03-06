@@ -451,13 +451,11 @@ function patchRegexText(index: number, key: 'name' | 'find_regex' | 'replace_str
 }
 
 .ew-flow-card__header {
-  position: sticky;
-  top: 0;
-  z-index: 10;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
   padding: 1rem 1.1rem;
   border-radius: 1.15rem 1.15rem 0 0;
   background: linear-gradient(
@@ -465,12 +463,12 @@ function patchRegexText(index: number, key: 'name' | 'find_regex' | 'replace_str
     color-mix(in srgb, var(--SmartThemeQuoteColor, #2f4158) 25%, rgba(10, 14, 20, 0.85)),
     color-mix(in srgb, var(--SmartThemeQuoteColor, #2f4158) 15%, rgba(10, 14, 20, 0.75))
   );
-  backdrop-filter: blur(16px);
   border-bottom: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 15%, transparent);
 }
 
 .ew-flow-card__summary {
   min-width: 0;
+  flex: 1 1 200px; /* Allow summary to shrink and wrap */
 }
 
 .ew-flow-card__name {
@@ -514,6 +512,7 @@ function patchRegexText(index: number, key: 'name' | 'find_regex' | 'replace_str
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: 0.5rem;
+  flex-shrink: 0; /* Prevent action buttons from being compressed */
 }
 
 .ew-flow-card__enabled {
