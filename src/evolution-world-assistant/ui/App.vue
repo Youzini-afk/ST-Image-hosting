@@ -323,6 +323,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  min-width: 0; /* Prevent flex child overflow from compressing the layout */
   font-family:
     'Inter',
     'Noto Sans SC',
@@ -566,6 +567,7 @@ onUnmounted(() => {
 
 .ew-list-leave-active {
   position: absolute;
+  width: 100%; /* Prevent container collapse during leave animation */
 }
 
 @media (max-width: 1100px) {
