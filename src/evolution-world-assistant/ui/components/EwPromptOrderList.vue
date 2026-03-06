@@ -22,13 +22,14 @@
           </span>
           <span class="ew-prompt-order__name">{{ entry.name || entry.identifier }}</span>
 
-          <!-- Inline chips for prompt-type entries -->
           <template v-if="entry.type === 'prompt'">
-            <span class="ew-prompt-order__chip">{{ entry.role }}</span>
-            <span class="ew-prompt-order__chip">{{ entry.injection_position === 'in_chat' ? '聊天中' : '相对' }}</span>
-            <span v-if="entry.injection_position === 'in_chat'" class="ew-prompt-order__chip">深度 {{ entry.injection_depth }}</span>
+            <span :class="['ew-prompt-order__chip', `ew-prompt-order__chip--${entry.role}`]">{{ entry.role }}</span>
+            <span :class="['ew-prompt-order__chip', entry.injection_position === 'in_chat' ? 'ew-prompt-order__chip--inchat' : 'ew-prompt-order__chip--relative']">
+              {{ entry.injection_position === 'in_chat' ? '聊天中' : '相对' }}
+            </span>
+            <span v-if="entry.injection_position === 'in_chat'" class="ew-prompt-order__chip ew-prompt-order__chip--depth">深度 {{ entry.injection_depth }}</span>
           </template>
-          <span v-else-if="entry.role !== 'system'" class="ew-prompt-order__chip">{{ entry.role }}</span>
+          <span v-else-if="entry.role !== 'system'" :class="['ew-prompt-order__chip', `ew-prompt-order__chip--${entry.role}`]">{{ entry.role }}</span>
 
           <div class="ew-prompt-order__actions">
             <button
@@ -204,15 +205,19 @@ function onDragEnd() {
 .ew-prompt-order__list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .ew-prompt-order__item {
   background: var(--ew-bg-elevated, rgba(255, 255, 255, 0.03));
   border: 1px solid var(--ew-border, rgba(255, 255, 255, 0.08));
-  border-radius: 6px;
-  transition: opacity 0.15s, box-shadow 0.15s;
+  border-radius: 8px;
+  transition: opacity 0.2s, background 0.2s, border-color 0.2s;
   cursor: grab;
+}
+
+.ew-prompt-order__item:hover {
+  background: var(--ew-bg-hover, rgba(255, 255, 255, 0.05));
 }
 
 .ew-prompt-order__item:active {
@@ -220,64 +225,104 @@ function onDragEnd() {
 }
 
 .ew-prompt-order__item--disabled {
-  opacity: 0.45;
+  opacity: 0.5;
+}
+
+.ew-prompt-order__item--disabled:hover {
+  opacity: 0.6;
 }
 
 .ew-prompt-order__item--editing {
   border-color: var(--ew-accent, #80a0ff);
+  background: var(--ew-bg-elevated, rgba(255, 255, 255, 0.04));
 }
 
 .ew-prompt-order__row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  min-height: 36px;
+  gap: 12px;
+  padding: 10px 14px;
+  min-height: 48px;
 }
 
 .ew-prompt-order__handle {
   cursor: grab;
-  opacity: 0.4;
+  opacity: 0.25;
   font-size: 14px;
   user-select: none;
   flex-shrink: 0;
+  width: 16px;
+  transition: opacity 0.2s;
 }
 
 .ew-prompt-order__item:hover .ew-prompt-order__handle {
-  opacity: 0.8;
+  opacity: 0.7;
 }
 
 .ew-prompt-order__icon {
   flex-shrink: 0;
-  font-size: 13px;
+  font-size: 14px;
+  width: 20px;
+  text-align: center;
 }
 
 .ew-prompt-order__name {
   flex: 1;
-  font-size: 13px;
+  font-size: 14px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--ew-text, #ddd);
+  color: var(--ew-text, #eee);
+  font-weight: 500;
 }
 
 .ew-prompt-order__item--marker .ew-prompt-order__name {
   color: var(--ew-text-muted, #aaa);
+  font-weight: 400;
 }
 
 .ew-prompt-order__chip {
-  font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: var(--ew-chip-bg, rgba(255, 255, 255, 0.06));
-  color: var(--ew-text-muted, #aaa);
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 9999px; /* Pill shape */
+  background: var(--ew-chip-bg, rgba(255, 255, 255, 0.08));
+  color: var(--ew-text-muted, #bbb);
   flex-shrink: 0;
+  letter-spacing: 0.5px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+/* Chip Semantic Colors */
+.ew-prompt-order__chip--system {
+  background: rgba(167, 139, 250, 0.15); /* Purple tint */
+  color: #c4b5fd;
+}
+.ew-prompt-order__chip--user {
+  background: rgba(96, 165, 250, 0.15); /* Blue tint */
+  color: #93c5fd;
+}
+.ew-prompt-order__chip--assistant {
+  background: rgba(244, 114, 182, 0.15); /* Pink/Red tint */
+  color: #f9a8d4;
+}
+.ew-prompt-order__chip--relative {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ddd;
+}
+.ew-prompt-order__chip--inchat {
+  background: rgba(52, 211, 153, 0.15); /* Emerald green tint */
+  color: #6ee7b7;
+}
+.ew-prompt-order__chip--depth {
+  background: rgba(251, 191, 36, 0.15); /* Amber/Yellow tint */
+  color: #fcd34d;
 }
 
 .ew-prompt-order__actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
   flex-shrink: 0;
   margin-left: auto;
 }
@@ -315,35 +360,53 @@ function onDragEnd() {
 
 /* ── Inline editor ── */
 .ew-prompt-order__editor {
-  padding: 8px 10px 10px;
-  border-top: 1px solid var(--ew-border, rgba(255, 255, 255, 0.08));
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.15); /* Drawer inset dark background */
+  border-top: 1px solid var(--ew-border, rgba(255, 255, 255, 0.05));
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .ew-prompt-order__editor-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 12px;
 }
 
 .ew-prompt-order__editor-label {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 12px;
-  color: var(--ew-text-muted, #aaa);
+  font-size: 13px;
+  color: var(--ew-text, #ddd);
+  font-weight: 500;
 }
 
 .ew-prompt-order__editor-label input,
 .ew-prompt-order__editor-label select,
 .ew-prompt-order__editor-label textarea {
   font-size: 13px;
-  padding: 4px 8px;
-  border: 1px solid var(--ew-border, rgba(255, 255, 255, 0.1));
-  border-radius: 4px;
+  padding: 6px 10px;
+  border: 1px solid var(--ew-border, rgba(255, 255, 255, 0.12));
+  border-radius: 6px;
   background: var(--ew-input-bg, rgba(0, 0, 0, 0.2));
-  color: var(--ew-text, #ddd);
+  color: var(--ew-text, #fff);
+  transition: border-color 0.2s;
+}
+
+.ew-prompt-order__editor-label input:focus,
+.ew-prompt-order__editor-label select:focus,
+.ew-prompt-order__editor-label textarea:focus {
+  outline: none;
+  border-color: var(--ew-accent, #80a0ff);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.ew-prompt-order__editor-label textarea {
   resize: vertical;
+  min-height: 80px;
+  font-family: Consolas, Monaco, monospace;
 }
 
 /* ── Add button ── */
