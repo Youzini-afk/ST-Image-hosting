@@ -11,9 +11,6 @@
     @close="store.closePanel"
   >
     <template #actions>
-      <button type="button" class="ew-btn" @click="store.validateConfig">校验配置</button>
-      <button type="button" class="ew-btn" @click="openImportFilePicker">导入配置</button>
-      <button type="button" class="ew-btn" @click="store.exportConfig">导出配置</button>
       <button
         type="button"
         class="ew-moon-toggle"
@@ -22,11 +19,13 @@
         :title="store.settings.theme_moon ? '关闭月相主题' : '开启月相主题'"
         @click="store.settings.theme_moon = !store.settings.theme_moon"
       >
-        <span class="ew-switch__track ew-moon-toggle__track" :data-enabled="store.settings.theme_moon ? '1' : '0'">
-          <span class="ew-switch__thumb" />
+        <span class="ew-moon-toggle__moon" :class="{ 'is-full': store.settings.theme_moon }">
+          <span class="ew-moon-toggle__shadow" />
         </span>
-        <span class="ew-moon-toggle__icon">🌙</span>
       </button>
+      <button type="button" class="ew-btn" @click="store.validateConfig">校验配置</button>
+      <button type="button" class="ew-btn" @click="openImportFilePicker">导入配置</button>
+      <button type="button" class="ew-btn" @click="store.exportConfig">导出配置</button>
       <button type="button" class="ew-btn ew-btn--danger" @click="store.closePanel">关闭</button>
       <input
         ref="importFileInputRef"
@@ -688,29 +687,58 @@ onUnmounted(() => {
   }
 }
 
-/* Moon toggle compact button in header */
+/* Moon toggle: CSS crescent → full moon animation */
 .ew-moon-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
   padding: 0;
   background: transparent;
   border: none;
   cursor: pointer;
   flex-shrink: 0;
 }
-.ew-moon-toggle__track {
-  width: 32px !important;
-  height: 18px !important;
+
+.ew-moon-toggle__moon {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  box-shadow: 0 0 6px rgba(251, 191, 36, 0.3);
+  overflow: hidden;
+  transition: box-shadow 0.6s ease, background 0.6s ease;
 }
-.ew-moon-toggle__icon {
-  font-size: 1.1rem;
-  line-height: 1;
-  filter: drop-shadow(0 0 4px rgba(250, 204, 21, 0.4));
-  transition: filter 0.3s ease;
+
+/* Shadow overlay creates the crescent shape */
+.ew-moon-toggle__shadow {
+  position: absolute;
+  top: -2px;
+  left: 6px;
+  width: 22px;
+  height: 28px;
+  border-radius: 50%;
+  background: #1e293b;
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.6s ease;
 }
-.ew-moon-toggle:hover .ew-moon-toggle__icon {
-  filter: drop-shadow(0 0 8px rgba(250, 204, 21, 0.7));
+
+/* Full moon: shadow slides away + glow intensifies */
+.ew-moon-toggle__moon.is-full {
+  background: linear-gradient(135deg, #fde68a, #fbbf24);
+  box-shadow:
+    0 0 10px rgba(251, 191, 36, 0.5),
+    0 0 24px rgba(251, 191, 36, 0.25);
+}
+
+.ew-moon-toggle__moon.is-full .ew-moon-toggle__shadow {
+  transform: translateX(22px);
+  opacity: 0;
+}
+
+/* Hover glow */
+.ew-moon-toggle:hover .ew-moon-toggle__moon {
+  box-shadow:
+    0 0 12px rgba(251, 191, 36, 0.5),
+    0 0 30px rgba(251, 191, 36, 0.2);
 }
 
 </style>
