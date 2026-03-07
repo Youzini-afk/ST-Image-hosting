@@ -4118,19 +4118,19 @@ function sortEntries(): void {
   }
   // mutate mode
   if (!draftEntries.value.length) return;
+  // Save reference to the currently selected entry BEFORE any UID mutation
+  const currentSelectedRef = selectedEntry.value;
   draftEntries.value.sort(compareEntriesByPositionThenOrder);
   if (persistedState.value.sort.reassign_uid) {
     for (let i = 0; i < draftEntries.value.length; i++) {
       draftEntries.value[i].uid = i;
     }
-    // Re-select if needed
-    if (selectedEntryUid.value !== null) {
-      const idx = draftEntries.value.findIndex(e => e === selectedEntry.value);
-      if (idx >= 0) {
-        selectedEntryUid.value = idx;
-        selectedEntryUids.value = [idx];
-        selectedEntryAnchorUid.value = idx;
-      }
+    // Re-select using saved reference (since UIDs have changed)
+    if (currentSelectedRef) {
+      const newUid = currentSelectedRef.uid; // already reassigned above
+      selectedEntryUid.value = newUid;
+      selectedEntryUids.value = [newUid];
+      selectedEntryAnchorUid.value = newUid;
     }
   }
   toastr.success(`已按位置→权重排序 ${draftEntries.value.length} 个条目${persistedState.value.sort.reassign_uid ? '（UID 已重新分配）' : ''}`);
