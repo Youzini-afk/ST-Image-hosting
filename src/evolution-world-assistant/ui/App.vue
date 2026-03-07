@@ -14,6 +14,19 @@
       <button type="button" class="ew-btn" @click="store.validateConfig">校验配置</button>
       <button type="button" class="ew-btn" @click="openImportFilePicker">导入配置</button>
       <button type="button" class="ew-btn" @click="store.exportConfig">导出配置</button>
+      <button
+        type="button"
+        class="ew-moon-toggle"
+        role="switch"
+        :aria-checked="store.settings.theme_moon ? 'true' : 'false'"
+        :title="store.settings.theme_moon ? '关闭月相主题' : '开启月相主题'"
+        @click="store.settings.theme_moon = !store.settings.theme_moon"
+      >
+        <span class="ew-switch__track ew-moon-toggle__track" :data-enabled="store.settings.theme_moon ? '1' : '0'">
+          <span class="ew-switch__thumb" />
+        </span>
+        <span class="ew-moon-toggle__icon">🌙</span>
+      </button>
       <button type="button" class="ew-btn ew-btn--danger" @click="store.closePanel">关闭</button>
       <input
         ref="importFileInputRef"
@@ -42,20 +55,7 @@
                 <span class="ew-switch__text">{{ store.settings.enabled ? '已开启' : '已关闭' }}</span>
               </button>
             </EwFieldRow>
-            <EwFieldRow label="月相主题" :help="{ shortHelp: '开启深度定制的月相星空主题', detailHelp: '将界面切换为幽暗深邃的月夜星空风格。' }">
-              <button
-                type="button"
-                class="ew-switch"
-                role="switch"
-                :aria-checked="store.settings.theme_moon ? 'true' : 'false'"
-                @click="store.settings.theme_moon = !store.settings.theme_moon"
-              >
-                <span class="ew-switch__track" :data-enabled="store.settings.theme_moon ? '1' : '0'">
-                  <span class="ew-switch__thumb" />
-                </span>
-                <span class="ew-switch__text">{{ store.settings.theme_moon ? '开启 🌙' : '未开启' }}</span>
-              </button>
-            </EwFieldRow>
+
             <EwFieldRow label="调度模式" :help="help('dispatch_mode')">
               <select v-model="store.settings.dispatch_mode">
                 <option value="parallel">并行</option>
@@ -688,6 +688,31 @@ onUnmounted(() => {
   }
 }
 
+/* Moon toggle compact button in header */
+.ew-moon-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.ew-moon-toggle__track {
+  width: 32px !important;
+  height: 18px !important;
+}
+.ew-moon-toggle__icon {
+  font-size: 1.1rem;
+  line-height: 1;
+  filter: drop-shadow(0 0 4px rgba(250, 204, 21, 0.4));
+  transition: filter 0.3s ease;
+}
+.ew-moon-toggle:hover .ew-moon-toggle__icon {
+  filter: drop-shadow(0 0 8px rgba(250, 204, 21, 0.7));
+}
+
 </style>
 
 <!-- Moon Phase theme: MUST be unscoped so selectors can cross component boundaries -->
@@ -776,11 +801,69 @@ onUnmounted(() => {
   box-shadow: 0 0 12px rgba(56, 189, 248, 0.2) !important;
 }
 
+/* --- Red / danger element overrides --- */
 .theme-moon-phase .ew-btn--primary {
   background: var(--ew-accent) !important;
+  border-color: var(--ew-accent) !important;
 }
 
 .theme-moon-phase .ew-btn--danger {
-  background: var(--ew-danger) !important;
+  background: rgba(244, 63, 94, 0.15) !important;
+  border: 1px solid rgba(244, 63, 94, 0.4) !important;
+  color: #fb7185 !important;
+  box-shadow: none !important;
+}
+.theme-moon-phase .ew-btn--danger:hover {
+  background: rgba(244, 63, 94, 0.25) !important;
+  border-color: rgba(244, 63, 94, 0.6) !important;
+  box-shadow: 0 0 12px rgba(244, 63, 94, 0.15) !important;
+}
+
+/* Input / select / textarea backgrounds */
+.theme-moon-phase input,
+.theme-moon-phase select,
+.theme-moon-phase textarea {
+  background: rgba(15, 23, 42, 0.5) !important;
+  border-color: rgba(99, 102, 241, 0.2) !important;
+  color: #e0e8f5 !important;
+}
+.theme-moon-phase input:focus,
+.theme-moon-phase select:focus,
+.theme-moon-phase textarea:focus {
+  border-color: rgba(129, 140, 248, 0.5) !important;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15) !important;
+}
+
+/* Summary stats cards */
+.theme-moon-phase .ew-summary-card {
+  background: rgba(15, 23, 42, 0.4) !important;
+  border-color: rgba(99, 102, 241, 0.15) !important;
+}
+.theme-moon-phase .ew-summary-card strong {
+  color: #c4b5fd !important;
+}
+
+/* Section card titles */
+.theme-moon-phase .ew-section-card__title {
+  color: #e0e8f5 !important;
+}
+
+/* Flow/API card borders */
+.theme-moon-phase .ew-flow-card,
+.theme-moon-phase .ew-api-card {
+  border-color: rgba(99, 102, 241, 0.18) !important;
+  background: rgba(15, 23, 42, 0.35) !important;
+}
+.theme-moon-phase .ew-flow-card:hover,
+.theme-moon-phase .ew-api-card:hover {
+  border-color: rgba(99, 102, 241, 0.35) !important;
+}
+
+/* Scrollbar */
+.theme-moon-phase .ew-panel__body::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.3) !important;
+}
+.theme-moon-phase .ew-panel__body::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.5) !important;
 }
 </style>
