@@ -760,19 +760,23 @@ onUnmounted(() => {
   --ew-danger: #f87171;
 
   background:
-    /* 散落星点 — 用多层 radial-gradient 在面板上绘制致密繁星 */
-    radial-gradient(circle at 12% 15%, rgba(251, 191, 36, 0.25) 1px, transparent 1px),
-    radial-gradient(circle at 38% 42%, rgba(203, 213, 225, 0.2) 1px, transparent 1px),
-    radial-gradient(circle at 65% 8%, rgba(251, 191, 36, 0.18) 1px, transparent 1px),
-    radial-gradient(circle at 85% 35%, rgba(203, 213, 225, 0.22) 1px, transparent 1px),
-    radial-gradient(circle at 22% 68%, rgba(251, 191, 36, 0.15) 1px, transparent 1px),
-    radial-gradient(circle at 55% 82%, rgba(203, 213, 225, 0.18) 1px, transparent 1px),
-    radial-gradient(circle at 78% 65%, rgba(251, 191, 36, 0.2) 1px, transparent 1px),
-    radial-gradient(circle at 92% 88%, rgba(203, 213, 225, 0.16) 1px, transparent 1px),
-    radial-gradient(circle at 8% 92%, rgba(251, 191, 36, 0.14) 1px, transparent 1px),
-    radial-gradient(circle at 48% 25%, rgba(203, 213, 225, 0.12) 1px, transparent 1px),
+    /* 密集繁星 — 每层不同 tile 尺寸避免网格感，大量平铺 */
+    radial-gradient(1px 1px at 12% 15%, rgba(251, 191, 36, 0.45) 50%, transparent),
+    radial-gradient(1px 1px at 60% 70%, rgba(203, 213, 225, 0.4) 50%, transparent),
+    radial-gradient(1.2px 1.2px at 35% 40%, rgba(251, 191, 36, 0.35) 50%, transparent),
+    radial-gradient(1px 1px at 80% 25%, rgba(203, 213, 225, 0.45) 50%, transparent),
+    radial-gradient(1px 1px at 20% 80%, rgba(251, 191, 36, 0.3) 50%, transparent),
+    radial-gradient(1.5px 1.5px at 55% 50%, rgba(253, 224, 71, 0.35) 50%, transparent),
+    radial-gradient(1px 1px at 90% 60%, rgba(203, 213, 225, 0.35) 50%, transparent),
+    radial-gradient(1px 1px at 45% 90%, rgba(251, 191, 36, 0.3) 50%, transparent),
+    radial-gradient(1.2px 1.2px at 70% 15%, rgba(203, 213, 225, 0.4) 50%, transparent),
+    radial-gradient(1px 1px at 5% 55%, rgba(251, 191, 36, 0.25) 50%, transparent),
     /* 底层渐变 */
     linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%) !important;
+  background-size:
+    97px 103px, 130px 141px, 167px 179px, 113px 127px, 89px 97px,
+    199px 211px, 151px 163px, 109px 119px, 181px 191px, 139px 149px,
+    100% 100% !important;
   border-color: rgba(148, 163, 184, 0.25) !important;
   box-shadow:
     0 24px 64px rgba(0, 0, 0, 0.7),
