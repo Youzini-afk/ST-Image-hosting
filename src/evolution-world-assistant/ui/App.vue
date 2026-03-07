@@ -750,8 +750,18 @@ onUnmounted(() => {
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ── Phase 0: CSS Variables & Global Transition ── */
-.ew-panel, .ew-panel *, .ew-overlay {
-  /* 当切换主题时，所有组件的色彩属性平滑过渡 */
+/* 只给需要平滑过渡的关键组件加 transition，避免 input/button/toggle 被影响 */
+.ew-panel,
+.ew-overlay,
+.ew-panel__header,
+.ew-panel__tabs,
+.ew-panel__tab,
+.ew-panel__body,
+.ew-section-card,
+.ew-section-card__title,
+.ew-summary-card,
+.ew-flow-card,
+.ew-api-card {
   transition: background 0.8s cubic-bezier(0.4, 0, 0.2, 1),
               border-color 0.8s cubic-bezier(0.4, 0, 0.2, 1),
               box-shadow 0.8s cubic-bezier(0.4, 0, 0.2, 1),
@@ -805,15 +815,9 @@ onUnmounted(() => {
     100% 100% !important;
 }
 
-/* 激活月相主题时，让星盘从左到右滑出 (clip-path展开全屏) */
-.theme-moon-phase.ew-panel::before {
+/* 激活月相主题时，让星空从左到右滑出 (clip-path展开全屏) */
+.theme-moon-phase .ew-panel::before {
   clip-path: inset(0 0 0 0);
-
-  border-color: rgba(148, 163, 184, 0.25) !important;
-  box-shadow:
-    0 24px 64px rgba(0, 0, 0, 0.7),
-    0 4px 24px rgba(251, 191, 36, 0.1),
-    inset 0 1px 0 rgba(148, 163, 184, 0.1) !important;
 }
 
 /* 遮罩层夜空色调 */
