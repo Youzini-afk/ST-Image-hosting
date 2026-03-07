@@ -65,15 +65,17 @@
 
           <div class="ew-grid ew-grid--two">
             <EwFieldRow label="解锁上下文长度">
-              <label class="ew-checkbox">
+              <label class="ew-switch ew-switch--field">
                 <input :checked="flow.generation_options.unlock_context_length" type="checkbox" @change="setGenerationBool('unlock_context_length', $event)" />
-                <span>启用</span>
+                <span class="ew-switch__slider"></span>
+                <span class="ew-switch__label">{{ flow.generation_options.unlock_context_length ? '已启用' : '已关闭' }}</span>
               </label>
             </EwFieldRow>
             <EwFieldRow label="流式传输">
-              <label class="ew-checkbox">
+              <label class="ew-switch ew-switch--field">
                 <input :checked="flow.generation_options.stream" type="checkbox" @change="setGenerationBool('stream', $event)" />
-                <span>{{ flow.generation_options.stream ? '已启用' : '已关闭' }}</span>
+                <span class="ew-switch__slider"></span>
+                <span class="ew-switch__label">{{ flow.generation_options.stream ? '已启用' : '已关闭' }}</span>
               </label>
             </EwFieldRow>
             <EwFieldRow label="上下文长度（词符）">
@@ -777,6 +779,44 @@ function patchRegexText(index: number, key: 'name' | 'find_regex' | 'replace_str
 
 .ew-switch:focus-visible {
   outline: none;
+}
+
+/* ── Field-level slide toggle (slider variant) ── */
+.ew-switch--field {
+  gap: 0.6rem;
+}
+.ew-switch--field input { display: none; }
+.ew-switch__slider {
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.12);
+  position: relative;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.ew-switch__slider::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #888;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s, background 0.2s;
+}
+.ew-switch--field input:checked + .ew-switch__slider {
+  background: var(--ew-accent, #8b5cf6);
+}
+.ew-switch--field input:checked + .ew-switch__slider::after {
+  transform: translateX(16px);
+  background: #fff;
+}
+.ew-switch__label {
+  font-size: 0.82rem;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 80%, transparent);
+  user-select: none;
 }
 
 .ew-checkbox {
