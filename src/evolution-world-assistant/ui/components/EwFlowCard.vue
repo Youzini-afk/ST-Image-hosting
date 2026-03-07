@@ -442,23 +442,19 @@ function patchRegexText(index: number, key: 'name' | 'find_regex' | 'replace_str
 
 <style scoped>
 .ew-flow-card {
-  border-radius: 1.15rem;
-  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 35%, transparent);
-  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 10%, rgba(8, 12, 18, 0.45));
-  box-shadow:
-    0 10px 30px rgba(0, 0, 0, 0.25),
-    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
-  backdrop-filter: blur(14px) saturate(130%);
-  -webkit-backdrop-filter: blur(14px) saturate(130%);
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 20%, transparent);
+  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 5%, rgba(10, 14, 20, 0.4));
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   overflow: visible;
-  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+  transition: box-shadow 0.3s ease, border-color 0.3s ease, transform 0.3s ease;
 }
 
-.ew-flow-card:focus-within {
-  border-color: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 45%, transparent);
-  box-shadow:
-    0 16px 40px rgba(0, 0, 0, 0.35),
-    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+.ew-flow-card:focus-within,
+.ew-flow-card:hover {
+  border-color: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 35%, transparent);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  transform: translateY(-2px);
 }
 
 .ew-flow-card__header {
@@ -468,13 +464,8 @@ function patchRegexText(index: number, key: 'name' | 'find_regex' | 'replace_str
   flex-wrap: wrap;
   gap: 0.75rem;
   padding: 1rem 1.1rem;
-  border-radius: 1.15rem 1.15rem 0 0;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--SmartThemeQuoteColor, #2f4158) 25%, rgba(10, 14, 20, 0.85)),
-    color-mix(in srgb, var(--SmartThemeQuoteColor, #2f4158) 15%, rgba(10, 14, 20, 0.75))
-  );
-  border-bottom: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 15%, transparent);
+  border-radius: 12px 12px 0 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 10%, transparent);
 }
 
 .ew-flow-card__summary {
@@ -578,17 +569,22 @@ function patchRegexText(index: number, key: 'name' | 'find_regex' | 'replace_str
 }
 
 .ew-flow-card__section {
-  border-radius: 1rem;
-  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 30%, transparent);
-  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 5%, rgba(0, 0, 0, 0.15));
-  padding: 0.8rem 0.9rem;
+  padding: 0.5rem 0 1rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 8%, transparent);
+}
+
+.ew-flow-card__section:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
 }
 
 .ew-flow-card__section h4 {
-  margin: 0 0 0.65rem;
-  font-size: 0.9rem;
+  margin: 0 0 0.8rem;
+  font-size: 0.85rem;
   font-weight: 600;
-  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 95%, transparent);
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 65%, transparent);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .ew-flow-card__section-head {

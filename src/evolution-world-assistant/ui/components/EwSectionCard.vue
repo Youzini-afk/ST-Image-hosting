@@ -62,34 +62,18 @@ function toggleOpen() {
 .ew-section-card {
   position: relative;
   z-index: 1;
-  border-radius: 1.15rem;
-  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 30%, transparent);
-  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #334457) 10%, rgba(8, 12, 18, 0.45));
-  box-shadow:
-    0 10px 30px rgba(0, 0, 0, 0.25),
-    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
-  backdrop-filter: blur(14px) saturate(130%);
-  -webkit-backdrop-filter: blur(14px) saturate(130%);
-  overflow: visible;
-  transition: box-shadow 0.3s ease, border-color 0.3s ease;
-}
-
-.ew-section-card:hover,
-.ew-section-card:focus-within {
-  z-index: 12;
-  border-color: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 45%, transparent);
-  box-shadow:
-    0 16px 40px rgba(0, 0, 0, 0.35),
-    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+  margin-bottom: 24px;
 }
 
 .ew-section-card__header {
   display: flex;
-  align-items: flex-start;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1rem 1.1rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 15%, transparent);
+  padding: 0 0.5rem 0.75rem 0.5rem;
+  position: relative;
+}
+
   position: relative;
 }
 
@@ -110,19 +94,20 @@ function toggleOpen() {
 
 .ew-section-card__title {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   font-weight: 700;
   line-height: 1.25;
-  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 98%, transparent);
-  letter-spacing: 0.01em;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 90%, transparent);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .ew-section-card__subtitle {
   margin: 0.35rem 0 0;
   font-size: 0.8rem;
-  font-weight: 500;
+  font-weight: 400;
   line-height: 1.4;
-  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 65%, transparent);
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 50%, transparent);
 }
 
 .ew-section-card__actions {

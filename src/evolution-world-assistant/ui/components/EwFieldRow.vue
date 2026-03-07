@@ -38,10 +38,10 @@ defineProps<{
 
 .ew-field-row__label {
   min-width: 0;
-  color: color-mix(in srgb, var(--SmartThemeBodyColor, #ecf2f9) 90%, transparent);
-  font-size: 0.84rem;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #ecf2f9) 85%, transparent);
+  font-size: 0.82rem;
   line-height: 1.2;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .ew-field-row__control {
@@ -52,17 +52,14 @@ defineProps<{
 .ew-field-row__control :deep(select),
 .ew-field-row__control :deep(textarea) {
   width: 100%;
-  border-radius: 0.72rem;
-  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 48%, transparent);
-  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 12%, rgba(8, 12, 18, 0.55));
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 15%, transparent);
+  background: rgba(0, 0, 0, 0.2);
   color: var(--SmartThemeBodyColor, #eef2f8);
-  padding: 0.5rem 0.62rem;
-  font-size: 0.86rem;
-  line-height: 1.35;
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease,
-    background 0.2s ease;
+  padding: 0.55rem 0.65rem;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  transition: all 0.2s ease;
 }
 
 .ew-field-row__control :deep(textarea) {
@@ -80,9 +77,9 @@ defineProps<{
 .ew-field-row__control :deep(select:focus),
 .ew-field-row__control :deep(textarea:focus) {
   outline: none;
-  border-color: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 78%, transparent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 28%, transparent);
-  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 16%, rgba(8, 12, 18, 0.6));
+  border-color: var(--ew-accent, #5c9dd8);
+  box-shadow: 0 0 0 1px var(--ew-accent, #5c9dd8);
+  background: rgba(0, 0, 0, 0.3);
 }
 
 .ew-field-row__control :deep(input[disabled]),

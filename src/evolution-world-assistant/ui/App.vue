@@ -530,40 +530,29 @@ onUnmounted(() => {
   width: 2.8rem;
   height: 1.6rem;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 58%, transparent);
-  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 18%, rgba(7, 10, 15, 0.4));
-  box-shadow:
-    inset 0 1px 4px rgba(0, 0, 0, 0.35),
-    0 0 0 1px rgba(255, 255, 255, 0.06);
+  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 15%, transparent);
+  background: rgba(0, 0, 0, 0.3);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.25);
   display: inline-flex;
   align-items: center;
   padding: 0.15rem;
-  transition:
-    border-color 0.3s ease,
-    background 0.3s ease,
-    box-shadow 0.3s ease;
+  transition: all 0.3s ease;
 }
 
 .ew-switch__track[data-enabled='1'] {
-  border-color: color-mix(in srgb, var(--ew-success) 65%, transparent);
-  background: color-mix(in srgb, var(--ew-success) 45%, rgba(7, 10, 15, 0.4));
-  box-shadow:
-    inset 0 1px 4px rgba(0, 0, 0, 0.2),
-    0 0 10px color-mix(in srgb, var(--ew-success) 25%, transparent);
+  border-color: color-mix(in srgb, var(--ew-success) 45%, transparent);
+  background: color-mix(in srgb, var(--ew-success) 35%, rgba(7, 10, 15, 0.4));
+  box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.2);
 }
 
 .ew-switch__thumb {
   width: 1.25rem;
   height: 1.25rem;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--SmartThemeBodyColor, #eef3f9) 90%, transparent);
-  box-shadow:
-    0 2px 5px rgba(0, 0, 0, 0.45),
-    0 0 0 1px rgba(0, 0, 0, 0.1);
+  background: color-mix(in srgb, var(--SmartThemeBodyColor, #eef3f9) 95%, transparent);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
   transform: translateX(0);
-  transition:
-    transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
-    background 0.3s ease;
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.3s ease;
 }
 
 .ew-switch__track[data-enabled='1'] .ew-switch__thumb {
@@ -573,14 +562,14 @@ onUnmounted(() => {
 
 .ew-switch__text {
   font-size: 0.82rem;
-  font-weight: 600;
+  font-weight: 500;
   color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 85%, transparent);
   transition: color 0.2s ease;
 }
 
 .ew-switch:hover .ew-switch__track,
 .ew-switch:focus-visible .ew-switch__track {
-  border-color: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 85%, transparent);
+  background: rgba(0, 0, 0, 0.4);
 }
 
 .ew-switch:focus-visible {

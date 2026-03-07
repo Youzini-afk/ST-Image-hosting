@@ -189,24 +189,18 @@ async function loadModels() {
 
 <style scoped>
 .ew-api-card {
-  border-radius: 1rem;
-  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 35%, transparent);
-  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #2f4158) 12%, rgba(10, 14, 20, 0.45));
-  box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.2),
-    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
-  backdrop-filter: blur(12px) saturate(120%);
-  -webkit-backdrop-filter: blur(12px) saturate(120%);
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 20%, transparent);
+  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 5%, rgba(10, 14, 20, 0.4));
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   overflow: visible;
   transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .ew-api-card[data-expanded='1'] {
-  border-color: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 60%, transparent);
-  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #2f4158) 16%, rgba(10, 14, 20, 0.65));
-  box-shadow:
-    0 16px 40px rgba(0, 0, 0, 0.3),
-    0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+  border-color: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 35%, transparent);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  transform: translateY(-2px);
 }
 
 .ew-api-card__head {
