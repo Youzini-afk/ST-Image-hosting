@@ -747,151 +747,190 @@ onUnmounted(() => {
 <style>
 /* --- Moon Phase Theme (unscoped) --- */
 .theme-moon-phase .ew-panel {
-  --SmartThemeQuoteColor: #4a6fa5;
-  --SmartThemeBodyColor: #e0e8f5;
-  --ew-accent: #a78bfa;
-  --ew-accent-hover: #c4b5fd;
-  --ew-accent-glow: rgba(167, 139, 250, 0.4);
-  --ew-success: #38bdf8;
-  --ew-danger: #fb7185;
+  /* 深邃夜空蓝与冷月银白 */
+  --SmartThemeQuoteColor: #1e293b;
+  --SmartThemeBodyColor: #e2e8f0;
+  /* 月光金/琥珀色强调 */
+  --ew-accent: #fbbf24;
+  --ew-accent-hover: #fcd34d;
+  --ew-accent-glow: rgba(251, 191, 36, 0.35);
+  --ew-success: #34d399;
+  --ew-danger: #f87171;
 
-  background:
-    radial-gradient(ellipse at 15% 5%, rgba(99, 102, 241, 0.08), transparent 50%),
-    radial-gradient(ellipse at 85% 95%, rgba(56, 189, 248, 0.06), transparent 50%),
-    color-mix(in srgb, #1e293b 25%, rgba(8, 12, 22, 0.88)) !important;
-  border-color: rgba(99, 102, 241, 0.25) !important;
+  /* 深邃主背景 */
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%) !important;
+  border-color: rgba(148, 163, 184, 0.25) !important;
   box-shadow:
-    0 24px 64px rgba(0, 0, 0, 0.6),
-    0 0 80px rgba(99, 102, 241, 0.06),
-    inset 0 1px 1px rgba(148, 163, 184, 0.1) !important;
+    0 24px 64px rgba(0, 0, 0, 0.7),
+    0 4px 24px rgba(251, 191, 36, 0.1),
+    inset 0 1px 0 rgba(148, 163, 184, 0.1) !important;
 }
 
+/* 遮罩层夜空色调 */
 .theme-moon-phase.ew-overlay {
   background:
-    radial-gradient(circle at 10% 0%, rgba(99, 102, 241, 0.1), transparent 45%),
-    radial-gradient(circle at 90% 100%, rgba(56, 189, 248, 0.08), transparent 40%),
-    rgba(2, 6, 15, 0.72) !important;
+    radial-gradient(circle at 20% 10%, rgba(251, 191, 36, 0.08), transparent 45%),
+    rgba(2, 6, 15, 0.78) !important;
 }
 
+/* 头部背景融入夜色 */
 .theme-moon-phase .ew-panel__header {
-  background: linear-gradient(
-    165deg,
-    color-mix(in srgb, #334155 30%, rgba(8, 12, 22, 0.85)),
-    color-mix(in srgb, #1e293b 20%, rgba(8, 12, 22, 0.8))
-  ) !important;
-  border-bottom-color: rgba(99, 102, 241, 0.2) !important;
+  background: color-mix(in srgb, #0f172a 40%, rgba(15, 23, 42, 0.85)) !important;
+  border-bottom-color: rgba(148, 163, 184, 0.2) !important;
 }
 
+/* 标题银白月光流光质感 */
 .theme-moon-phase .ew-panel__title {
-  background: linear-gradient(135deg, #f1f5f9 0%, #c4b5fd 60%, #818cf8 100%) !important;
+  background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 50%, #94a3b8 100%) !important;
   -webkit-background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
+  position: relative;
 }
 
+/* 标签栏 */
 .theme-moon-phase .ew-panel__tabs {
-  background: color-mix(in srgb, #1e293b 18%, rgba(6, 10, 18, 0.6)) !important;
-  border-bottom-color: rgba(99, 102, 241, 0.15) !important;
+  background: rgba(15, 23, 42, 0.6) !important;
+  border-bottom-color: rgba(148, 163, 184, 0.15) !important;
 }
 
+/* 已激活标签: 银色边框 + 星光底色 */
 .theme-moon-phase .ew-panel__tab[data-active='1'] {
-  border-color: #818cf8 !important;
-  background: rgba(99, 102, 241, 0.2) !important;
-  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3) !important;
+  border-color: rgba(148, 163, 184, 0.5) !important;
+  background: rgba(251, 191, 36, 0.12) !important;
+  color: #f8fafc !important;
+  box-shadow: 0 4px 16px rgba(251, 191, 36, 0.15) !important;
+}
+.theme-moon-phase .ew-panel__tab:hover:not([data-active='1']) {
+  background: rgba(251, 191, 36, 0.05) !important;
+  color: #e2e8f0 !important;
 }
 
-@keyframes ew-halo-breath {
+/* 繁星漂移动画 */
+@keyframes ew-stars-drift {
+  0%, 100% { transform: translateY(0); opacity: 0.2; }
+  50% { transform: translateY(-10px); opacity: 0.5; }
+}
+
+@keyframes ew-star-pulse {
   0%, 100% { opacity: 0.15; transform: scale(1); }
-  50% { opacity: 0.35; transform: scale(1.01); }
+  50% { opacity: 0.4; transform: scale(1.02); }
 }
 
+/* Section Card: 深空底色 + 繁星背景 */
 .theme-moon-phase .ew-section-card {
   position: relative;
   overflow: hidden;
+  border-color: rgba(148, 163, 184, 0.15) !important;
+}
+.theme-moon-phase .ew-section-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background:
+    radial-gradient(1px 1px at 20% 30%, #fbbf24 100%, transparent),
+    radial-gradient(1px 1px at 70% 60%, #cbd5e1 100%, transparent),
+    radial-gradient(1.5px 1.5px at 40% 80%, #fbbf24 100%, transparent);
+  background-size: 150px 150px;
+  animation: ew-stars-drift 8s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
 }
 .theme-moon-phase .ew-section-card::after {
   content: "";
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.07) 0%, transparent 50%);
-  animation: ew-halo-breath 10s ease-in-out infinite;
+  background: radial-gradient(ellipse at center, rgba(251, 191, 36, 0.05) 0%, transparent 60%);
+  animation: ew-star-pulse 6s ease-in-out infinite;
   pointer-events: none;
   z-index: 0;
 }
 
 .theme-moon-phase .ew-switch__track[data-enabled='1'] {
-  border-color: rgba(129, 140, 248, 0.5) !important;
-  background: rgba(99, 102, 241, 0.3) !important;
+  border-color: rgba(251, 191, 36, 0.5) !important;
+  background: rgba(251, 191, 36, 0.25) !important;
 }
 
 .theme-moon-phase .ew-panel__status[data-enabled='1'] {
-  border-color: rgba(56, 189, 248, 0.5) !important;
-  background: rgba(56, 189, 248, 0.15) !important;
-  box-shadow: 0 0 12px rgba(56, 189, 248, 0.2) !important;
+  border-color: rgba(52, 211, 153, 0.4) !important;
+  background: rgba(52, 211, 153, 0.15) !important;
+  box-shadow: 0 0 12px rgba(52, 211, 153, 0.15) !important;
 }
 
 /* --- Red / danger element overrides --- */
 .theme-moon-phase .ew-btn--primary {
   background: var(--ew-accent) !important;
+  color: #451a03 !important; /* Dark text on bright gold */
   border-color: var(--ew-accent) !important;
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.3) !important;
 }
 
 .theme-moon-phase .ew-btn--danger {
-  background: rgba(244, 63, 94, 0.15) !important;
-  border: 1px solid rgba(244, 63, 94, 0.4) !important;
-  color: #fb7185 !important;
+  background: rgba(220, 38, 38, 0.15) !important;
+  border: 1px solid rgba(239, 68, 68, 0.3) !important;
+  color: #fca5a5 !important;
   box-shadow: none !important;
 }
 .theme-moon-phase .ew-btn--danger:hover {
-  background: rgba(244, 63, 94, 0.25) !important;
-  border-color: rgba(244, 63, 94, 0.6) !important;
-  box-shadow: 0 0 12px rgba(244, 63, 94, 0.15) !important;
+  background: rgba(220, 38, 38, 0.25) !important;
+  border-color: rgba(239, 68, 68, 0.5) !important;
+  box-shadow: 0 0 12px rgba(220, 38, 38, 0.15) !important;
+}
+
+/* Normal button hover */
+.theme-moon-phase .ew-btn {
+  border-color: rgba(148, 163, 184, 0.3) !important;
+}
+.theme-moon-phase .ew-btn:hover {
+  background: rgba(251, 191, 36, 0.08) !important;
+  border-color: rgba(251, 191, 36, 0.4) !important;
 }
 
 /* Input / select / textarea backgrounds */
 .theme-moon-phase input,
 .theme-moon-phase select,
 .theme-moon-phase textarea {
-  background: rgba(15, 23, 42, 0.5) !important;
-  border-color: rgba(99, 102, 241, 0.2) !important;
-  color: #e0e8f5 !important;
+  background: rgba(15, 23, 42, 0.6) !important;
+  border-color: rgba(148, 163, 184, 0.2) !important;
+  color: #e2e8f0 !important;
 }
 .theme-moon-phase input:focus,
 .theme-moon-phase select:focus,
 .theme-moon-phase textarea:focus {
-  border-color: rgba(129, 140, 248, 0.5) !important;
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15) !important;
+  border-color: rgba(251, 191, 36, 0.5) !important;
+  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.15) !important;
 }
 
 /* Summary stats cards */
 .theme-moon-phase .ew-summary-card {
   background: rgba(15, 23, 42, 0.4) !important;
-  border-color: rgba(99, 102, 241, 0.15) !important;
+  border-color: rgba(148, 163, 184, 0.15) !important;
 }
 .theme-moon-phase .ew-summary-card strong {
-  color: #c4b5fd !important;
+  color: #fbbf24 !important; /* Gold text */
 }
 
 /* Section card titles */
 .theme-moon-phase .ew-section-card__title {
-  color: #e0e8f5 !important;
+  color: #f8fafc !important;
 }
 
 /* Flow/API card borders */
 .theme-moon-phase .ew-flow-card,
 .theme-moon-phase .ew-api-card {
-  border-color: rgba(99, 102, 241, 0.18) !important;
+  border-color: rgba(148, 163, 184, 0.2) !important;
   background: rgba(15, 23, 42, 0.35) !important;
 }
 .theme-moon-phase .ew-flow-card:hover,
 .theme-moon-phase .ew-api-card:hover {
-  border-color: rgba(99, 102, 241, 0.35) !important;
+  border-color: rgba(251, 191, 36, 0.3) !important;
+  box-shadow: 0 4px 16px rgba(251, 191, 36, 0.08) !important;
 }
 
 /* Scrollbar */
 .theme-moon-phase .ew-panel__body::-webkit-scrollbar-thumb {
-  background: rgba(99, 102, 241, 0.3) !important;
+  background: rgba(148, 163, 184, 0.3) !important;
 }
 .theme-moon-phase .ew-panel__body::-webkit-scrollbar-thumb:hover {
-  background: rgba(99, 102, 241, 0.5) !important;
+  background: rgba(148, 163, 184, 0.5) !important;
 }
 </style>
