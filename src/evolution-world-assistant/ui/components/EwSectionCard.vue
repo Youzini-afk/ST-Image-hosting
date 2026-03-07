@@ -74,9 +74,6 @@ function toggleOpen() {
   position: relative;
 }
 
-  position: relative;
-}
-
 /* Subtle glow at the bottom of the header */
 .ew-section-card__header::after {
   content: '';
