@@ -242,14 +242,17 @@ export function assembleOrderedPrompts(
     // Sort by depth descending so deeper injections are inserted first
     // (this preserves correct positions when inserting multiple items)
     deferredInjections.sort((a, b) => b.depth - a.depth);
+    let insertedCount = 0;
 
     for (const { role, content, depth } of deferredInjections) {
       // Calculate insertion point: end of chat minus depth
+      // Each prior splice shifted the array, so add insertedCount offset
       const insertIdx = Math.max(
         chatHistoryStartIdx,
-        chatHistoryEndIdx - Math.min(depth, chatLen),
+        chatHistoryEndIdx + insertedCount - Math.min(depth, chatLen),
       );
       result.splice(insertIdx, 0, { role, content });
+      insertedCount++;
     }
   } else if (deferredInjections.length > 0) {
     // No chat history marker — append deferred items at the end

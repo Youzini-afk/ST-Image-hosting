@@ -30,6 +30,13 @@ interface HideState {
 // Module-level state
 let hideState: HideState = { lastProcessedLength: 0 };
 
+/**
+ * Tracks message indices that EW itself has hidden.
+ * This prevents unhideAll/runFullHideCheck from corrupting
+ * messages that were originally is_system=true (e.g. character card intro).
+ */
+const ewHiddenIndices = new Set<number>();
+
 // ── Helpers ───────────────────────────────────────────────────────────
 
 function getChat(): any[] | null {
@@ -88,9 +95,12 @@ export function runFullHideCheck(settings: HideSettings): void {
 
     if (shouldBeHidden && !isHidden) {
       msg.is_system = true;
+      ewHiddenIndices.add(i);
       toHide.push(i);
-    } else if (!shouldBeHidden && isHidden) {
+    } else if (!shouldBeHidden && isHidden && ewHiddenIndices.has(i)) {
+      // Only unhide messages that EW itself hid — skip original system messages
       msg.is_system = false;
+      ewHiddenIndices.delete(i);
       toShow.push(i);
     }
   }
@@ -147,6 +157,7 @@ export function runIncrementalHideCheck(settings: HideSettings): void {
     for (let i = prevVisibleStart; i < targetVisibleStart; i++) {
       if (chat[i] && chat[i].is_system !== true) {
         chat[i].is_system = true;
+        ewHiddenIndices.add(i);
         indices.push(i);
       }
     }
@@ -160,29 +171,30 @@ export function runIncrementalHideCheck(settings: HideSettings): void {
   hideState.lastProcessedLength = chatLen;
 }
 
-// ── 3. Unhide all ────────────────────────────────────────────────────
-
 /**
- * Removes hidden status from ALL messages in the current chat.
+ * Removes hidden status only from messages that EW itself has hidden.
+ * Original system messages (is_system=true before EW ran) are left untouched.
  */
 export function unhideAll(): void {
   const chat = getChat();
   if (!chat) return;
 
-  let count = 0;
-  for (let i = 0; i < chat.length; i++) {
-    if (chat[i] && chat[i].is_system === true) {
-      chat[i].is_system = false;
-      count++;
+  const toShow: number[] = [];
+  for (const idx of ewHiddenIndices) {
+    if (chat[idx] && chat[idx].is_system === true) {
+      chat[idx].is_system = false;
+      toShow.push(idx);
     }
   }
+  ewHiddenIndices.clear();
 
-  if (count > 0 && typeof $ !== 'undefined') {
-    $('.mes[is_system="true"]').attr('is_system', 'false');
+  if (toShow.length > 0 && typeof $ !== 'undefined') {
+    const sel = toShow.map(id => `.mes[mesid="${id}"]`).join(',');
+    $(sel).attr('is_system', 'false');
   }
 
   hideState.lastProcessedLength = chat.length;
-  console.log(`[EW Hide] Unhid ${count} messages`);
+  console.log(`[EW Hide] Unhid ${toShow.length} messages (EW-managed only)`);
 }
 
 // ── 4. Floor limiter ─────────────────────────────────────────────────
@@ -228,4 +240,5 @@ export function applyFloorLimit(settings: HideSettings): void {
 
 export function resetHideState(): void {
   hideState = { lastProcessedLength: 0 };
+  ewHiddenIndices.clear();
 }

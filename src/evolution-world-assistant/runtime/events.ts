@@ -129,6 +129,7 @@ async function onGenerationAfterCommands(
       const policy = settings.failure_policy ?? 'stop_generation';
 
       if (policy === 'retry_once') {
+        console.warn('[EW] retry_once: first attempt failed — retrying. Note: worldbook may have been partially modified by the failed attempt.');
         toastr.warning(`工作流首次失败，正在重试… (${result.reason ?? ''})`, 'Evolution World');
         result = await runWorkflow({
           message_id: messageId,
