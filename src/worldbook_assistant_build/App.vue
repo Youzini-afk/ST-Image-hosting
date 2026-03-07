@@ -253,7 +253,7 @@
               <header class="editor-head">
                 <label class="field editor-comment">
                   <span>备注 (COMMENT)</span>
-                  <input v-model="selectedEntry.name" type="text" class="text-input" />
+                  <input v-model="selectedEntry.name" type="text" class="text-input" tabindex="-1" />
                 </label>
                 <div class="editor-badges">
                   <span class="editor-badge" :class="selectedEntry.enabled ? 'on' : 'off'">{{ selectedEntry.enabled ? 'EN' : 'OFF' }}</span>
@@ -9184,7 +9184,12 @@ function selectEntry(uid: number, event?: MouseEvent): void {
     selectedEntryUid.value = uid;
     selectedEntryUids.value = [uid];
     selectedEntryAnchorUid.value = uid;
-    mobileTab.value = 'edit';
+    // Blur active input to prevent keyboard auto-popup on tab switch
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
+    nextTick(() => {
+      mobileTab.value = 'edit';
+    });
     return;
   }
 
