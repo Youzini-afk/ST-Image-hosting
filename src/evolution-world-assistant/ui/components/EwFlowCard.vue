@@ -931,12 +931,32 @@ function patchRegexText(index: number, key: 'name' | 'find_regex' | 'replace_str
 }
 
 @media (max-width: 900px) {
+  .ew-flow-card {
+    transition: box-shadow 0.3s ease, border-color 0.3s ease,
+                margin 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                padding 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                border-radius 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  }
   .ew-flow-card__header {
     flex-direction: column;
   }
   .ew-flow-card__actions {
     width: 100%;
     justify-content: flex-start;
+  }
+  /* 展开时左右撑满 — 跳出父容器 padding */
+  .ew-flow-card[data-expanded='1'] {
+    margin-left: -0.9rem;
+    margin-right: -0.9rem;
+    padding-left: 0.9rem;
+    padding-right: 0.9rem;
+    border-radius: 6px;
+    border-left-color: transparent;
+    border-right-color: transparent;
+  }
+  .ew-flow-card[data-expanded='1']:hover,
+  .ew-flow-card[data-expanded='1']:focus-within {
+    transform: none; /* 展开时不浮起 */
   }
   .ew-grid--two {
     grid-template-columns: 1fr;
