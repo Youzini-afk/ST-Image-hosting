@@ -25,7 +25,7 @@
 
     <div class="ew-content-stack">
       <template v-if="store.activeTab === 'overview'">
-        <EwSectionCard title="高频设置" subtitle="先配置最常用项，快速跑通流程。">
+        <EwSectionCard title="高频设置">
           <div class="ew-grid two">
             <EwFieldRow label="总开关" :help="help('enabled')">
               <button
@@ -155,7 +155,7 @@
         <EwSectionCard
           v-model="store.globalAdvancedOpen"
           title="高级配置"
-          subtitle="默认收起，仅在需要精细调优时展开。"
+          subtitle=""
           collapsible
         >
           <div class="ew-grid two">
