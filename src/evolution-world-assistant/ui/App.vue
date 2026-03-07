@@ -682,6 +682,56 @@ onUnmounted(() => {
   .ew-list-leave-active {
     transition: none;
   }
+  /* Disable all theme transition animations for motion-sensitive users */
+  .ew-panel::before,
+  .ew-panel__title::before,
+  .ew-section-card__title::before,
+  .ew-flow-card__title::before,
+  .ew-api-card__title::before,
+  .theme-moon-phase .ew-panel__tab[data-active='1']::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .ew-panel,
+  .ew-overlay,
+  .ew-panel__header,
+  .ew-panel__tabs,
+  .ew-panel__tab,
+  .ew-panel__body,
+  .ew-section-card,
+  .ew-section-card__title,
+  .ew-summary-card,
+  .ew-flow-card,
+  .ew-api-card {
+    transition: none !important;
+  }
+}
+
+/* ── 移动端主题切换性能优化 ── */
+@media (max-width: 900px) {
+  .ew-panel,
+  .ew-overlay,
+  .ew-panel__header,
+  .ew-panel__tabs,
+  .ew-panel__tab,
+  .ew-panel__body,
+  .ew-section-card,
+  .ew-section-card__title,
+  .ew-summary-card,
+  .ew-flow-card,
+  .ew-api-card {
+    transition: background 0.35s ease-out,
+                color 0.35s ease-out !important;
+  }
+  .ew-panel::before {
+    transition: clip-path 0.35s ease-out !important;
+  }
+  .ew-panel__title::before,
+  .ew-section-card__title::before,
+  .ew-flow-card__title::before,
+  .ew-api-card__title::before {
+    transition: opacity 0.25s ease-out, transform 0.25s ease-out !important;
+  }
 }
 
 /* Moon toggle: CSS crescent → full moon animation */
@@ -748,6 +798,7 @@ onUnmounted(() => {
 
 /* ── Phase 0: CSS Variables & Global Transition ── */
 /* 只给需要平滑过渡的关键组件加 transition，避免 input/button/toggle 被影响 */
+/* 性能优化: 只过渡 background 和 color — box-shadow/border-color 直接切换，减少 paint 开销 */
 .ew-panel,
 .ew-overlay,
 .ew-panel__header,
@@ -759,10 +810,8 @@ onUnmounted(() => {
 .ew-summary-card,
 .ew-flow-card,
 .ew-api-card {
-  transition: background 0.8s cubic-bezier(0.4, 0, 0.2, 1),
-              border-color 0.8s cubic-bezier(0.4, 0, 0.2, 1),
-              box-shadow 0.8s cubic-bezier(0.4, 0, 0.2, 1),
-              color 0.8s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition: background 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+              color 0.6s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
 .theme-moon-phase .ew-panel {
@@ -786,12 +835,13 @@ onUnmounted(() => {
   content: "";
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
-  z-index: -2; /* 确保在最最底层，不遮挡任何内容和 section-card 背景 */
+  z-index: -2;
   pointer-events: none;
   border-radius: inherit;
-  /* 默认星空完全隐藏 (裁切在最左侧边缘宽度为0) */
   clip-path: inset(0 100% 0 0);
-  transition: clip-path 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: clip-path 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: clip-path;
+  contain: strict;
   background:
     /* 密集繁星 — 每层不同 tile 尺寸避免网格感，大量平铺 */
     radial-gradient(1px 1px at 12% 15%, rgba(251, 191, 36, 0.45) 50%, transparent),
@@ -866,10 +916,9 @@ onUnmounted(() => {
   /* 默认：隐藏 */
   opacity: 0;
   transform: translateY(-50%) scale(0) rotate(20deg);
-  filter: drop-shadow(0 0 0 transparent);
   pointer-events: none;
-  /* 退场过渡：缩小+旋转+淡出 */
-  transition: opacity 0.4s ease-out, transform 0.4s ease-out, filter 0.4s ease-out;
+  /* 退场过渡：缩小+旋转+淡出 — 不过渡 filter 以减少 paint 开销 */
+  transition: opacity 0.4s ease-out, transform 0.4s ease-out;
 }
 
 /* ⭐ 星盘图标 — 始终渲染，默认不可见 */
@@ -889,9 +938,8 @@ onUnmounted(() => {
   mask-repeat: no-repeat;
   opacity: 0;
   transform: translateY(-50%) scale(0) rotate(180deg);
-  filter: drop-shadow(0 0 0 transparent);
   pointer-events: none;
-  transition: opacity 0.4s ease-out, transform 0.4s ease-out, filter 0.4s ease-out;
+  transition: opacity 0.4s ease-out, transform 0.4s ease-out;
 }
 
 /* 📄 卷轴图标 — 始终渲染，默认不可见 */
@@ -912,9 +960,8 @@ onUnmounted(() => {
   mask-repeat: no-repeat;
   opacity: 0;
   transform: translateY(-50%) scaleY(0) scaleX(0.8);
-  filter: drop-shadow(0 0 0 transparent);
   pointer-events: none;
-  transition: opacity 0.4s ease-out, transform 0.4s ease-out, filter 0.4s ease-out;
+  transition: opacity 0.4s ease-out, transform 0.4s ease-out;
 }
 
 /* ── 主题激活时：入场动画 ── */
