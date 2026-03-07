@@ -108,6 +108,7 @@
                 <button class="btn" type="button" @click="extractFromChat" style="padding:8px 14px;font-size:13px;">📥 提取</button>
                 <button class="btn" type="button" @click="showApiSettings = true" style="padding:8px 14px;font-size:13px;">⚙️ 设置</button>
                 <button class="btn" type="button" @click="aiConfigPreview = false; aiConfigChanges = []; aiConfigTargetWorldbook = selectedWorldbookName || ''" style="padding:8px 14px;font-size:13px;">🔧 AI配置</button>
+                <button class="btn" type="button" :disabled="!draftEntries.length" @click="sortEntries" :class="{ active: viewSortActive }" style="padding:8px 14px;font-size:13px;">🔢 排序</button>
                 <button class="btn" type="button" :disabled="!selectedEntry" @click="openEntryHistoryModal" style="padding:8px 14px;font-size:13px;">🕰️ 条目时光机</button>
                 <button class="btn" type="button" :disabled="!selectedWorldbookName" @click="openWorldbookHistoryModal" style="padding:8px 14px;font-size:13px;">⏪ 整本时光机</button>
               </div>
@@ -1747,7 +1748,8 @@
                 </label>
               </div>
               <div v-if="!isDesktopFocusMode" class="list-summary">
-                条目 {{ filteredEntries.length }} / {{ draftEntries.length }} | 启用 {{ enabledEntryCount }} | 选中 {{ selectedEntryCount }}
+                <span>条目 {{ filteredEntries.length }} / {{ draftEntries.length }} | 启用 {{ enabledEntryCount }} | 选中 {{ selectedEntryCount }}</span>
+                <button class="btn mini" type="button" :disabled="!draftEntries.length" :class="{ active: viewSortActive }" @click="sortEntries" style="margin-left:auto;font-size:11px;">🔢 排序</button>
               </div>
               <div v-if="selectedEntryCount > 1 && !isMobile" class="list-multi-edit-hint" :class="{ off: !multiEditEnabled }">
                 {{ multiEditHintText }}
@@ -2205,6 +2207,21 @@
               </select>
             </label>
             <div style="font-size:11px;color:var(--wb-text-muted,#64748b);margin-top:4px;">开启后将在工具栏和移动端 Tab 中显示 AI 对话入口</div>
+            <label class="field" style="margin-top:8px;">
+              <span>排序模式</span>
+              <select class="text-input" :value="persistedState.sort.mode" @change="updatePersistedState(s => s.sort.mode = ($event.target as HTMLSelectElement).value as 'mutate' | 'view')">
+                <option value="mutate">直接排序（修改条目顺序）</option>
+                <option value="view">仅显示排序（不修改数据）</option>
+              </select>
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px;">
+              <input
+                type="checkbox"
+                :checked="persistedState.sort.reassign_uid"
+                @change="updatePersistedState(s => s.sort.reassign_uid = ($event.target as HTMLInputElement).checked)"
+              />
+              <span>排序后重新分配 UID（仅直接排序模式）</span>
+            </label>
             <label class="field" style="margin-top:8px;">
               <span>主题</span>
               <select class="text-input" :value="currentTheme" @change="setTheme(($event.target as HTMLSelectElement).value as ThemeKey)">
@@ -3552,6 +3569,7 @@ interface PersistedState {
   tag_editor: TagEditorPersistState;
   layout: LayoutState;
   cross_copy: CrossCopyPersistState;
+  sort: { mode: 'mutate' | 'view'; reassign_uid: boolean };
 }
 
 interface ActivationLog {
@@ -3722,6 +3740,26 @@ const positionSelectOptions: Array<{
   { value: 'at_depth_as_user', type: 'at_depth', role: 'user', label: '@D 👤 [用户]在深度' },
   { value: 'at_depth_as_assistant', type: 'at_depth', role: 'assistant', label: '@D 🤖 [AI]在深度' },
 ];
+
+const POSITION_TYPE_SORT_ORDER: Record<string, number> = {
+  before_character_definition: 0,
+  after_character_definition: 1,
+  before_example_messages: 2,
+  after_example_messages: 3,
+  before_author_note: 4,
+  after_author_note: 5,
+  at_depth: 6,
+};
+
+function compareEntriesByPositionThenOrder(a: WorldbookEntry, b: WorldbookEntry): number {
+  const posA = POSITION_TYPE_SORT_ORDER[a.position.type] ?? 99;
+  const posB = POSITION_TYPE_SORT_ORDER[b.position.type] ?? 99;
+  if (posA !== posB) return posA - posB;
+  if (a.position.type === 'at_depth' && b.position.type === 'at_depth') {
+    if (a.position.depth !== b.position.depth) return a.position.depth - b.position.depth;
+  }
+  return a.position.order - b.position.order;
+}
 
 const worldbookNames = ref<string[]>([]);
 const selectedWorldbookName = ref('');
@@ -4046,9 +4084,11 @@ const selectedPositionSelectValue = computed<PositionSelectValue>({
   },
 });
 
+const viewSortActive = ref(false);
+
 const filteredEntries = computed(() => {
   const keyword = searchText.value.trim().toLowerCase();
-  return draftEntries.value.filter(entry => {
+  const result = draftEntries.value.filter(entry => {
     if (onlyEnabled.value && !entry.enabled) {
       return false;
     }
@@ -4062,9 +4102,39 @@ const filteredEntries = computed(() => {
       keysJoined.includes(keyword)
     );
   });
+  if (viewSortActive.value) {
+    return [...result].sort(compareEntriesByPositionThenOrder);
+  }
+  return result;
 });
 
 const enabledEntryCount = computed(() => draftEntries.value.filter(entry => entry.enabled).length);
+
+function sortEntries(): void {
+  const mode = persistedState.value.sort.mode;
+  if (mode === 'view') {
+    viewSortActive.value = !viewSortActive.value;
+    return;
+  }
+  // mutate mode
+  if (!draftEntries.value.length) return;
+  draftEntries.value.sort(compareEntriesByPositionThenOrder);
+  if (persistedState.value.sort.reassign_uid) {
+    for (let i = 0; i < draftEntries.value.length; i++) {
+      draftEntries.value[i].uid = i;
+    }
+    // Re-select if needed
+    if (selectedEntryUid.value !== null) {
+      const idx = draftEntries.value.findIndex(e => e === selectedEntry.value);
+      if (idx >= 0) {
+        selectedEntryUid.value = idx;
+        selectedEntryUids.value = [idx];
+        selectedEntryAnchorUid.value = idx;
+      }
+    }
+  }
+  toastr.success(`已按位置→权重排序 ${draftEntries.value.length} 个条目${persistedState.value.sort.reassign_uid ? '（UID 已重新分配）' : ''}`);
+}
 
 const totalContentChars = computed(() =>
   draftEntries.value.reduce((sum, entry) => {
@@ -6256,6 +6326,7 @@ function createDefaultPersistedState(): PersistedState {
     },
     layout: createDefaultLayoutState(),
     cross_copy: createDefaultCrossCopyPersistState(),
+    sort: { mode: 'mutate', reassign_uid: true },
   };
 }
 
@@ -6466,6 +6537,13 @@ function normalizePersistedState(input: unknown): PersistedState {
     })(),
     layout: normalizeLayoutState(root.layout),
     cross_copy: normalizeCrossCopyPersistState(root.cross_copy),
+    sort: (() => {
+      const raw = asRecord(root.sort);
+      return {
+        mode: raw?.mode === 'view' ? 'view' as const : 'mutate' as const,
+        reassign_uid: raw?.reassign_uid !== false,
+      };
+    })(),
   };
 }
 
@@ -14099,6 +14177,9 @@ watch(hasUnsavedChanges, (val) => {
   font-size: 12px;
   padding: 0 8px;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .list-multi-edit-hint {
