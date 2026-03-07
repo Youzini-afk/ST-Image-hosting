@@ -190,6 +190,7 @@ defineEmits<{
 
 .ew-panel__tab {
   position: relative;
+  flex-shrink: 0;
   border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 38%, transparent);
   border-radius: 999px;
   background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 14%, transparent);
