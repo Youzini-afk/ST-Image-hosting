@@ -1,6 +1,7 @@
 <template>
   <EwPanelShell
     v-if="store.settings.ui_open"
+    :class="{ 'theme-moon-phase': store.settings.theme_moon }"
     :busy="store.busy"
     :enabled="store.settings.enabled"
     title="Evolution World Assistant"
@@ -39,6 +40,20 @@
                   <span class="ew-switch__thumb" />
                 </span>
                 <span class="ew-switch__text">{{ store.settings.enabled ? '已开启' : '已关闭' }}</span>
+              </button>
+            </EwFieldRow>
+            <EwFieldRow label="月相主题" :help="{ shortHelp: '开启深度定制的月相星空主题', detailHelp: '将界面切换为幽暗深邃的月夜星空风格。' }">
+              <button
+                type="button"
+                class="ew-switch"
+                role="switch"
+                :aria-checked="store.settings.theme_moon ? 'true' : 'false'"
+                @click="store.settings.theme_moon = !store.settings.theme_moon"
+              >
+                <span class="ew-switch__track" :data-enabled="store.settings.theme_moon ? '1' : '0'">
+                  <span class="ew-switch__thumb" />
+                </span>
+                <span class="ew-switch__text">{{ store.settings.theme_moon ? '开启 🌙' : '未开启' }}</span>
               </button>
             </EwFieldRow>
             <EwFieldRow label="调度模式" :help="help('dispatch_mode')">
@@ -672,4 +687,65 @@ onUnmounted(() => {
     transition: none;
   }
 }
+
+/* --- Moon Phase Theme --- */
+.theme-moon-phase {
+  /* 基础主色：深灰蓝月夜 */
+  --ew-bg-primary: #0f172a;
+  --ew-bg-surface: linear-gradient(135deg, #1a1f2e 0%, #2d3748 50%, #1a1f2e 100%);
+  --ew-bg-surface-hover: linear-gradient(135deg, rgba(45, 55, 72, 0.5) 0%, rgba(26, 31, 46, 0.6) 100%);
+  --ew-bg-inset: rgba(15, 23, 42, 0.4);
+
+  /* 边框：月光蓝 / 紫灰 */
+  --ew-border: rgba(123, 164, 235, 0.25);
+  --ew-border-focus: rgba(139, 92, 246, 0.5);
+
+  /* 阴影：柔和月光发光感 */
+  --ew-shadow-sm: 0 4px 24px rgba(123, 164, 235, 0.1), inset 0 1px 0 rgba(148, 163, 184, 0.05);
+  --ew-shadow-md: 0 8px 40px rgba(139, 92, 246, 0.15), inset 0 1px 0 rgba(148, 163, 184, 0.1);
+
+  /* 文字颜色：冷月银白 */
+  --ew-text-primary: #f8fafc;
+  --ew-text-secondary: #c4b5fd;
+  --ew-text-muted: #94a3b8;
+
+  /* 品牌色/强调色：浅紫月光 */
+  --ew-accent: #a78bfa;
+  --ew-accent-hover: #c4b5fd;
+  --ew-accent-bg: rgba(139, 92, 246, 0.15);
+}
+
+/* 月晕呼吸特效 */
+@keyframes ew-halo-breath {
+  0%, 100% { opacity: 0.2; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.02); }
+}
+
+:deep(.theme-moon-phase) .ew-flow-card {
+  position: relative;
+  overflow: hidden;
+}
+:deep(.theme-moon-phase) .ew-flow-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(circle at 10% 20%, rgba(123, 164, 235, 0.12) 0%, rgba(96, 165, 250, 0.05) 25%, transparent 45%);
+  animation: ew-halo-breath 8s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+:deep(.theme-moon-phase) .ew-api-card {
+  position: relative;
+  overflow: hidden;
+}
+:deep(.theme-moon-phase) .ew-api-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(circle at 90% 80%, rgba(139, 92, 246, 0.1) 0%, rgba(167, 139, 250, 0.05) 20%, transparent 40%);
+  animation: ew-halo-breath 6s ease-in-out infinite reverse;
+  pointer-events: none;
+  z-index: 0;
+}
+
 </style>

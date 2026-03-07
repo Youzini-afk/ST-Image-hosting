@@ -154,6 +154,7 @@ export const EwSettingsSchema = z.object({
   gate_ttl_ms: z.coerce.number().int().positive().default(12000),
   floor_binding_enabled: z.boolean().default(true),
   auto_cleanup_orphans: z.boolean().default(true),
+  theme_moon: z.boolean().default(false),
   ui_open: z.boolean().default(false),
   api_presets: z.array(EwApiPresetSchema).default([]),
   flows: z.array(EwFlowConfigSchema).default([]),
