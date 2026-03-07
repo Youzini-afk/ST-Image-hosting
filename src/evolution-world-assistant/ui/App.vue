@@ -833,24 +833,32 @@ onUnmounted(() => {
   border-bottom-color: rgba(148, 163, 184, 0.2) !important;
 }
 
-/* ── Phase 2: SVG 新月图标注入标题 ── */
-.theme-moon-phase .ew-panel__title {
-  background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 50%, #94a3b8 100%) !important;
-  -webkit-background-clip: text !important;
-  background-clip: text !important;
-  -webkit-text-fill-color: transparent !important;
+/* ── Phase 2: SVG 图标 — 始终存在但默认隐藏，主题激活时入场/关闭时退场 ── */
+
+/* 标题区域始终加 position:relative 和 padding 过渡 */
+.ew-panel__title {
   position: relative;
-  padding-left: 28px !important;
+  transition: padding-left 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.theme-moon-phase .ew-panel__title::before {
+.ew-section-card__title {
+  position: relative;
+  transition: padding-left 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              color 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.ew-flow-card__title,
+.ew-api-card__title {
+  position: relative;
+  transition: padding-left 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 🌙 新月图标 — 始终渲染，默认不可见 */
+.ew-panel__title::before {
   content: "";
   position: absolute;
   left: 0;
   top: 50%;
-  transform: translateY(-50%);
   width: 20px;
   height: 20px;
-  /* 精绘 SVG 新月 — 纯矢量弯月含内弧 */
   background-color: #fbbf24;
   -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z'/%3E%3C/svg%3E");
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z'/%3E%3C/svg%3E");
@@ -858,26 +866,23 @@ onUnmounted(() => {
   mask-size: contain;
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
-  filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.8));
-  animation: ew-moon-rise 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s both,
-             ew-icon-glow 4s ease-in-out 0.9s infinite;
+  /* 默认：隐藏 */
+  opacity: 0;
+  transform: translateY(-50%) scale(0) rotate(20deg);
+  filter: drop-shadow(0 0 0 transparent);
+  pointer-events: none;
+  /* 退场过渡：缩小+旋转+淡出 */
+  transition: opacity 0.4s ease-out, transform 0.4s ease-out, filter 0.4s ease-out;
 }
 
-/* ── Phase 2: SVG 星盘图标注入 Section Card 标题 ── */
-.theme-moon-phase .ew-section-card__title {
-  color: #f8fafc !important;
-  position: relative;
-  padding-left: 24px !important;
-}
-.theme-moon-phase .ew-section-card__title::before {
+/* ⭐ 星盘图标 — 始终渲染，默认不可见 */
+.ew-section-card__title::before {
   content: "";
   position: absolute;
   left: 0;
   top: 50%;
-  transform: translateY(-50%);
   width: 16px;
   height: 16px;
-  /* 精绘 SVG 星盘/罗盘 — 填充型五角星 + 圆环 */
   background-color: #94a3b8;
   -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z'/%3E%3Cpath d='M12 5.5l1.76 3.56 3.93.57-2.84 2.77.67 3.91L12 14.47l-3.52 1.84.67-3.91-2.84-2.77 3.93-.57z'/%3E%3C/svg%3E");
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z'/%3E%3Cpath d='M12 5.5l1.76 3.56 3.93.57-2.84 2.77.67 3.91L12 14.47l-3.52 1.84.67-3.91-2.84-2.77 3.93-.57z'/%3E%3C/svg%3E");
@@ -885,27 +890,22 @@ onUnmounted(() => {
   mask-size: contain;
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
-  filter: drop-shadow(0 0 4px rgba(148, 163, 184, 0.6));
-  animation: ew-compass-spin-in 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 0.5s both,
-             ew-icon-glow-silver 6s ease-in-out 1.2s infinite;
+  opacity: 0;
+  transform: translateY(-50%) scale(0) rotate(180deg);
+  filter: drop-shadow(0 0 0 transparent);
+  pointer-events: none;
+  transition: opacity 0.4s ease-out, transform 0.4s ease-out, filter 0.4s ease-out;
 }
 
-/* ── Phase 2: SVG 卷轴图标注入 Flow/API Card 标题 ── */
-.theme-moon-phase .ew-flow-card__title,
-.theme-moon-phase .ew-api-card__title {
-  position: relative;
-  padding-left: 22px !important;
-}
-.theme-moon-phase .ew-flow-card__title::before,
-.theme-moon-phase .ew-api-card__title::before {
+/* 📄 卷轴图标 — 始终渲染，默认不可见 */
+.ew-flow-card__title::before,
+.ew-api-card__title::before {
   content: "";
   position: absolute;
   left: 0;
   top: 50%;
-  transform: translateY(-50%);
   width: 14px;
   height: 14px;
-  /* 精绘 SVG 卷轴/文件 — 填充型科幻风 */
   background-color: #fbbf24;
   -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z'/%3E%3C/svg%3E");
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z'/%3E%3C/svg%3E");
@@ -913,8 +913,41 @@ onUnmounted(() => {
   mask-size: contain;
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
-  filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.6));
-  opacity: 0.8;
+  opacity: 0;
+  transform: translateY(-50%) scaleY(0) scaleX(0.8);
+  filter: drop-shadow(0 0 0 transparent);
+  pointer-events: none;
+  transition: opacity 0.4s ease-out, transform 0.4s ease-out, filter 0.4s ease-out;
+}
+
+/* ── 主题激活时：入场动画 ── */
+.theme-moon-phase .ew-panel__title {
+  background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 50%, #94a3b8 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  padding-left: 28px !important;
+}
+.theme-moon-phase .ew-panel__title::before {
+  animation: ew-moon-rise 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s both,
+             ew-icon-glow 4s ease-in-out 0.9s infinite;
+}
+
+.theme-moon-phase .ew-section-card__title {
+  color: #f8fafc !important;
+  padding-left: 24px !important;
+}
+.theme-moon-phase .ew-section-card__title::before {
+  animation: ew-compass-spin-in 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 0.5s both,
+             ew-icon-glow-silver 6s ease-in-out 1.2s infinite;
+}
+
+.theme-moon-phase .ew-flow-card__title,
+.theme-moon-phase .ew-api-card__title {
+  padding-left: 22px !important;
+}
+.theme-moon-phase .ew-flow-card__title::before,
+.theme-moon-phase .ew-api-card__title::before {
   animation: ew-scroll-unroll 0.5s cubic-bezier(0.5, 2, 0.5, 1) 0.6s both;
 }
 
