@@ -36,273 +36,270 @@
       />
     </template>
 
-    <div class="ew-content-stack">
-      <template v-if="store.activeTab === 'overview'">
-        <EwSectionCard title="高频设置">
-          <div class="ew-grid two">
-            <EwFieldRow label="总开关" :help="help('enabled')">
-              <button
-                type="button"
-                class="ew-switch"
-                role="switch"
-                :aria-checked="store.settings.enabled ? 'true' : 'false'"
-                @click="store.settings.enabled = !store.settings.enabled"
-              >
-                <span class="ew-switch__track" :data-enabled="store.settings.enabled ? '1' : '0'">
-                  <span class="ew-switch__thumb" />
-                </span>
-                <span class="ew-switch__text">{{ store.settings.enabled ? '已开启' : '已关闭' }}</span>
-              </button>
-            </EwFieldRow>
+    <transition name="ew-tab-fade" mode="out-in">
+      <div :key="store.activeTab" class="ew-content-stack">
+        <template v-if="store.activeTab === 'overview'">
+          <EwSectionCard title="高频设置">
+            <div class="ew-grid two">
+              <EwFieldRow label="总开关" :help="help('enabled')">
+                <button
+                  type="button"
+                  class="ew-switch"
+                  role="switch"
+                  :aria-checked="store.settings.enabled ? 'true' : 'false'"
+                  @click="store.settings.enabled = !store.settings.enabled"
+                >
+                  <span class="ew-switch__track" :data-enabled="store.settings.enabled ? '1' : '0'">
+                    <span class="ew-switch__thumb" />
+                  </span>
+                  <span class="ew-switch__text">{{ store.settings.enabled ? '已开启' : '已关闭' }}</span>
+                </button>
+              </EwFieldRow>
 
-            <EwFieldRow label="调度模式" :help="help('dispatch_mode')">
-              <select v-model="store.settings.dispatch_mode">
-                <option value="parallel">并行</option>
-                <option value="serial">串行</option>
-              </select>
-            </EwFieldRow>
-            <EwFieldRow label="总超时(ms)" :help="help('total_timeout_ms')">
-              <input v-model.number="store.settings.total_timeout_ms" type="number" min="1000" step="500" />
-            </EwFieldRow>
-            <EwFieldRow label="门控时效(ms)" :help="help('gate_ttl_ms')">
-              <input v-model.number="store.settings.gate_ttl_ms" type="number" min="1000" step="500" />
-            </EwFieldRow>
-          </div>
-        </EwSectionCard>
-
-        <EwSectionCard title="运行摘要" subtitle="当前配置规模和关键参数一览。">
-          <div class="ew-summary-grid">
-            <article class="ew-summary-card">
-              <h4>工作流数量</h4>
-              <strong>{{ store.settings.flows.length }}</strong>
-              <small>总工作流</small>
-            </article>
-            <article class="ew-summary-card">
-              <h4>启用工作流</h4>
-              <strong>{{ enabledFlowCount }}</strong>
-              <small>有效工作流</small>
-            </article>
-            <article class="ew-summary-card">
-              <h4>调度模式</h4>
-              <strong>{{ store.settings.dispatch_mode === 'parallel' ? '并行' : '串行' }}</strong>
-              <small>当前策略</small>
-            </article>
-            <article class="ew-summary-card">
-              <h4>总超时</h4>
-              <strong>{{ store.settings.total_timeout_ms }}ms</strong>
-              <small>全链路上限</small>
-            </article>
-          </div>
-        </EwSectionCard>
-      </template>
-
-      <template v-else-if="store.activeTab === 'api'">
-        <EwSectionCard title="API配置" subtitle="统一管理外部接口预设，供工作流复用。">
-          <template #actions>
-            <button type="button" class="ew-btn" @click="store.addApiPreset">新增API配置</button>
-          </template>
-
-          <transition-group name="ew-list" tag="div" class="ew-api-list">
-            <EwApiPresetCard
-              v-for="(preset, index) in store.settings.api_presets"
-              :key="preset.id"
-              :index="index"
-              :model-value="preset"
-              :expanded="store.expandedApiPresetId === preset.id"
-              :bind-count="getPresetBindCount(preset.id)"
-              @toggle-expand="store.toggleApiPresetExpanded(preset.id)"
-              @remove="store.removeApiPreset(preset.id)"
-              @update:model-value="value => updateApiPreset(index, value)"
-            />
-          </transition-group>
-        </EwSectionCard>
-      </template>
-
-      <template v-else-if="store.activeTab === 'global'">
-        <EwSectionCard title="基础配置" subtitle="世界书命名与楼层绑定控制。">
-          <div class="ew-grid two">
-            <EwFieldRow label="动态条目前缀" :help="help('dynamic_entry_prefix')">
-              <input
-                v-model="store.settings.dynamic_entry_prefix"
-                type="text"
-                :placeholder="help('dynamic_entry_prefix')?.placeholder"
-              />
-            </EwFieldRow>
-            <EwFieldRow label="控制器条目名" :help="help('controller_entry_name')">
-              <input
-                v-model="store.settings.controller_entry_name"
-                type="text"
-                :placeholder="help('controller_entry_name')?.placeholder"
-              />
-            </EwFieldRow>
-            <EwFieldRow label="楼层绑定" :help="help('floor_binding_enabled')">
-              <button
-                type="button"
-                class="ew-switch"
-                role="switch"
-                :aria-checked="store.settings.floor_binding_enabled ? 'true' : 'false'"
-                @click="store.settings.floor_binding_enabled = !store.settings.floor_binding_enabled"
-              >
-                <span class="ew-switch__track" :data-enabled="store.settings.floor_binding_enabled ? '1' : '0'">
-                  <span class="ew-switch__thumb" />
-                </span>
-                <span class="ew-switch__text">{{ store.settings.floor_binding_enabled ? '已开启' : '已关闭' }}</span>
-              </button>
-            </EwFieldRow>
-            <EwFieldRow label="自动清理孤儿条目" :help="help('auto_cleanup_orphans')">
-              <button
-                type="button"
-                class="ew-switch"
-                role="switch"
-                :aria-checked="store.settings.auto_cleanup_orphans ? 'true' : 'false'"
-                @click="store.settings.auto_cleanup_orphans = !store.settings.auto_cleanup_orphans"
-              >
-                <span class="ew-switch__track" :data-enabled="store.settings.auto_cleanup_orphans ? '1' : '0'">
-                  <span class="ew-switch__thumb" />
-                </span>
-                <span class="ew-switch__text">{{ store.settings.auto_cleanup_orphans ? '已开启' : '已关闭' }}</span>
-              </button>
-            </EwFieldRow>
-          </div>
-        </EwSectionCard>
-
-        <EwSectionCard
-          v-model="store.globalAdvancedOpen"
-          title="高级配置"
-          subtitle=""
-          collapsible
-        >
-          <div class="ew-grid two">
-            <EwFieldRow label="失败策略" :help="help('failure_policy')">
-              <select v-model="store.settings.failure_policy">
-                <option value="stop_generation">失败即中止发送</option>
-                <option value="continue_generation">静默继续生成</option>
-                <option value="retry_once">失败重试一次</option>
-                <option value="notify_only">仅通知（不中止）</option>
-              </select>
-            </EwFieldRow>
-          </div>
-        </EwSectionCard>
-
-        <EwSectionCard title="隐藏设置" subtitle="批量隐藏旧楼层（节省 tokens）或限制界面渲染数量（提升流畅度）。">
-          <div class="ew-grid two">
-            <EwFieldRow label="隐藏楼层">
-              <button
-                type="button"
-                class="ew-switch"
-                role="switch"
-                :aria-checked="store.settings.hide_settings.enabled ? 'true' : 'false'"
-                @click="store.settings.hide_settings.enabled = !store.settings.hide_settings.enabled"
-              >
-                <span class="ew-switch__track" :data-enabled="store.settings.hide_settings.enabled ? '1' : '0'">
-                  <span class="ew-switch__thumb" />
-                </span>
-                <span class="ew-switch__text">{{ store.settings.hide_settings.enabled ? '已开启' : '已关闭' }}</span>
-              </button>
-            </EwFieldRow>
-            <EwFieldRow label="保留最新 N 条">
-              <input
-                v-model.number="store.settings.hide_settings.hide_last_n"
-                type="number"
-                min="0"
-                step="1"
-                placeholder="0 表示不隐藏"
-                :disabled="!store.settings.hide_settings.enabled"
-              />
-            </EwFieldRow>
-            <EwFieldRow label="限制楼层渲染">
-              <button
-                type="button"
-                class="ew-switch"
-                role="switch"
-                :aria-checked="store.settings.hide_settings.limiter_enabled ? 'true' : 'false'"
-                @click="store.settings.hide_settings.limiter_enabled = !store.settings.hide_settings.limiter_enabled"
-              >
-                <span class="ew-switch__track" :data-enabled="store.settings.hide_settings.limiter_enabled ? '1' : '0'">
-                  <span class="ew-switch__thumb" />
-                </span>
-                <span class="ew-switch__text">{{ store.settings.hide_settings.limiter_enabled ? '已开启' : '已关闭' }}</span>
-              </button>
-            </EwFieldRow>
-            <EwFieldRow label="仅渲染最新 M 条">
-              <input
-                v-model.number="store.settings.hide_settings.limiter_count"
-                type="number"
-                min="1"
-                step="1"
-                placeholder="例如 20"
-                :disabled="!store.settings.hide_settings.limiter_enabled"
-              />
-            </EwFieldRow>
-          </div>
-          <div class="ew-actions-wrap" style="margin-top: 0.75rem;">
-            <button type="button" class="ew-btn" @click="onApplyHide">
-              立即应用隐藏
-            </button>
-            <button type="button" class="ew-btn ew-btn--danger" @click="onUnhideAll">
-              取消全部隐藏
-            </button>
-          </div>
-        </EwSectionCard>
-      </template>
-
-      <template v-else-if="store.activeTab === 'flows'">
-        <EwSectionCard title="工作流编排" subtitle="每条工作流独立配置，按优先级合并结果。">
-          <template #actions>
-            <button type="button" class="ew-btn" @click="store.addFlow">新增工作流</button>
-          </template>
-
-          <transition-group name="ew-list" tag="div" class="ew-flow-list">
-            <EwFlowCard
-              v-for="(flow, index) in store.settings.flows"
-              :key="flow.id"
-              :index="index"
-              :model-value="flow"
-              :api-presets="store.settings.api_presets"
-              :expanded="store.expandedFlowId === flow.id"
-              @toggle-expand="store.toggleFlowExpanded(flow.id)"
-              @remove="store.removeFlow(flow.id)"
-              @update:model-value="value => updateFlow(index, value)"
-            />
-          </transition-group>
-        </EwSectionCard>
-      </template>
-
-      <template v-else>
-        <EwSectionCard title="调试操作" subtitle="手动执行、语法校验与快速回滚。">
-          <div class="ew-actions-wrap">
-            <button type="button" class="ew-btn" @click="store.runManual(manualMessage)">手动运行</button>
-            <button type="button" class="ew-btn" @click="store.validateControllerSyntax">控制器语法校验</button>
-            <button type="button" class="ew-btn ew-btn--danger" @click="store.rollbackController">回滚控制器</button>
-          </div>
-
-          <EwFieldRow label="手动运行输入" :help="help('manual_message')">
-            <textarea v-model="manualMessage" rows="3" placeholder="留空将使用最新楼层文本" />
-          </EwFieldRow>
-        </EwSectionCard>
-
-        <EwSectionCard title="运行记录" subtitle="最近一次执行与请求响应摘要。">
-          <div class="ew-debug-grid">
-            <div class="ew-pre-box">
-              <strong>最近运行</strong>
-              <pre>{{ formattedLastRun }}</pre>
+              <EwFieldRow label="调度模式" :help="help('dispatch_mode')">
+                <select v-model="store.settings.dispatch_mode">
+                  <option value="parallel">并行</option>
+                  <option value="serial">串行</option>
+                </select>
+              </EwFieldRow>
+              <EwFieldRow label="总超时(ms)" :help="help('total_timeout_ms')">
+                <input v-model.number="store.settings.total_timeout_ms" type="number" min="1000" step="500" />
+              </EwFieldRow>
+              <EwFieldRow label="门控时效(ms)" :help="help('gate_ttl_ms')">
+                <input v-model.number="store.settings.gate_ttl_ms" type="number" min="1000" step="500" />
+              </EwFieldRow>
             </div>
-            <div class="ew-pre-box">
-              <strong>最近请求/响应摘要</strong>
-              <pre>{{ formattedLastIo }}</pre>
+          </EwSectionCard>
+
+          <EwSectionCard title="运行摘要" subtitle="当前配置规模和关键参数一览。">
+            <div class="ew-summary-grid">
+              <article class="ew-summary-card">
+                <h4>工作流数量</h4>
+                <strong>{{ store.settings.flows.length }}</strong>
+                <small>总工作流</small>
+              </article>
+              <article class="ew-summary-card">
+                <h4>已启用</h4>
+                <strong>{{ enabledFlowCount }}</strong>
+                <small>活跃工作流</small>
+              </article>
+              <article class="ew-summary-card">
+                <h4>API预设</h4>
+                <strong>{{ store.settings.api_presets.length }}</strong>
+                <small>接口配置</small>
+              </article>
             </div>
-          </div>
+          </EwSectionCard>
+        </template>
 
-          <EwFieldRow label="导入配置(JSON)" :help="help('import_text')">
-            <textarea v-model="store.importText" rows="6" placeholder="paste config json" />
-          </EwFieldRow>
+        <template v-else-if="store.activeTab === 'api'">
+          <EwSectionCard title="API配置" subtitle="统一管理外部接口预设，供工作流复用。">
+            <template #actions>
+              <button type="button" class="ew-btn" @click="store.addApiPreset">新增API配置</button>
+            </template>
 
-          <div class="ew-actions-wrap">
-            <button type="button" class="ew-btn" @click="store.importConfig">导入配置</button>
-          </div>
-        </EwSectionCard>
-      </template>
-    </div>
+            <transition-group name="ew-list" tag="div" class="ew-api-list">
+              <EwApiPresetCard
+                v-for="(preset, index) in store.settings.api_presets"
+                :key="preset.id"
+                :index="index"
+                :model-value="preset"
+                :expanded="store.expandedApiPresetId === preset.id"
+                :bind-count="getPresetBindCount(preset.id)"
+                @toggle-expand="store.toggleApiPresetExpanded(preset.id)"
+                @remove="store.removeApiPreset(preset.id)"
+                @update:model-value="value => updateApiPreset(index, value)"
+              />
+            </transition-group>
+          </EwSectionCard>
+        </template>
+
+        <template v-else-if="store.activeTab === 'global'">
+          <EwSectionCard title="基础配置" subtitle="世界书命名与楼层绑定控制。">
+            <div class="ew-grid two">
+              <EwFieldRow label="动态条目前缀" :help="help('dynamic_entry_prefix')">
+                <input
+                  v-model="store.settings.dynamic_entry_prefix"
+                  type="text"
+                  :placeholder="help('dynamic_entry_prefix')?.placeholder"
+                />
+              </EwFieldRow>
+              <EwFieldRow label="控制器条目名" :help="help('controller_entry_name')">
+                <input
+                  v-model="store.settings.controller_entry_name"
+                  type="text"
+                  :placeholder="help('controller_entry_name')?.placeholder"
+                />
+              </EwFieldRow>
+              <EwFieldRow label="楼层绑定" :help="help('floor_binding_enabled')">
+                <button
+                  type="button"
+                  class="ew-switch"
+                  role="switch"
+                  :aria-checked="store.settings.floor_binding_enabled ? 'true' : 'false'"
+                  @click="store.settings.floor_binding_enabled = !store.settings.floor_binding_enabled"
+                >
+                  <span class="ew-switch__track" :data-enabled="store.settings.floor_binding_enabled ? '1' : '0'">
+                    <span class="ew-switch__thumb" />
+                  </span>
+                  <span class="ew-switch__text">{{ store.settings.floor_binding_enabled ? '已开启' : '已关闭' }}</span>
+                </button>
+              </EwFieldRow>
+              <EwFieldRow label="自动清理孤儿条目" :help="help('auto_cleanup_orphans')">
+                <button
+                  type="button"
+                  class="ew-switch"
+                  role="switch"
+                  :aria-checked="store.settings.auto_cleanup_orphans ? 'true' : 'false'"
+                  @click="store.settings.auto_cleanup_orphans = !store.settings.auto_cleanup_orphans"
+                >
+                  <span class="ew-switch__track" :data-enabled="store.settings.auto_cleanup_orphans ? '1' : '0'">
+                    <span class="ew-switch__thumb" />
+                  </span>
+                  <span class="ew-switch__text">{{ store.settings.auto_cleanup_orphans ? '已开启' : '已关闭' }}</span>
+                </button>
+              </EwFieldRow>
+            </div>
+          </EwSectionCard>
+
+          <EwSectionCard
+            v-model="store.globalAdvancedOpen"
+            title="高级配置"
+            subtitle=""
+            collapsible
+          >
+            <div class="ew-grid two">
+              <EwFieldRow label="失败策略" :help="help('failure_policy')">
+                <select v-model="store.settings.failure_policy">
+                  <option value="stop_generation">失败即中止发送</option>
+                  <option value="continue_generation">静默继续生成</option>
+                  <option value="retry_once">失败重试一次</option>
+                  <option value="notify_only">仅通知（不中止）</option>
+                </select>
+              </EwFieldRow>
+            </div>
+          </EwSectionCard>
+
+          <EwSectionCard title="隐藏设置" subtitle="批量隐藏旧楼层（节省 tokens）或限制界面渲染数量（提升流畅度）。">
+            <div class="ew-grid two">
+              <EwFieldRow label="隐藏楼层">
+                <button
+                  type="button"
+                  class="ew-switch"
+                  role="switch"
+                  :aria-checked="store.settings.hide_settings.enabled ? 'true' : 'false'"
+                  @click="store.settings.hide_settings.enabled = !store.settings.hide_settings.enabled"
+                >
+                  <span class="ew-switch__track" :data-enabled="store.settings.hide_settings.enabled ? '1' : '0'">
+                    <span class="ew-switch__thumb" />
+                  </span>
+                  <span class="ew-switch__text">{{ store.settings.hide_settings.enabled ? '已开启' : '已关闭' }}</span>
+                </button>
+              </EwFieldRow>
+              <EwFieldRow label="保留最新 N 条">
+                <input
+                  v-model.number="store.settings.hide_settings.hide_last_n"
+                  type="number"
+                  min="0"
+                  step="1"
+                  placeholder="0 表示不隐藏"
+                  :disabled="!store.settings.hide_settings.enabled"
+                />
+              </EwFieldRow>
+              <EwFieldRow label="限制楼层渲染">
+                <button
+                  type="button"
+                  class="ew-switch"
+                  role="switch"
+                  :aria-checked="store.settings.hide_settings.limiter_enabled ? 'true' : 'false'"
+                  @click="store.settings.hide_settings.limiter_enabled = !store.settings.hide_settings.limiter_enabled"
+                >
+                  <span class="ew-switch__track" :data-enabled="store.settings.hide_settings.limiter_enabled ? '1' : '0'">
+                    <span class="ew-switch__thumb" />
+                  </span>
+                  <span class="ew-switch__text">{{ store.settings.hide_settings.limiter_enabled ? '已开启' : '已关闭' }}</span>
+                </button>
+              </EwFieldRow>
+              <EwFieldRow label="仅渲染最新 M 条">
+                <input
+                  v-model.number="store.settings.hide_settings.limiter_count"
+                  type="number"
+                  min="1"
+                  step="1"
+                  placeholder="例如 20"
+                  :disabled="!store.settings.hide_settings.limiter_enabled"
+                />
+              </EwFieldRow>
+            </div>
+            <div class="ew-actions-wrap" style="margin-top: 0.75rem;">
+              <button type="button" class="ew-btn" @click="onApplyHide">
+                立即应用隐藏
+              </button>
+              <button type="button" class="ew-btn ew-btn--danger" @click="onUnhideAll">
+                取消全部隐藏
+              </button>
+            </div>
+          </EwSectionCard>
+        </template>
+
+        <template v-else-if="store.activeTab === 'flows'">
+          <EwSectionCard title="工作流编排" subtitle="每条工作流独立配置，按优先级合并结果。">
+            <template #actions>
+              <button type="button" class="ew-btn" @click="store.addFlow">新增工作流</button>
+            </template>
+
+            <transition-group name="ew-list" tag="div" class="ew-flow-list">
+              <EwFlowCard
+                v-for="(flow, index) in store.settings.flows"
+                :key="flow.id"
+                :index="index"
+                :model-value="flow"
+                :api-presets="store.settings.api_presets"
+                :expanded="store.expandedFlowId === flow.id"
+                @toggle-expand="store.toggleFlowExpanded(flow.id)"
+                @remove="store.removeFlow(flow.id)"
+                @update:model-value="value => updateFlow(index, value)"
+              />
+            </transition-group>
+          </EwSectionCard>
+        </template>
+
+        <template v-else>
+          <EwSectionCard title="调试操作" subtitle="手动执行、语法校验与快速回滚。">
+            <div class="ew-actions-wrap">
+              <button type="button" class="ew-btn" @click="store.runManual(manualMessage)">手动运行</button>
+              <button type="button" class="ew-btn" @click="store.validateControllerSyntax">控制器语法校验</button>
+              <button type="button" class="ew-btn ew-btn--danger" @click="store.rollbackController">回滚控制器</button>
+            </div>
+
+            <EwFieldRow label="手动运行输入" :help="help('manual_message')">
+              <textarea v-model="manualMessage" rows="3" placeholder="留空将使用最新楼层文本" />
+            </EwFieldRow>
+          </EwSectionCard>
+
+          <EwSectionCard title="运行记录" subtitle="最近一次执行与请求响应摘要。">
+            <div class="ew-debug-grid">
+              <div class="ew-pre-box">
+                <strong>最近运行</strong>
+                <pre>{{ formattedLastRun }}</pre>
+              </div>
+              <div class="ew-pre-box">
+                <strong>最近请求/响应摘要</strong>
+                <pre>{{ formattedLastIo }}</pre>
+              </div>
+            </div>
+
+            <EwFieldRow label="导入配置(JSON)" :help="help('import_text')">
+              <textarea v-model="store.importText" rows="6" placeholder="paste config json" />
+            </EwFieldRow>
+
+            <div class="ew-actions-wrap">
+              <button type="button" class="ew-btn" @click="store.importConfig">导入配置</button>
+            </div>
+          </EwSectionCard>
+        </template>
+      </div>
+    </transition>
   </EwPanelShell>
 </template>
 
@@ -1139,6 +1136,41 @@ onUnmounted(() => {
   100% {
     opacity: 1;
     transform: translateY(-50%) scale(1);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Phase 2.6: 标签页切换过渡动画 (Tab Switch Transition)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* 进入：从下方微滑入 + 淡显 */
+.ew-tab-fade-enter-active {
+  animation: ew-tab-enter 0.3s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+/* 离开：向上微滑出 + 淡隐 */
+.ew-tab-fade-leave-active {
+  animation: ew-tab-leave 0.2s cubic-bezier(0.4, 0, 0.6, 1) both;
+}
+
+@keyframes ew-tab-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ew-tab-leave {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
   }
 }
 
