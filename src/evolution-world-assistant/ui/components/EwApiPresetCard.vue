@@ -61,10 +61,19 @@
 
           <EwFieldRow v-if="preset.mode === 'workflow_http'" label="模型">
             <div class="ew-api-card__model-wrap">
+              <select
+                v-if="preset.model_candidates.length > 0"
+                :value="preset.model"
+                @change="patch({ model: ($event.target as HTMLSelectElement).value })"
+              >
+                <option v-for="model in preset.model_candidates" :key="model" :value="model">
+                  {{ model }}
+                </option>
+              </select>
               <input
+                v-else
                 :value="preset.model"
                 type="text"
-                :list="modelListId"
                 placeholder="gpt-4o-mini"
                 @input="setText('model', $event)"
               />
@@ -76,9 +85,6 @@
               >
                 {{ loadingModels ? '加载中...' : '加载模型列表' }}
               </button>
-              <datalist :id="modelListId">
-                <option v-for="model in preset.model_candidates" :key="model" :value="model" />
-              </datalist>
             </div>
           </EwFieldRow>
         </div>
@@ -107,7 +113,6 @@ const emit = defineEmits<{
 
 const preset = computed(() => props.modelValue);
 const loadingModels = ref(false);
-const modelListId = computed(() => `ew-model-list-${preset.value.id || props.index}`);
 const endpointSummary = computed(() => {
   if (preset.value.mode === 'llm_connector') {
     return '酒馆主API（自动使用当前配置）';
