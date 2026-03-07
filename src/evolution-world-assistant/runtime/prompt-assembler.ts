@@ -1,5 +1,4 @@
 import type { EwFlowConfig, EwPromptOrderEntry } from './types';
-import { getSettings } from './settings';
 
 // SillyTavern globals available at runtime in extension context
 declare function getCharacterCardFields(): {
@@ -147,12 +146,8 @@ export function collectPromptComponents(flow: EwFlowConfig): PromptComponents {
     const lastId = getLastMessageId();
     if (lastId >= 0) {
       const msgs = getChatMessages(`0-${lastId}`, { hide_state: 'unhidden' });
-      // Ensure we read at least hide_last_n messages so the workflow
-      // doesn't further truncate what the user chose to keep visible.
-      const hideN = getSettings()?.hide_settings?.hide_last_n ?? 0;
-      const effectiveTurns = hideN > 0 ? Math.max(flow.context_turns, hideN) : flow.context_turns;
       components.chatMessages = msgs
-        .slice(-effectiveTurns)
+        .slice(-flow.context_turns)
         .map((msg: any) => ({
           role: msg.role as 'system' | 'user' | 'assistant',
           content: msg.message ?? '',
