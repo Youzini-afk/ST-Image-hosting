@@ -100,7 +100,7 @@ export async function commitMergedPlan(
     ctrl.enabled = true;
     nextEntries = cloned;
   } else {
-    nextEntries = [...nextEntries, ensureDefaultEntry(settings.controller_entry_name, controllerTemplate, true, nextEntries)];
+    nextEntries = [...nextEntries, ensureDefaultEntry(settings.controller_entry_name, controllerTemplate, true, nextEntries, true)];
   }
 
   // Commit all changes in one atomic operation.

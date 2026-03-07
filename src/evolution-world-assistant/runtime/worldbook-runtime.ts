@@ -143,13 +143,13 @@ function nextUid(entries: WorldbookEntry[]): number {
   return (maxUid ?? 0) + 1;
 }
 
-export function ensureDefaultEntry(name: string, content: string, enabled: boolean, entries: WorldbookEntry[]): WorldbookEntry {
+export function ensureDefaultEntry(name: string, content: string, enabled: boolean, entries: WorldbookEntry[], constant = false): WorldbookEntry {
   return {
     uid: nextUid(entries),
     name,
     enabled,
     strategy: {
-      type: 'constant',
+      type: constant ? 'constant' : 'selective',
       keys: [],
       keys_secondary: { logic: 'and_any', keys: [] },
       scan_depth: 'same_as_global',
