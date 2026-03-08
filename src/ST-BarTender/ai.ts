@@ -219,6 +219,7 @@ export async function callAI(
   presetParams: Record<string, number>,
   apiConfig: ApiConfig,
   customSystemPrompt?: string,
+  onStream?: (chunk: string) => void,
 ): Promise<WidgetConfig> {
   const systemPrompt = customSystemPrompt?.trim() || buildSystemPrompt(presetEntries, presetParams);
 
@@ -231,8 +232,6 @@ export async function callAI(
   ];
 
   // === 解析可用 API 源 ===
-  // 参照 shujuku 的 attemptToLoadCoreApis_ACU (line 9157-9176):
-  // 先尝试 iframe 本地全局, 再回退到 parent window
   const parentWin = (() => {
     try {
       return (window.parent && window.parent !== window) ? window.parent : window;
@@ -248,15 +247,18 @@ export async function callAI(
     TavernHelper: !!thApi?.generateRaw,
     generateRaw: typeof generateRaw === 'function',
     mode: apiConfig.mode,
+    stream: apiConfig.gen_stream,
   });
 
   let rawResponse: string;
 
   if (apiConfig.mode === 'custom' && apiConfig.custom_url) {
-    // === 自定义 API: 完全参照 shujuku callApi_ACU (line 6346-6388) ===
+    // === 自定义 API ===
     if (!stApi?.getRequestHeaders) {
       throw new Error('SillyTavern.getRequestHeaders 不可用');
     }
+
+    const useStream = !!(apiConfig.gen_stream && onStream);
 
     const requestBody = {
       messages: messages,
@@ -264,7 +266,7 @@ export async function callAI(
       max_tokens: apiConfig.gen_max_tokens || 64000,
       temperature: apiConfig.gen_temperature ?? 0.7,
       top_p: apiConfig.gen_top_p ?? 0.95,
-      stream: false,
+      stream: useStream,
       chat_completion_source: 'custom',
       group_names: [],
       include_reasoning: false,
@@ -280,7 +282,7 @@ export async function callAI(
         : '',
     };
 
-    console.info('[预设控制] 正在通过自定义 API 调用...');
+    console.info('[预设控制] 正在通过自定义 API 调用...', { stream: useStream });
     const response = await fetchFn('/api/backends/chat-completions/generate', {
       method: 'POST',
       headers: { ...stApi.getRequestHeaders(), 'Content-Type': 'application/json' },
@@ -292,18 +294,52 @@ export async function callAI(
       throw new Error(`API 请求失败: ${response.status} ${errTxt}`);
     }
 
-    const data = await response.json();
-    if (data?.choices?.[0]) {
-      rawResponse = (data.choices[0].message?.content || '').trim();
-    } else if (data?.content) {
-      rawResponse = data.content.trim();
+    if (useStream && response.body) {
+      // === SSE 流式读取 ===
+      rawResponse = '';
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // 保留未完成的行
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed === 'data: [DONE]') continue;
+          if (!trimmed.startsWith('data: ')) continue;
+
+          try {
+            const json = JSON.parse(trimmed.slice(6));
+            const delta = json.choices?.[0]?.delta?.content;
+            if (delta) {
+              rawResponse += delta;
+              onStream(delta);
+            }
+          } catch {
+            // 非 JSON 行，忽略
+          }
+        }
+      }
     } else {
-      const errorMessage = data?.error?.message || JSON.stringify(data).slice(0, 500);
-      throw new Error(`API 返回无效响应: ${errorMessage}`);
+      // === 非流式：等完整响应 ===
+      const data = await response.json();
+      if (data?.choices?.[0]) {
+        rawResponse = (data.choices[0].message?.content || '').trim();
+      } else if (data?.content) {
+        rawResponse = data.content.trim();
+      } else {
+        const errorMessage = data?.error?.message || JSON.stringify(data).slice(0, 500);
+        throw new Error(`API 返回无效响应: ${errorMessage}`);
+      }
     }
   } else {
-    // === 酒馆主 API: 参照 shujuku callApi_ACU (line 6326-6339) ===
-    // 尝试多个来源: TavernHelper.generateRaw > iframe 全局 generateRaw
+    // === 酒馆主 API ===
     const genRawFn =
       (typeof thApi?.generateRaw === 'function' ? thApi.generateRaw : undefined) ||
       (typeof generateRaw === 'function' ? generateRaw : undefined);
@@ -312,11 +348,7 @@ export async function callAI(
       throw new Error('generateRaw 不可用 — 请确认已安装酒馆助手(TavernHelper)扩展');
     }
 
-    console.info('[预设控制] 正在通过酒馆 API 调用 generateRaw...', {
-      source: typeof thApi?.generateRaw === 'function' ? 'TavernHelper' : 'iframe_global',
-      stream: apiConfig.gen_stream,
-    });
-
+    console.info('[预设控制] 正在通过酒馆 API 调用 generateRaw...');
     const response = await genRawFn({
       ordered_prompts: messages,
       should_stream: apiConfig.gen_stream ?? true,

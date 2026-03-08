@@ -110,6 +110,7 @@ export const useStore = defineStore('preset-control', () => {
 
   // ========== AI 加载状态 ==========
   const isLoading = ref(false);
+  const streamingText = ref(''); // 流式输出的实时文本
 
   // ========== 模型列表 ==========
   const modelCandidates = ref<string[]>([]);
@@ -219,14 +220,19 @@ export const useStore = defineStore('preset-control', () => {
     });
 
     isLoading.value = true;
+    streamingText.value = '';
     try {
       scanPreset();
 
       const result = await callAI(
         userMessage, presetEntries.value, presetParams.value,
         settings.value.api, settings.value.custom_system_prompt,
+        (chunk: string) => {
+          streamingText.value += chunk;
+        },
       );
 
+      streamingText.value = '';
       chatHistory.value.push({
         id: uid(),
         role: 'assistant',
@@ -237,6 +243,7 @@ export const useStore = defineStore('preset-control', () => {
       widgetConfig.value = result;
       toastr.success('面板已更新');
     } catch (err) {
+      streamingText.value = '';
       const errorMsg = err instanceof Error ? err.message : String(err);
       chatHistory.value.push({
         id: uid(),
@@ -353,6 +360,7 @@ export const useStore = defineStore('preset-control', () => {
     presetEntries,
     presetParams,
     isLoading,
+    streamingText,
     modelCandidates,
     isLoadingModels,
     panelOpen,

@@ -20,9 +20,15 @@
         <div class="chat-area__bubble-content">{{ msg.content }}</div>
       </div>
 
-      <div v-if="store.isLoading" class="chat-area__loading">
-        <i class="fa-solid fa-spinner fa-spin" />
-        <span>AI 正在生成...</span>
+      <!-- 流式输出气泡 -->
+      <div v-if="store.isLoading" class="chat-area__bubble chat-area__bubble--ai">
+        <div class="chat-area__bubble-role">
+          <i class="fa-solid fa-robot" />
+        </div>
+        <div class="chat-area__bubble-content chat-area__bubble-content--streaming">
+          <template v-if="store.streamingText">{{ store.streamingText }}</template>
+          <template v-else><i class="fa-solid fa-spinner fa-spin" /> AI 正在生成...</template>
+        </div>
       </div>
     </div>
 
@@ -143,6 +149,17 @@ watch(
     }
   },
 );
+
+// 流式输出时也滚动到底部
+watch(
+  () => store.streamingText,
+  async () => {
+    await nextTick();
+    if (messagesRef.value) {
+      messagesRef.value.scrollTop = messagesRef.value.scrollHeight;
+    }
+  },
+);
 </script>
 
 <style scoped>
@@ -253,6 +270,13 @@ watch(
   padding: 8px 12px;
   color: rgba(255, 255, 255, 0.4);
   font-size: 12px;
+}
+
+.chat-area__bubble-content--streaming {
+  max-height: 200px;
+  overflow-y: auto;
+  font-size: 11px;
+  opacity: 0.7;
 }
 
 /* --- Shortcuts --- */
