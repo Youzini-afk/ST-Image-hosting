@@ -89,24 +89,26 @@ export function buildSystemPrompt(presetEntries: PresetEntrySnapshot[], presetPa
 
     ## ⚠️ 布局硬性规则（必须严格遵守！）
 
-    1. **所有 card 和 container 必须设 \`layout.width: 'full'\`**，禁止使用 'hug' 或 'auto'。
-    2. **顶层 root** 必须是 \`container\` + \`direction: 'column'\` + \`width: 'full'\` + \`padding: 'medium'\`。
-    3. **若用 row 布局并排放卡片**，row container 设 \`width: 'full'\`，内部每个 card 也设 \`width: 'full'\`（flex 自动均分）。
-    4. **toggle 的 label** 必须是完整名称，不要缩写或截断。
+    1. **禁止使用 row 布局**！所有卡片必须垂直排列（\`direction: 'column'\`），不要并排放置（因为界面可能在窄小的悬浮窗口中显示）。
+    2. **所有 card 和 container 必须设 \`layout.width: 'full'\`**，禁止 'hug' 或 'auto'。
+    3. **顶层 root** 必须是 \`container\` + \`direction: 'column'\` + \`width: 'full'\` + \`padding: 'medium'\`。
+    4. **toggle 的 label 必须是条目的完整名称**，不允许缩写、截断或修改。比如条目名是 "主提示词" 就写 "主提示词"，不能写 "主提示" 或 "主..."。
     5. **所有 card** 至少设置 \`padding: 'medium'\`。
+    6. **必须包含所有条目**！上面列出的每一个预设条目都必须生成对应的 toggle，不允许遗漏任何一个。
+    7. **所有参数**都必须生成对应的 slider，不允许遗漏。
 
     ## 最佳实践
 
     1. **只输出纯 JSON**（可包裹在\`\`\`json内），不要有任何其他文字。
     2. **高级感来源于留白与嵌套**：顶层是一个 \`container(column, full)\`，里面是几个 \`card(glass, rounded, full)\`。
     3. **用 \`text\` 做区域标题**（\`appearance.typography: 'h2'\`），放在 card 内部最前面。
-    4. **slider 必须设置 \`slider_meta\`**：根据参数类型合理设置区间。例如 temperature 用 \`{min:0, max:2, step:0.05}\`，max_context 用 \`{min:1024, max:200000, step:1024}\`。
-    5. **严格引用上下文**：\`entry_id\` 和 \`param_name\` 必须从上面的列表中选取，不要凭空创造。
-    6. **分组要智能**：根据条目名称的语义相近度进行分组，功能相关的放在一起。
+    4. **slider 必须设置 \`slider_meta\`**：根据参数类型合理设置区间。
+    5. **严格引用上下文**：\`entry_id\` 和 \`param_name\` 必须从上面的列表中选取。
+    6. **分组要智能**：根据条目名称的语义进行分组。
 
     ## 完整输出示例
 
-    以下示例展示了一个包含两个卡片的控制台。注意所有 card/container 都用了 \`width: 'full'\`。
+    以下示例展示了一个单栏布局的控制台。注意全部用 column 布局，不用 row。
 
     \`\`\`json
     {
@@ -117,33 +119,25 @@ export function buildSystemPrompt(presetEntries: PresetEntrySnapshot[], presetPa
         "layout": { "direction": "column", "gap": "medium", "padding": "medium", "width": "full" },
         "children": [
           {
-            "id": "row1",
-            "type": "container",
-            "layout": { "direction": "row", "gap": "medium", "align": "stretch", "width": "full" },
+            "id": "card-prompts",
+            "type": "card",
+            "appearance": { "theme": "glass", "corner": "rounded", "elevation": 1 },
+            "layout": { "direction": "column", "gap": "small", "padding": "medium", "width": "full" },
             "children": [
-              {
-                "id": "card-prompts",
-                "type": "card",
-                "appearance": { "theme": "glass", "corner": "rounded", "elevation": 1 },
-                "layout": { "direction": "column", "gap": "small", "padding": "medium", "width": "full" },
-                "children": [
-                  { "id": "t1", "type": "text", "content": "提示词条目", "appearance": { "typography": "h2" } },
-                  { "id": "sw1", "type": "toggle", "label": "主系统提示", "action": { "type": "toggle_preset_entry", "entry_id": "main" } },
-                  { "id": "sw2", "type": "toggle", "label": "越狱提示", "action": { "type": "toggle_preset_entry", "entry_id": "jailbreak" } }
-                ]
-              },
-              {
-                "id": "card-params",
-                "type": "card",
-                "appearance": { "theme": "glass", "corner": "rounded", "elevation": 1 },
-                "layout": { "direction": "column", "gap": "small", "padding": "medium", "width": "full" },
-                "children": [
-                  { "id": "t2", "type": "text", "content": "生成参数", "appearance": { "typography": "h2" } },
-                  { "id": "sl1", "type": "slider", "label": "温度", "action": { "type": "set_preset_param", "param_name": "temperature" }, "slider_meta": { "min": 0, "max": 2, "step": 0.05 } },
-                  { "id": "div1", "type": "divider" },
-                  { "id": "sl2", "type": "slider", "label": "Top P", "action": { "type": "set_preset_param", "param_name": "top_p" }, "slider_meta": { "min": 0, "max": 1, "step": 0.05 } }
-                ]
-              }
+              { "id": "t1", "type": "text", "content": "提示词条目", "appearance": { "typography": "h2" } },
+              { "id": "sw1", "type": "toggle", "label": "主系统提示", "action": { "type": "toggle_preset_entry", "entry_id": "main" } },
+              { "id": "sw2", "type": "toggle", "label": "越狱提示", "action": { "type": "toggle_preset_entry", "entry_id": "jailbreak" } }
+            ]
+          },
+          {
+            "id": "card-params",
+            "type": "card",
+            "appearance": { "theme": "glass", "corner": "rounded", "elevation": 1 },
+            "layout": { "direction": "column", "gap": "small", "padding": "medium", "width": "full" },
+            "children": [
+              { "id": "t2", "type": "text", "content": "生成参数", "appearance": { "typography": "h2" } },
+              { "id": "sl1", "type": "slider", "label": "温度", "action": { "type": "set_preset_param", "param_name": "temperature" }, "slider_meta": { "min": 0, "max": 2, "step": 0.05 } },
+              { "id": "sl2", "type": "slider", "label": "Top P", "action": { "type": "set_preset_param", "param_name": "top_p" }, "slider_meta": { "min": 0, "max": 1, "step": 0.05 } }
             ]
           }
         ]
@@ -177,9 +171,13 @@ function extractJson(text: string): string {
 function sanitizeBlock(block: UIBlock, isRoot = false): UIBlock {
   const b = { ...block };
 
-  // card 和 container 强制 width: 'full'
+  // card 和 container 强制 width: 'full' + direction: 'column'
   if (b.type === 'card' || b.type === 'container') {
     if (!b.layout) b.layout = {};
+    // 强制 column 布局，禁止 row（悬浮窗口窄小时 row 会溢出）
+    if (b.layout.direction === 'row') {
+      b.layout.direction = 'column';
+    }
     // 'hug' 和 'auto' 会导致内容过窄，强制改为 'full'
     if (!b.layout.width || b.layout.width === 'hug' || b.layout.width === 'auto') {
       b.layout.width = 'full';
@@ -246,7 +244,7 @@ export async function callAI(
     const requestBody = {
       messages,
       model: apiConfig.custom_model,
-      max_tokens: 16000,
+      max_tokens: 64000,
       temperature: 0.7,
       top_p: 0.95,
       stream: false,
