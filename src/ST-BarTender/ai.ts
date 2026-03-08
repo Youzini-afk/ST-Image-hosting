@@ -178,36 +178,76 @@ export async function callAI(
   console.info('[预设控制] system prompt 长度:', systemPrompt.length, '字符');
   console.info('[预设控制] API 模式:', apiConfig.mode, apiConfig.mode === 'custom' ? apiConfig.custom_url : '(使用酒馆API)');
 
-  // === 构建 generateRaw 配置 ===
-  // 关键：不使用 user_input + 'user_input' 占位符！
-  // 'user_input' 是 BuiltinPrompt，酒馆会注入整个预设 pipeline（角色描述、世界书等），
-  // 导致请求膨胀到 15K+ tokens。直接用 RolePrompt 数组绕过预设 pipeline。
-  const config: GenerateRawConfig = {
-    ordered_prompts: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userMessage },
-    ],
-    should_stream: false,
-  };
-
-  // 自定义 API
-  if (apiConfig.mode === 'custom' && apiConfig.custom_url) {
-    config.custom_api = {
-      apiurl: apiConfig.custom_url,
-      key: apiConfig.custom_key || undefined,
-      model: apiConfig.custom_model,
-      source: apiConfig.custom_source || 'openai',
-    };
-  }
-
-  console.info('[预设控制] 正在调用 generateRaw...', { custom_api: !!config.custom_api });
+  const messages = [
+    { role: 'system' as const, content: systemPrompt },
+    { role: 'user' as const, content: userMessage },
+  ];
 
   let rawResponse: string;
-  try {
-    rawResponse = await generateRaw(config);
-  } catch (err) {
-    console.error('[预设控制] generateRaw 失败:', err);
-    throw err;
+
+  if (apiConfig.mode === 'custom' && apiConfig.custom_url) {
+    // === 自定义 API: 参照 shujuku 的直接 fetch 方式 ===
+    // 通过 SillyTavern 后端代理发送请求
+    const parentWin = (window.parent && window.parent !== window) ? window.parent : window;
+    const stApi = (parentWin as any).SillyTavern;
+    if (!stApi?.getRequestHeaders) {
+      throw new Error('SillyTavern API 不可用，请检查酒馆版本');
+    }
+
+    const requestBody = {
+      messages,
+      model: apiConfig.custom_model,
+      max_tokens: 16000,
+      temperature: 0.7,
+      top_p: 0.95,
+      stream: false,
+      chat_completion_source: 'custom',
+      custom_prompt_post_processing: 'strict',
+      reverse_proxy: apiConfig.custom_url,
+      custom_url: apiConfig.custom_url,
+      custom_include_headers: apiConfig.custom_key
+        ? `Authorization: Bearer ${apiConfig.custom_key}`
+        : '',
+    };
+
+    console.info('[预设控制] 正在通过自定义 API 调用 (fetch)...');
+    const response = await parentWin.fetch('/api/backends/chat-completions/generate', {
+      method: 'POST',
+      headers: { ...stApi.getRequestHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errTxt = await response.text();
+      throw new Error(`API 请求失败: ${response.status} ${errTxt}`);
+    }
+
+    const data = await response.json();
+    if (data?.choices?.[0]?.message?.content) {
+      rawResponse = data.choices[0].message.content.trim();
+    } else if (data?.content) {
+      rawResponse = data.content.trim();
+    } else {
+      throw new Error(`API 返回无效响应: ${JSON.stringify(data).slice(0, 500)}`);
+    }
+  } else {
+    // === 酒馆主 API: 参照 shujuku 使用 TavernHelper.generateRaw ===
+    const parentWin = (window.parent && window.parent !== window) ? window.parent : window;
+    const th = (parentWin as any).TavernHelper;
+    if (typeof th?.generateRaw !== 'function') {
+      throw new Error('TavernHelper.generateRaw 不可用，请检查酒馆版本');
+    }
+
+    console.info('[预设控制] 正在通过酒馆 API 调用 (TavernHelper.generateRaw)...');
+    const response = await th.generateRaw({
+      ordered_prompts: messages,
+      should_stream: false,
+    });
+
+    if (typeof response !== 'string') {
+      throw new Error('主API调用未返回预期的文本响应');
+    }
+    rawResponse = response.trim();
   }
 
   console.info('[预设控制] AI 返回, 长度:', rawResponse?.length ?? 0);
