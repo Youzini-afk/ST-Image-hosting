@@ -1178,7 +1178,6 @@ onUnmounted(() => {
 
 /* Section Card: 深空底色 + 高密度像素级星场 */
 .theme-moon-phase .ew-section-card {
-  overflow: hidden;
   border-color: rgba(148, 163, 184, 0.15) !important;
 }
 

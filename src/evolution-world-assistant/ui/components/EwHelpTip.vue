@@ -24,7 +24,6 @@
       :id="tipId"
       class="ew-help-tip__bubble"
       role="tooltip"
-      :style="bubbleStyle"
       @click.stop
       @mouseenter="clearCloseTimer"
       @mouseleave="handleBubbleMouseLeave"
@@ -65,31 +64,6 @@ const tipId = `ew-help-tip-${++tipSequence}`;
 const detailId = `${tipId}-detail`;
 const touchLike = ref(false);
 let closeTimer: ReturnType<typeof setTimeout> | null = null;
-
-const bubbleStyle = ref<Record<string, string>>({});
-
-function positionBubble() {
-  if (!rootRef.value) return;
-  const rect = rootRef.value.getBoundingClientRect();
-  const bubbleWidth = Math.min(340, window.innerWidth - 16);
-
-  // Align right edge to trigger right edge
-  let left = rect.right - bubbleWidth;
-  if (left < 8) left = 8;
-  if (left + bubbleWidth > window.innerWidth - 8) {
-    left = window.innerWidth - bubbleWidth - 8;
-  }
-
-  // Default: below the trigger
-  const top = rect.bottom + 6;
-
-  bubbleStyle.value = {
-    position: 'fixed',
-    top: `${top}px`,
-    left: `${left}px`,
-    width: `${bubbleWidth}px`,
-  };
-}
 
 function refreshTouchMode() {
   try {
@@ -156,8 +130,6 @@ function openTip(mode: 'hover' | 'detail') {
     }
   }
   activeTipCloser = close;
-
-  nextTick(() => positionBubble());
 }
 
 function toggleDetail() {
@@ -302,7 +274,11 @@ onUnmounted(() => {
 }
 
 .ew-help-tip__bubble {
+  position: absolute;
+  top: calc(100% + 0.42rem);
+  right: 0;
   z-index: 99999;
+  width: min(22rem, calc(100vw - 2rem));
   border-radius: 0.9rem;
   border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 56%, transparent);
   background: color-mix(in srgb, var(--SmartThemeQuoteColor, #394a61) 18%, rgba(10, 14, 20, 0.93));
@@ -351,6 +327,15 @@ onUnmounted(() => {
 @supports not ((backdrop-filter: blur(1px))) {
   .ew-help-tip__bubble {
     background: color-mix(in srgb, var(--SmartThemeQuoteColor, #394a61) 22%, rgba(10, 14, 20, 0.97));
+  }
+}
+
+@media (max-width: 900px) {
+  .ew-help-tip__bubble {
+    right: auto;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(22rem, calc(100vw - 1.4rem));
   }
 }
 </style>
