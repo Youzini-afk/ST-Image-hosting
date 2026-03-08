@@ -5,7 +5,7 @@
       <div v-if="store.chatHistory.length === 0" class="chat-area__empty">
         <i class="fa-solid fa-comments" />
         <p>描述你想要的控制面板布局</p>
-        <p class="chat-area__hint">例如：「把所有 COT 相关条目放一组，翻译相关放一组」</p>
+        <p class="chat-area__hint">例如：「把所有 COT 相关条目放一组，文风相关放一组」</p>
       </div>
 
       <div
