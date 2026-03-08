@@ -68,7 +68,6 @@ const menuStyle = computed(() => {
   } catch { /* 跨域静默 */ }
 
   const ballCenterX = props.ballX + props.ballSize / 2;
-  const ballCenterY = props.ballY + props.ballSize / 2;
 
   // 水平位置：优先在球的左边，空间不够则放右边
   let left: number;
@@ -80,8 +79,8 @@ const menuStyle = computed(() => {
     left = props.ballX + props.ballSize + MARGIN;
   }
 
-  // 垂直位置：对齐球的中心
-  let top = ballCenterY - MENU_MAX_HEIGHT / 2;
+  // 垂直位置：顶部与悬浮球顶部平齐
+  let top = props.ballY;
 
   // 边界约束
   if (left < MARGIN) left = MARGIN;
