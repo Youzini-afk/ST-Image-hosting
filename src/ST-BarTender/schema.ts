@@ -106,6 +106,10 @@ export const ApiConfigSchema = z
     custom_key: z.string().default(''),
     custom_model: z.string().default(''),
     custom_source: z.string().default('openai'),
+    gen_max_tokens: z.number().default(64000),
+    gen_temperature: z.number().default(0.7),
+    gen_top_p: z.number().default(0.95),
+    gen_stream: z.boolean().default(true),
   })
   .prefault({});
 export type ApiConfig = z.infer<typeof ApiConfigSchema>;

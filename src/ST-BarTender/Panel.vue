@@ -81,6 +81,30 @@
           </select>
         </div>
       </template>
+
+      <!-- 生成参数（所有模式通用） -->
+      <div class="pc-panel__api-sep">生成参数</div>
+      <div class="pc-panel__api-row">
+        <label class="pc-panel__api-label">最大Tokens</label>
+        <input v-model.number="store.settings.api.gen_max_tokens" class="pc-panel__api-input" type="number" min="1024" max="200000" step="1024" />
+      </div>
+      <div class="pc-panel__api-row">
+        <label class="pc-panel__api-label">温度</label>
+        <input v-model.number="store.settings.api.gen_temperature" class="pc-panel__api-input" type="number" min="0" max="2" step="0.05" />
+      </div>
+      <div class="pc-panel__api-row">
+        <label class="pc-panel__api-label">Top P</label>
+        <input v-model.number="store.settings.api.gen_top_p" class="pc-panel__api-input" type="number" min="0" max="1" step="0.05" />
+      </div>
+      <div class="pc-panel__api-row">
+        <label class="pc-panel__api-label">流式</label>
+        <div class="pc-panel__api-toggle" @click="store.settings.api.gen_stream = !store.settings.api.gen_stream">
+          <div class="pc-panel__api-toggle-track" :class="{ 'active': store.settings.api.gen_stream }">
+            <div class="pc-panel__api-toggle-thumb" />
+          </div>
+          <span class="pc-panel__api-toggle-text">{{ store.settings.api.gen_stream ? '开启' : '关闭' }}</span>
+        </div>
+      </div>
     </div>
 
     <!-- 主体分栏 -->
@@ -345,6 +369,56 @@ onUnmounted(() => {
 .pc-panel__api-fetch-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.pc-panel__api-sep {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.pc-panel__api-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.pc-panel__api-toggle-track {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  transition: background 0.2s;
+}
+
+.pc-panel__api-toggle-track.active {
+  background: linear-gradient(135deg, #66bb6a, #43a047);
+}
+
+.pc-panel__api-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+}
+
+.pc-panel__api-toggle-track.active .pc-panel__api-toggle-thumb {
+  transform: translateX(16px);
+}
+
+.pc-panel__api-toggle-text {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .pc-panel__body {

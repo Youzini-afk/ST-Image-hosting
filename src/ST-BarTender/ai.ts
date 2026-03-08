@@ -244,10 +244,10 @@ export async function callAI(
     const requestBody = {
       messages,
       model: apiConfig.custom_model,
-      max_tokens: 64000,
-      temperature: 0.7,
-      top_p: 0.95,
-      stream: false,
+      max_tokens: apiConfig.gen_max_tokens || 64000,
+      temperature: apiConfig.gen_temperature ?? 0.7,
+      top_p: apiConfig.gen_top_p ?? 0.95,
+      stream: false, // 自定义 API 路径始终等完整响应后再解析
       chat_completion_source: 'custom',
       custom_prompt_post_processing: 'strict',
       reverse_proxy: apiConfig.custom_url,
@@ -289,10 +289,10 @@ export async function callAI(
       throw new Error('generateRaw 不可用 — TavernHelper 和 iframe 全局均未找到，请检查酒馆版本');
     }
 
-    console.info('[预设控制] 正在通过酒馆 API 调用 generateRaw...');
+    console.info('[预设控制] 正在通过酒馆 API 调用 generateRaw...', { stream: apiConfig.gen_stream });
     const response = await genRawFn({
       ordered_prompts: messages,
-      should_stream: false,
+      should_stream: apiConfig.gen_stream ?? true,
     });
 
     if (typeof response !== 'string') {
