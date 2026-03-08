@@ -324,21 +324,13 @@ export const useStore = defineStore('preset-control', () => {
       root: {
         id: uid(),
         type: 'container',
-        layout: { direction: 'column', gap: 'medium', padding: 'medium' },
-        children: [
-          {
-            id: uid(),
-            type: 'card',
-            appearance: { theme: 'glass', corner: 'rounded' },
-            layout: { direction: 'column', gap: 'small', padding: 'medium' },
-            children: normalEntries.map(e => ({
-              id: uid(),
-              type: 'toggle',
-              label: e.name,
-              action: { type: 'toggle_preset_entry', entry_id: e.id }
-            }))
-          }
-        ]
+        layout: { direction: 'column', gap: 'small', padding: 'none' },
+        children: normalEntries.map(e => ({
+          id: uid(),
+          type: 'toggle',
+          label: e.name,
+          action: { type: 'toggle_preset_entry', entry_id: e.id }
+        }))
       }
     });
   }
