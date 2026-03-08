@@ -197,6 +197,17 @@ export const useStore = defineStore('preset-control', () => {
     settings.value.panel_open = open;
   });
 
+  // ========== 悬浮球菜单 ==========
+  const ballMenuOpen = ref(false);
+
+  function toggleBallMenu() {
+    ballMenuOpen.value = !ballMenuOpen.value;
+    if (ballMenuOpen.value) {
+      // 打开菜单时刷新预设状态
+      scanPreset();
+    }
+  }
+
   // ========== Actions ==========
 
   async function sendChat(userMessage: string) {
@@ -350,9 +361,11 @@ export const useStore = defineStore('preset-control', () => {
     modelCandidates,
     isLoadingModels,
     panelOpen,
+    ballMenuOpen,
     scanPreset,
     sendChat,
     loadModels,
+    toggleBallMenu,
     getBoundValue,
     executeAction,
     autoGenerateFromPreset,

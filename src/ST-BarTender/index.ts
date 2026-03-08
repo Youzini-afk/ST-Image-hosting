@@ -4,6 +4,7 @@
 
 import { createScriptIdDiv, teleportStyle } from '@util/script';
 import Panel from './Panel.vue';
+import FloatingBall from './FloatingBall.vue';
 import { useStore } from './store';
 
 const MENU_ITEM_NAME = '预设控制';
@@ -12,13 +13,20 @@ const MENU_ITEM_ID = 'st-bartender-menu-item';
 const MENU_EVENT_NS = '.st_bartender';
 const MENU_RETRY_MS = 1500;
 
-let app: ReturnType<typeof createApp> | null = null;
-let $root: JQuery<HTMLDivElement> | null = null;
+let panelApp: ReturnType<typeof createApp> | null = null;
+let $panelRoot: JQuery<HTMLDivElement> | null = null;
+
+let ballApp: ReturnType<typeof createApp> | null = null;
+let $ballRoot: JQuery<HTMLDivElement> | null = null;
+
 let destroyStyle: (() => void) | null = null;
 let menuRetryTimer: ReturnType<typeof setTimeout> | null = null;
 
+// 共享 Pinia 实例
+const pinia = createPinia();
+
 // ============================================================
-// 1. 魔法棒菜单项注入（与 Evolution World 相同模式）
+// 1. 魔法棒菜单项注入
 // ============================================================
 
 function resolveParentDocument(): Document {
@@ -77,7 +85,7 @@ function installMagicWandMenuItem() {
       if ($menuButton.length && $extensionsMenu.is(':visible')) {
         $menuButton.trigger('click');
       }
-      togglePanel();
+      openMainPanel();
     });
 }
 
@@ -90,44 +98,56 @@ function uninstallMagicWandMenuItem() {
 }
 
 // ============================================================
-// 2. 面板（与 Evolution World 相同模式：div + teleportStyle）
+// 2. 悬浮球（始终挂载）
 // ============================================================
 
-function togglePanel() {
-  if ($root) {
-    $root.toggle();
-    return;
-  }
-  mountPanel();
-}
+function mountFloatingBall() {
+  if (ballApp) return;
 
-function mountPanel() {
-  if (app) return;
-
-  app = createApp(Panel).use(createPinia());
-  $root = createScriptIdDiv().appendTo('body');
-  app.mount($root[0]);
+  ballApp = createApp(FloatingBall).use(pinia);
+  $ballRoot = createScriptIdDiv().appendTo('body');
+  ballApp.mount($ballRoot[0]);
 
   const style = teleportStyle();
   destroyStyle = style.destroy;
 
-  const pinia = app.config.globalProperties.$pinia;
+  console.info('[预设控制] 悬浮球已挂载');
+}
+
+// ============================================================
+// 3. 主面板（按需挂载）
+// ============================================================
+
+function openMainPanel() {
+  if (!panelApp) {
+    mountPanel();
+  }
+
   const store = useStore(pinia);
   store.panelOpen = true;
   store.scanPreset();
+}
+
+function mountPanel() {
+  if (panelApp) return;
+
+  panelApp = createApp(Panel).use(pinia);
+  $panelRoot = createScriptIdDiv().appendTo('body');
+  panelApp.mount($panelRoot[0]);
 
   console.info('[预设控制] 面板已挂载');
 }
 
 // ============================================================
-// 3. 主流程
+// 4. 主流程
 // ============================================================
 
 $(() => {
   try {
+    mountFloatingBall();
     installMagicWandMenuItem();
   } catch (error) {
-    console.error('[预设控制] 魔法棒菜单挂载失败:', error);
+    console.error('[预设控制] 初始化失败:', error);
   }
 
   toastr.success('预设控制脚本已加载', '🍸 BarTender', { timeOut: 2000 });
@@ -135,15 +155,23 @@ $(() => {
 });
 
 // ============================================================
-// 4. 卸载
+// 5. 卸载
 // ============================================================
 
 $(window).on('pagehide', () => {
   uninstallMagicWandMenuItem();
-  app?.unmount();
-  app = null;
-  $root?.remove();
-  $root = null;
+
+  ballApp?.unmount();
+  ballApp = null;
+  $ballRoot?.remove();
+  $ballRoot = null;
+
+  panelApp?.unmount();
+  panelApp = null;
+  $panelRoot?.remove();
+  $panelRoot = null;
+
   destroyStyle?.();
   destroyStyle = null;
 });
+

@@ -130,6 +130,8 @@ export const SettingsSchema = z
     panel_y: z.number().default(-1),
     panel_width: z.number().default(900),
     panel_height: z.number().default(600),
+    ball_x: z.number().default(-1),
+    ball_y: z.number().default(-1),
     chat_history: z.array(ChatMessageSchema).default([]),
     widget_config: WidgetConfigSchema.optional(),
   })
