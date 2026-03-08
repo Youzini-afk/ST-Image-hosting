@@ -9,7 +9,7 @@
  */
 
 import type { EwFlowConfig, EwPromptOrderEntry } from '../runtime/types';
-import { BUILTIN_MARKERS, DEFAULT_PROMPT_ORDER } from '../runtime/types';
+import { DEFAULT_PROMPT_ORDER } from '../runtime/types';
 
 // ── ST 预设检测 ──────────────────────────────────────────────
 
@@ -75,35 +75,100 @@ export function convertStPresetToFlow(
   if (typeof preset.max_context_unlocked === 'boolean') genOpts.unlock_context_length = preset.max_context_unlocked;
 
   // ── 2. prompt_order 构建 ──
+  //
+  // ST 预设结构：
+  //   prompts[]      — 提示词定义 BAG（顺序不重要，仅定义 content/role/marker 等）
+  //   prompt_order[] — 真正的显示顺序 + enabled 覆盖
+  //
+  // prompt_order 格式: [{character_id, order: [{identifier, enabled}, ...]}]
+  // 我们取 order[0].order 作为排序依据。
+  //
+  // ST 还会复用内置标识符：
+  //   "nsfw"     → 实际用作 Auxiliary Prompt 的内容槽
+  //   "jailbreak" → 实际用作 Post-History Instructions 的内容槽
+  //   "enhanceDefinitions" → Enhance Definitions 的内容槽
+
   const stPrompts = preset.prompts as Array<Record<string, unknown>> | undefined;
   let promptOrder: EwPromptOrderEntry[];
 
   if (Array.isArray(stPrompts) && stPrompts.length > 0) {
-    promptOrder = stPrompts.map((p) => {
-      const identifier = (typeof p.identifier === 'string' && p.identifier) || uid();
-      const isMarker = p.marker === true;
+    // (a) Build lookup: identifier → prompt definition
+    const promptMap = new Map<string, Record<string, unknown>>();
+    for (const p of stPrompts) {
+      const id = typeof p.identifier === 'string' ? p.identifier : '';
+      if (id) promptMap.set(id, p);
+    }
 
-      // ST 中 marker 条目的 enabled 由 system_prompt 暗示；
-      // 非 marker 条目使用 enabled (若存在) 否则默认 true
-      let enabled: boolean;
-      if (isMarker) {
-        // 内置 marker 总是 enabled
-        enabled = BUILTIN_MARKERS.has(identifier) ? true : (p.enabled !== false);
-      } else {
-        enabled = p.enabled !== false;
+    // (b) Extract ordering from prompt_order (if present)
+    const stOrder = preset.prompt_order as Array<Record<string, unknown>> | undefined;
+    let orderList: Array<{ identifier: string; enabled: boolean }> | null = null;
+
+    if (Array.isArray(stOrder) && stOrder.length > 0) {
+      const first = stOrder[0];
+      const inner = first?.order;
+      if (Array.isArray(inner)) {
+        orderList = inner
+          .filter((e: any) => typeof e?.identifier === 'string')
+          .map((e: any) => ({
+            identifier: e.identifier as string,
+            enabled: e.enabled !== false,
+          }));
       }
+    }
+
+    // (c) Convert prompt definitions using order
+    const seen = new Set<string>();
+    const result: EwPromptOrderEntry[] = [];
+
+    const convertPrompt = (identifier: string, enabledOverride?: boolean): EwPromptOrderEntry | null => {
+      if (seen.has(identifier)) return null; // 去重
+      seen.add(identifier);
+
+      const p = promptMap.get(identifier);
+      if (!p) return null; // 定义不存在则跳过
+
+      const isMarker = p.marker === true;
+      const enabled = enabledOverride ?? (p.enabled !== false);
 
       return {
         identifier,
         name: typeof p.name === 'string' ? p.name : identifier,
         enabled,
         type: isMarker ? 'marker' : 'prompt',
-        role: (['system', 'user', 'assistant'].includes(p.role as string) ? p.role : 'system') as 'system' | 'user' | 'assistant',
+        role: (['system', 'user', 'assistant'].includes(p.role as string)
+          ? p.role : 'system') as 'system' | 'user' | 'assistant',
         content: typeof p.content === 'string' ? p.content : '',
         injection_position: mapInjPos(p.injection_position),
         injection_depth: typeof p.injection_depth === 'number' ? p.injection_depth : 0,
       } satisfies EwPromptOrderEntry;
-    });
+    };
+
+    if (orderList) {
+      // 按 prompt_order 排列
+      for (const entry of orderList) {
+        const item = convertPrompt(entry.identifier, entry.enabled);
+        if (item) result.push(item);
+      }
+      // prompt_order 里没出现但 prompts[] 里有的，附加到末尾
+      for (const p of stPrompts) {
+        const id = typeof p.identifier === 'string' ? p.identifier : '';
+        if (id && !seen.has(id)) {
+          const item = convertPrompt(id);
+          if (item) result.push(item);
+        }
+      }
+    } else {
+      // 无 prompt_order 时按 prompts[] 原始顺序
+      for (const p of stPrompts) {
+        const id = typeof p.identifier === 'string' ? p.identifier : '';
+        if (id) {
+          const item = convertPrompt(id);
+          if (item) result.push(item);
+        }
+      }
+    }
+
+    promptOrder = result.length > 0 ? result : [...DEFAULT_PROMPT_ORDER];
   } else {
     promptOrder = [...DEFAULT_PROMPT_ORDER];
   }
