@@ -278,15 +278,19 @@ export async function callAI(
       throw new Error(`API 返回无效响应: ${JSON.stringify(data).slice(0, 500)}`);
     }
   } else {
-    // === 酒馆主 API: 参照 shujuku 使用 TavernHelper.generateRaw ===
+    // === 酒馆主 API: 尝试多个来源的 generateRaw ===
     const parentWin = (window.parent && window.parent !== window) ? window.parent : window;
     const th = (parentWin as any).TavernHelper;
-    if (typeof th?.generateRaw !== 'function') {
-      throw new Error('TavernHelper.generateRaw 不可用，请检查酒馆版本');
+    const genRawFn: typeof generateRaw | undefined =
+      (typeof th?.generateRaw === 'function' ? th.generateRaw : undefined) ||
+      (typeof generateRaw === 'function' ? generateRaw : undefined);
+
+    if (!genRawFn) {
+      throw new Error('generateRaw 不可用 — TavernHelper 和 iframe 全局均未找到，请检查酒馆版本');
     }
 
-    console.info('[预设控制] 正在通过酒馆 API 调用 (TavernHelper.generateRaw)...');
-    const response = await th.generateRaw({
+    console.info('[预设控制] 正在通过酒馆 API 调用 generateRaw...');
+    const response = await genRawFn({
       ordered_prompts: messages,
       should_stream: false,
     });
