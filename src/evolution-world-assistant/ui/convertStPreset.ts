@@ -144,18 +144,10 @@ export function convertStPresetToFlow(
     };
 
     if (orderList) {
-      // 按 prompt_order 排列
+      // 按 prompt_order 排列（不追加 prompt_order 中未出现的条目）
       for (const entry of orderList) {
         const item = convertPrompt(entry.identifier, entry.enabled);
         if (item) result.push(item);
-      }
-      // prompt_order 里没出现但 prompts[] 里有的，附加到末尾
-      for (const p of stPrompts) {
-        const id = typeof p.identifier === 'string' ? p.identifier : '';
-        if (id && !seen.has(id)) {
-          const item = convertPrompt(id);
-          if (item) result.push(item);
-        }
       }
     } else {
       // 无 prompt_order 时按 prompts[] 原始顺序
