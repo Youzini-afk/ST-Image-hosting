@@ -2,7 +2,7 @@
 // 预设控制脚本入口
 // ============================================================
 
-import { createScriptIdIframe, teleportStyle } from '@util/script';
+import { createScriptIdDiv, teleportStyle } from '@util/script';
 import Panel from './Panel.vue';
 import { useStore } from './store';
 
@@ -12,10 +12,9 @@ const MENU_ITEM_ID = 'st-bartender-menu-item';
 const MENU_EVENT_NS = '.st_bartender';
 const MENU_RETRY_MS = 1500;
 
-let $iframe: JQuery<HTMLIFrameElement> | null = null;
 let app: ReturnType<typeof createApp> | null = null;
-let pinia: ReturnType<typeof createPinia> | null = null;
-let styleDestroy: (() => void) | null = null;
+let $root: JQuery<HTMLDivElement> | null = null;
+let destroyStyle: (() => void) | null = null;
 let menuRetryTimer: ReturnType<typeof setTimeout> | null = null;
 
 // ============================================================
@@ -74,7 +73,6 @@ function installMagicWandMenuItem() {
     .off(`click${MENU_EVENT_NS}`)
     .on(`click${MENU_EVENT_NS}`, event => {
       event.stopPropagation();
-      // 点击后关闭魔法棒菜单
       const $menuButton = $('#extensionsMenuButton', parentDoc);
       if ($menuButton.length && $extensionsMenu.is(':visible')) {
         $menuButton.trigger('click');
@@ -92,70 +90,33 @@ function uninstallMagicWandMenuItem() {
 }
 
 // ============================================================
-// 2. 悬浮面板（独立 iframe）
+// 2. 面板（与 Evolution World 相同模式：div + teleportStyle）
 // ============================================================
 
 function togglePanel() {
-  if ($iframe) {
-    $iframe.toggle();
+  if ($root) {
+    $root.toggle();
     return;
   }
-  openPanel();
+  mountPanel();
 }
 
-function openPanel() {
-  pinia = createPinia();
-  app = createApp(Panel).use(pinia);
+function mountPanel() {
+  if (app) return;
 
-  $iframe = createScriptIdIframe()
-    .css({
-      position: 'fixed',
-      top: '0',
-      left: '0',
-      width: '100vw',
-      height: '100vh',
-      border: 'none',
-      'z-index': '99998',
-      'pointer-events': 'none',
-      background: 'transparent',
-    })
-    .appendTo('body')
-    .on('load', function () {
-      const iframeDoc = this.contentDocument!;
+  app = createApp(Panel).use(createPinia());
+  $root = createScriptIdDiv().appendTo('body');
+  app.mount($root[0]);
 
-      iframeDoc.body.style.cssText = `
-        margin: 0;
-        padding: 0;
-        background: transparent;
-        pointer-events: none;
-        width: 100vw;
-        height: 100vh;
-        overflow: hidden;
-      `;
+  const style = teleportStyle();
+  destroyStyle = style.destroy;
 
-      const mountDiv = iframeDoc.createElement('div');
-      mountDiv.style.cssText = 'pointer-events: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;';
-      iframeDoc.body.appendChild(mountDiv);
+  const pinia = app.config.globalProperties.$pinia;
+  const store = useStore(pinia);
+  store.panelOpen = true;
+  store.scanPreset();
 
-      // 注入 Font Awesome
-      const faLink = iframeDoc.createElement('link');
-      faLink.rel = 'stylesheet';
-      faLink.href = 'https://testingcf.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/css/all.min.css';
-      iframeDoc.head.appendChild(faLink);
-
-      // 传送样式
-      const { destroy } = teleportStyle(iframeDoc.head);
-      styleDestroy = destroy;
-
-      // 挂载 Vue
-      app!.mount(mountDiv);
-
-      const store = useStore(pinia!);
-      store.panelOpen = true;
-      store.scanPreset();
-
-      console.info('[预设控制] 面板已挂载');
-    });
+  console.info('[预设控制] 面板已挂载');
 }
 
 // ============================================================
@@ -180,10 +141,9 @@ $(() => {
 $(window).on('pagehide', () => {
   uninstallMagicWandMenuItem();
   app?.unmount();
-  $iframe?.remove();
-  styleDestroy?.();
   app = null;
-  $iframe = null;
-  pinia = null;
-  styleDestroy = null;
+  $root?.remove();
+  $root = null;
+  destroyStyle?.();
+  destroyStyle = null;
 });
