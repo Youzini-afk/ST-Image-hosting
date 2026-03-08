@@ -11528,8 +11528,13 @@ async function loadWorldbook(name: string): Promise<void> {
       return;
     }
     const message = error instanceof Error ? error.message : String(error);
-    toastr.error(`读取世界书失败: ${message}`);
-    setStatus(`读取失败: ${message}`);
+    if (name !== name.trim()) {
+      toastr.error(`读取世界书失败: 世界书名称「${name.trim()}」首尾含有空格，请在酒馆中重命名该世界书以去除空格`);
+      setStatus(`读取失败: 世界书名称含首尾空格，请重命名`);
+    } else {
+      toastr.error(`读取世界书失败: ${message}`);
+      setStatus(`读取失败: ${message}`);
+    }
   } finally {
     pendingWorldbookLoadCount = Math.max(0, pendingWorldbookLoadCount - 1);
     if (pendingWorldbookLoadCount === 0) {
