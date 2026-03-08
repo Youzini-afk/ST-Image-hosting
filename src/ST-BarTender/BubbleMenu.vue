@@ -9,6 +9,14 @@
       <div class="bm-header">
         <span class="bm-title">{{ store.widgetConfig.title }}</span>
         <div class="bm-header-actions">
+          <button
+            class="bm-header-btn"
+            :class="{ 'bm-header-btn--active': store.settings.show_in_wand }"
+            :title="store.settings.show_in_wand ? '已挂载魔法棒菜单（点击关闭）' : '未挂载魔法棒菜单（点击开启）'"
+            @click="store.settings.show_in_wand = !store.settings.show_in_wand"
+          >
+            <i class="fa-solid fa-wand-magic-sparkles" />
+          </button>
           <button class="bm-header-btn" title="打开设置面板" @click="emit('openPanel')">
             <i class="fa-solid fa-gear" />
           </button>
@@ -169,6 +177,10 @@ const menuStyle = computed(() => {
 .bm-header-btn:hover {
   background: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.8);
+}
+
+.bm-header-btn--active {
+  color: rgba(100, 181, 246, 0.9);
 }
 
 .bm-body {

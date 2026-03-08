@@ -119,6 +119,15 @@ function mountFloatingBall() {
     }
   });
 
+  // 监听 show_in_wand → 动态安装/卸载魔法棒菜单项
+  watch(() => store.settings.show_in_wand, (show) => {
+    if (show) {
+      installMagicWandMenuItem();
+    } else {
+      uninstallMagicWandMenuItem();
+    }
+  });
+
   console.info('[预设控制] 悬浮球已挂载');
 }
 
@@ -153,7 +162,11 @@ function mountPanel() {
 $(() => {
   try {
     mountFloatingBall();
-    installMagicWandMenuItem();
+    // 魔法棒菜单仅在设置开启时安装（watcher 会处理后续变更）
+    const store = useStore(pinia);
+    if (store.settings.show_in_wand) {
+      installMagicWandMenuItem();
+    }
   } catch (error) {
     console.error('[预设控制] 初始化失败:', error);
   }
