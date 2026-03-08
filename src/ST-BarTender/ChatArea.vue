@@ -28,38 +28,44 @@
 
     <!-- 快捷操作 -->
     <div class="chat-area__shortcuts">
-      <button class="chat-area__shortcut-btn" @click="store.autoGenerateFromPreset()" title="从预设扫描">
+      <button class="chat-area__shortcut-btn" title="从预设扫描" @click="store.autoGenerateFromPreset()">
         <i class="fa-solid fa-magnifying-glass" />
         从预设扫描
       </button>
-      <button class="chat-area__shortcut-btn" @click="store.clearChat()" title="清空对话">
+      <button
+        class="chat-area__shortcut-btn"
+        :class="{ 'chat-area__shortcut-btn--active': store.settings.custom_system_prompt }"
+        title="系统提示词"
+        @click="promptDialogOpen = true"
+      >
+        <i class="fa-solid fa-scroll" />
+      </button>
+      <button class="chat-area__shortcut-btn" title="清空对话" @click="store.clearChat()">
         <i class="fa-solid fa-trash-can" />
       </button>
     </div>
 
-    <!-- 系统提示词 -->
-    <div class="chat-area__prompt-section">
-      <div class="chat-area__prompt-header" @click="promptExpanded = !promptExpanded">
-        <i class="fa-solid" :class="promptExpanded ? 'fa-chevron-down' : 'fa-chevron-right'" />
-        <span>系统提示词</span>
-        <span v-if="store.settings.custom_system_prompt" class="chat-area__prompt-badge">已自定义</span>
-      </div>
-      <div v-if="promptExpanded" class="chat-area__prompt-body">
-        <textarea
-          v-model="store.settings.custom_system_prompt"
-          class="chat-area__prompt-textarea"
-          :placeholder="store.getDefaultSystemPrompt()"
-          rows="8"
-        />
-        <div class="chat-area__prompt-actions">
-          <button
-            class="chat-area__prompt-reset"
-            title="恢复默认提示词"
-            @click="store.settings.custom_system_prompt = ''"
-          >
+    <!-- 系统提示词弹窗 -->
+    <div v-if="promptDialogOpen" class="prompt-dialog__backdrop" @mousedown.self="promptDialogOpen = false">
+      <div class="prompt-dialog">
+        <div class="prompt-dialog__header">
+          <span class="prompt-dialog__title">系统提示词</span>
+          <button class="prompt-dialog__close" @click="promptDialogOpen = false">
+            <i class="fa-solid fa-xmark" />
+          </button>
+        </div>
+        <div class="prompt-dialog__body">
+          <textarea
+            v-model="store.settings.custom_system_prompt"
+            class="prompt-dialog__textarea"
+            :placeholder="store.getDefaultSystemPrompt()"
+          />
+        </div>
+        <div class="prompt-dialog__footer">
+          <button class="prompt-dialog__reset" @click="store.settings.custom_system_prompt = ''">
             <i class="fa-solid fa-rotate-left" /> 恢复默认
           </button>
-          <span class="chat-area__prompt-hint">留空则使用自动生成的提示词</span>
+          <span class="prompt-dialog__hint">留空则使用自动生成的提示词</span>
         </div>
       </div>
     </div>
@@ -89,7 +95,7 @@ import { useStore } from './store';
 
 const store = useStore();
 const inputText = ref('');
-const promptExpanded = ref(false);
+const promptDialogOpen = ref(false);
 const messagesRef = ref<HTMLElement>();
 
 async function handleSend() {
@@ -307,99 +313,139 @@ watch(
   cursor: not-allowed;
 }
 
-/* 系统提示词 */
-.chat-area__prompt-section {
-  margin: 0 2px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+/* 系统提示词按钮高亮 */
+.chat-area__shortcut-btn--active {
+  color: #64b5f6 !important;
+  border-color: rgba(100, 181, 246, 0.25) !important;
+}
+
+/* 系统提示词弹窗 */
+.prompt-dialog__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: prompt-fade-in 0.15s ease-out;
+}
+
+@keyframes prompt-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.prompt-dialog {
+  width: min(560px, 90vw);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(22, 22, 30, 0.96);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+  animation: prompt-dialog-in 0.2s ease-out;
+}
+
+@keyframes prompt-dialog-in {
+  from { opacity: 0; transform: scale(0.94) translateY(12px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.prompt-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.prompt-dialog__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.prompt-dialog__close {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.prompt-dialog__close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.prompt-dialog__body {
+  flex: 1;
+  padding: 12px 16px;
   overflow: hidden;
 }
 
-.chat-area__prompt-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
-  cursor: pointer;
-  transition: color 0.15s, background 0.15s;
-}
-
-.chat-area__prompt-header:hover {
-  color: rgba(255, 255, 255, 0.75);
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.chat-area__prompt-header i {
-  font-size: 10px;
-  width: 12px;
-}
-
-.chat-area__prompt-badge {
-  font-size: 10px;
-  padding: 1px 5px;
-  border-radius: 4px;
-  background: rgba(100, 181, 246, 0.15);
-  color: rgba(100, 181, 246, 0.85);
-  margin-left: auto;
-}
-
-.chat-area__prompt-body {
-  padding: 0 10px 8px;
-}
-
-.chat-area__prompt-textarea {
+.prompt-dialog__textarea {
   width: 100%;
-  min-height: 100px;
-  max-height: 300px;
+  height: 320px;
   resize: vertical;
-  padding: 8px;
+  padding: 10px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
   color: rgba(255, 255, 255, 0.85);
-  font-size: 11px;
+  font-size: 12px;
   font-family: 'Consolas', 'Monaco', monospace;
-  line-height: 1.5;
+  line-height: 1.6;
   outline: none;
   transition: border-color 0.2s;
 }
 
-.chat-area__prompt-textarea:focus {
+.prompt-dialog__textarea:focus {
   border-color: rgba(100, 181, 246, 0.35);
 }
 
-.chat-area__prompt-textarea::placeholder {
+.prompt-dialog__textarea::placeholder {
   color: rgba(255, 255, 255, 0.15);
 }
 
-.chat-area__prompt-actions {
+.prompt-dialog__footer {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 6px;
+  gap: 10px;
+  padding: 10px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.chat-area__prompt-reset {
+.prompt-dialog__reset {
   border: none;
-  border-radius: 4px;
-  padding: 3px 8px;
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.45);
-  font-size: 11px;
+  border-radius: 6px;
+  padding: 5px 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
 
-.chat-area__prompt-reset:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.7);
+.prompt-dialog__reset:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.8);
 }
 
-.chat-area__prompt-hint {
-  font-size: 10px;
+.prompt-dialog__hint {
+  font-size: 11px;
   color: rgba(255, 255, 255, 0.25);
 }
 </style>
