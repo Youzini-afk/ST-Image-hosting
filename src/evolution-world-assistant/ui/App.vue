@@ -246,6 +246,15 @@
           <EwSectionCard title="工作流编排" subtitle="每条工作流独立配置，按优先级合并结果。">
             <template #actions>
               <button type="button" class="ew-btn" @click="store.addFlow">新增工作流</button>
+              <button type="button" class="ew-btn" @click="openFlowImportPicker">导入工作流</button>
+              <button type="button" class="ew-btn" @click="store.exportAllFlows">导出全部工作流</button>
+              <input
+                ref="flowImportRef"
+                type="file"
+                accept=".json,application/json"
+                class="ew-hidden-file-input"
+                @change="onFlowImportChange"
+              />
             </template>
 
             <transition-group name="ew-list" tag="div" class="ew-flow-list">
@@ -258,6 +267,7 @@
                 :expanded="store.expandedFlowId === flow.id"
                 @toggle-expand="store.toggleFlowExpanded(flow.id)"
                 @remove="store.removeFlow(flow.id)"
+                @export="store.exportSingleFlow(flow.id)"
                 @update:model-value="value => updateFlow(index, value)"
               />
             </transition-group>
@@ -318,6 +328,7 @@ import { useEwStore } from './store';
 const store = useEwStore();
 const manualMessage = ref('');
 const importFileInputRef = ref<HTMLInputElement | null>(null);
+const flowImportRef = ref<HTMLInputElement | null>(null);
 
 const enabledFlowCount = computed(() => store.settings.flows.filter(flow => flow.enabled).length);
 const formattedLastRun = computed(() => JSON.stringify(store.lastRun ?? {}, null, 2));
@@ -397,6 +408,26 @@ function onEsc(event: KeyboardEvent) {
     return;
   }
   store.closePanel();
+}
+
+function openFlowImportPicker() {
+  flowImportRef.value?.click();
+}
+
+async function onFlowImportChange(event: Event) {
+  const input = event.target as HTMLInputElement | null;
+  const file = input?.files?.[0];
+  if (!file) return;
+
+  try {
+    const text = await file.text();
+    store.importFlowsFromText(text);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    toastr.error(`文件读取失败: ${message}`, 'Evolution World');
+  } finally {
+    if (input) input.value = '';
+  }
 }
 
 onMounted(() => {

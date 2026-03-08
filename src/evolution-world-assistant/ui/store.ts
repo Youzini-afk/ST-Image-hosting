@@ -1,4 +1,6 @@
 import {
+  EwFlowConfig,
+  EwFlowConfigSchema,
   EwSettings,
   EwSettingsSchema,
   LastIoSummary,
@@ -255,6 +257,91 @@ export const useEwStore = defineStore('evolution-world-store', () => {
     }
   }
 
+  // ── Flow-level import / export ──
+
+  function downloadJson(data: unknown, filename: string) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function buildFlowExportPayload(flows: EwFlowConfig[]) {
+    return { ew_flow_export: true, version: 1, flows };
+  }
+
+  function sanitizeFilename(name: string) {
+    return name.replace(/[<>:"/\\|?*]/g, '_').trim() || 'flow';
+  }
+
+  function exportSingleFlow(flowId: string) {
+    const flow = settings.value.flows.find(f => f.id === flowId);
+    if (!flow) {
+      toastr.error('找不到该工作流', 'Evolution World');
+      return;
+    }
+    const payload = buildFlowExportPayload([flow]);
+    downloadJson(payload, `ew_flow_${sanitizeFilename(flow.name)}.json`);
+    toastr.success(`已导出工作流「${flow.name}」`, 'Evolution World');
+  }
+
+  function exportAllFlows() {
+    if (settings.value.flows.length === 0) {
+      toastr.warning('没有工作流可导出', 'Evolution World');
+      return;
+    }
+    const payload = buildFlowExportPayload(settings.value.flows);
+    downloadJson(payload, `ew_flows_all_${settings.value.flows.length}.json`);
+    toastr.success(`已导出全部 ${settings.value.flows.length} 条工作流`, 'Evolution World');
+  }
+
+  function importFlowsFromText(jsonText: string) {
+    if (!jsonText.trim()) {
+      toastr.warning('导入内容为空', 'Evolution World');
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(jsonText);
+      if (!parsed || parsed.ew_flow_export !== true || !Array.isArray(parsed.flows)) {
+        toastr.error('无效的工作流导出文件，缺少 ew_flow_export 标识', 'Evolution World');
+        return;
+      }
+
+      const validated: EwFlowConfig[] = [];
+      for (const raw of parsed.flows) {
+        validated.push(EwFlowConfigSchema.parse(raw));
+      }
+
+      if (validated.length === 0) {
+        toastr.warning('导出文件中没有工作流', 'Evolution World');
+        return;
+      }
+
+      // Deduplicate IDs: if conflict, append timestamp suffix
+      const existingIds = new Set(settings.value.flows.map(f => f.id));
+      for (const flow of validated) {
+        if (existingIds.has(flow.id)) {
+          flow.id = `${flow.id}_${Date.now()}`;
+        }
+        existingIds.add(flow.id);
+      }
+
+      const next = klona(settings.value);
+      next.flows.push(...validated);
+      settings.value = next;
+      toastr.success(`已导入 ${validated.length} 条工作流`, 'Evolution World');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      toastr.error(`工作流导入失败: ${message}`, 'Evolution World');
+    }
+  }
+
   function validateConfig() {
     const result = window.EvolutionWorldAPI?.validateConfig();
     if (!result) {
@@ -327,6 +414,9 @@ export const useEwStore = defineStore('evolution-world-store', () => {
     rollbackController,
     exportConfig,
     importConfig,
+    exportSingleFlow,
+    exportAllFlows,
+    importFlowsFromText,
     validateConfig,
     validateControllerSyntax,
     setOpen,
