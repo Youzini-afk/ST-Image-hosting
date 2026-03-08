@@ -1,6 +1,7 @@
 <template>
   <div
     ref="panelRef"
+    v-show="store.panelOpen"
     class="pc-panel"
     :style="panelStyle"
   >
@@ -145,9 +146,15 @@ function cleanupDragListeners() {
 onMounted(() => {
   // 初始位置居中
   if (panelPos.value.x < 0 || panelPos.value.y < 0) {
-    const doc = document;
-    const w = doc.documentElement.clientWidth || window.innerWidth;
-    const h = doc.documentElement.clientHeight || window.innerHeight;
+    // 获取可视区域尺寸（兼容 iframe 和主文档）
+    let w = window.innerWidth;
+    let h = window.innerHeight;
+    try {
+      if (window.parent && window.parent !== window) {
+        w = window.parent.innerWidth;
+        h = window.parent.innerHeight;
+      }
+    } catch { /* 跨域静默 */ }
     panelPos.value.x = Math.max(40, (w - store.settings.panel_width) / 2);
     panelPos.value.y = Math.max(40, (h - store.settings.panel_height) / 2);
   }
