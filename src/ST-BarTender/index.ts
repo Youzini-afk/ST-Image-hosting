@@ -111,6 +111,14 @@ function mountFloatingBall() {
   const style = teleportStyle();
   destroyStyle = style.destroy;
 
+  // 监听 panelOpen → 自动挂载并打开面板（供悬浮球齿轮按钮触发）
+  const store = useStore(pinia);
+  watch(() => store.panelOpen, (open) => {
+    if (open) {
+      openMainPanel();
+    }
+  });
+
   console.info('[预设控制] 悬浮球已挂载');
 }
 

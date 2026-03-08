@@ -128,10 +128,8 @@ onMounted(() => {
     ballPos.value.y = h / 2 - BALL_SIZE / 2;
   }
 
-  // 首次加载时如果没有保存的 widgetConfig，自动扫描预设生成
-  if (!store.settings.widget_config) {
-    store.autoGenerateFromPreset();
-  }
+  // 首次加载时自动扫描预设生成基础界面
+  store.autoGenerateFromPreset();
 });
 
 onUnmounted(() => {
