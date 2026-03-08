@@ -11507,7 +11507,13 @@ async function loadWorldbook(name: string): Promise<void> {
   isBusy.value = true;
   const isStaleRequest = () => requestId !== worldbookLoadRequestId || selectedWorldbookName.value !== name;
   try {
-    const rawEntries = await getWorldbook(name.trim());
+    let rawEntries: WorldbookEntry[];
+    try {
+      rawEntries = await getWorldbook(name);
+    } catch {
+      // Fallback: try trimmed name in case of whitespace mismatch
+      rawEntries = await getWorldbook(name.trim());
+    }
     if (isStaleRequest()) {
       return;
     }
@@ -11533,7 +11539,7 @@ async function loadWorldbook(name: string): Promise<void> {
 }
 
 async function reloadWorldbookNames(preferred?: string, switchOptions: WorldbookSwitchOptions = {}): Promise<boolean> {
-  const names = [...getWorldbookNames()].map(n => n.trim()).sort((left, right) => left.localeCompare(right, 'zh-Hans-CN'));
+  const names = [...getWorldbookNames()].sort((left, right) => left.localeCompare(right, 'zh-Hans-CN'));
   worldbookNames.value = names;
   normalizeCrossCopyWorldbookSelection();
   persistCrossCopyState();
