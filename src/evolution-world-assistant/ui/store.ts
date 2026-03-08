@@ -301,7 +301,7 @@ export const useEwStore = defineStore('evolution-world-store', () => {
     toastr.success(`已导出全部 ${settings.value.flows.length} 条工作流`, 'Evolution World');
   }
 
-  function importFlowsFromText(jsonText: string) {
+  function importFlowsFromText(jsonText: string, filename?: string) {
     if (!jsonText.trim()) {
       toastr.warning('导入内容为空', 'Evolution World');
       return;
@@ -320,8 +320,9 @@ export const useEwStore = defineStore('evolution-world-store', () => {
         }
       } else if (isSillyTavernPreset(parsed)) {
         // ── ST 预设 → 转换为单个 flow ──
+        const flowName = filename?.replace(/\.json$/i, '') || 'ST Preset';
         const flow = EwFlowConfigSchema.parse(
-          convertStPresetToFlow(parsed, 'ST Preset'),
+          convertStPresetToFlow(parsed, flowName),
         );
         validated = [flow];
         toastr.info('已识别为酒馆预设并转换', 'Evolution World');

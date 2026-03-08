@@ -421,7 +421,7 @@ async function onFlowImportChange(event: Event) {
 
   try {
     const text = await file.text();
-    store.importFlowsFromText(text);
+    store.importFlowsFromText(text, file.name);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     toastr.error(`文件读取失败: ${message}`, 'Evolution World');

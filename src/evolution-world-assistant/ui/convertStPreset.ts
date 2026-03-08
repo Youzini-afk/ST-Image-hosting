@@ -110,16 +110,22 @@ export function convertStPresetToFlow(
 
   // ── 3. 正则规则（扩展包装格式） ──
   const customRegex: Array<{ id: string; name: string; enabled: boolean; find_regex: string; replace_string: string }> = [];
-  const ext = (preset as any)?.extensions?.SPreset?.RegexBinding;
-  if (ext && Array.isArray(ext.regexes)) {
-    for (const r of ext.regexes as Array<Record<string, unknown>>) {
-      customRegex.push({
-        id: (typeof r.id === 'string' && r.id) || uid(),
-        name: typeof r.scriptName === 'string' ? r.scriptName : '',
-        enabled: r.disabled !== true,
-        find_regex: typeof r.findRegex === 'string' ? r.findRegex : '',
-        replace_string: typeof r.replaceString === 'string' ? r.replaceString : '',
-      });
+  const extensions = preset.extensions;
+  if (extensions && typeof extensions === 'object' && !Array.isArray(extensions)) {
+    const sp = (extensions as Record<string, unknown>).SPreset;
+    if (sp && typeof sp === 'object' && !Array.isArray(sp)) {
+      const rb = (sp as Record<string, unknown>).RegexBinding;
+      if (rb && typeof rb === 'object' && !Array.isArray(rb) && Array.isArray((rb as Record<string, unknown>).regexes)) {
+        for (const r of (rb as Record<string, unknown>).regexes as Array<Record<string, unknown>>) {
+          customRegex.push({
+            id: (typeof r.id === 'string' && r.id) || uid(),
+            name: typeof r.scriptName === 'string' ? r.scriptName : '',
+            enabled: r.disabled !== true,
+            find_regex: typeof r.findRegex === 'string' ? r.findRegex : '',
+            replace_string: typeof r.replaceString === 'string' ? r.replaceString : '',
+          });
+        }
+      }
     }
   }
 
