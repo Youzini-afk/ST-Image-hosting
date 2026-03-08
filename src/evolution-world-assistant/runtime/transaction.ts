@@ -117,6 +117,7 @@ export async function commitMergedPlan(
 
     if (dynSnapshots.length > 0 || controllerTemplate) {
       await markFloorEntries(
+        settings,
         messageId,
         dynDesired.map(e => e.name),
         controllerTemplate,

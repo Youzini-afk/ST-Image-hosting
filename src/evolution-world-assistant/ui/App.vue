@@ -177,6 +177,22 @@
                   <option value="notify_only">仅通知（不中止）</option>
                 </select>
               </EwFieldRow>
+              <EwFieldRow label="快照存储方式" :help="help('snapshot_storage')">
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <select v-model="store.settings.snapshot_storage" style="flex: 1;">
+                    <option value="message_data">消息数据（默认）</option>
+                    <option value="file">服务器文件</option>
+                  </select>
+                  <button
+                    type="button"
+                    class="ew-btn ew-btn--sm"
+                    :disabled="migratingSnapshots"
+                    @click="onMigrateSnapshots"
+                  >
+                    {{ migratingSnapshots ? '同步中…' : '同步快照' }}
+                  </button>
+                </div>
+              </EwFieldRow>
             </div>
           </EwSectionCard>
 
@@ -382,15 +398,32 @@ import EwSectionCard from './components/EwSectionCard.vue';
 import { getFieldHelp, PANEL_TABS } from './help-meta';
 import { showEwNotice } from './notice';
 import { useEwStore } from './store';
+import { migrateSnapshots } from '../runtime/floor-binding';
 
 const store = useEwStore();
 const manualMessage = ref('');
 const importFileInputRef = ref<HTMLInputElement | null>(null);
 const flowImportRef = ref<HTMLInputElement | null>(null);
+const migratingSnapshots = ref(false);
 
 const enabledFlowCount = computed(() => store.settings.flows.filter(flow => flow.enabled).length);
 const formattedLastRun = computed(() => JSON.stringify(store.lastRun ?? {}, null, 2));
 const formattedLastIo = computed(() => JSON.stringify(store.lastIo ?? {}, null, 2));
+
+async function onMigrateSnapshots() {
+  if (migratingSnapshots.value) return;
+  migratingSnapshots.value = true;
+  try {
+    const direction = store.settings.snapshot_storage === 'file' ? 'to_file' as const : 'to_message_data' as const;
+    const { migrated } = await migrateSnapshots(direction);
+    showEwNotice({ title: '快照同步', message: `已处理 ${migrated} 条消息`, level: 'success' });
+  } catch (e) {
+    console.error('[Evolution World] Migration failed:', e);
+    showEwNotice({ title: '快照同步失败', message: '请检查控制台', level: 'error' });
+  } finally {
+    migratingSnapshots.value = false;
+  }
+}
 
 function help(key: string) {
   return getFieldHelp(key);
