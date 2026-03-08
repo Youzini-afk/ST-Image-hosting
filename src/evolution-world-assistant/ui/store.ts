@@ -8,6 +8,7 @@ import {
 } from '../runtime/types';
 import { createDefaultApiPreset, createDefaultFlow } from '../runtime/factory';
 import { isSillyTavernPreset, convertStPresetToFlow } from './convertStPreset';
+import { readCharFlows, writeCharFlows } from '../runtime/char-flows';
 import type { TabKey } from './help-meta';
 import {
   getLastIo,
@@ -34,6 +35,12 @@ export const useEwStore = defineStore('evolution-world-store', () => {
   const expandedFlowId = ref<string | null>(null);
   const importText = ref('');
   const busy = ref(false);
+
+  // ── 角色卡绑定工作流 ──
+  const charFlows = ref<EwFlowConfig[]>([]);
+  const activeCharName = ref<string>('');
+  const flowScope = ref<'global' | 'character'>('global');
+  const charFlowsLoading = ref(false);
 
   const syncFromRuntime = subscribeSettings(next => {
     if (!_.isEqual(settings.value, next)) {
@@ -402,6 +409,74 @@ export const useEwStore = defineStore('evolution-world-store', () => {
     activeTab.value = 'overview';
   }
 
+  // ── 角色卡工作流操作 ──────────────────────────────────────────
+
+  async function loadCharFlows() {
+    charFlowsLoading.value = true;
+    try {
+      const name = getCurrentCharacterName?.() ?? '';
+      activeCharName.value = name;
+      charFlows.value = await readCharFlows(settings.value);
+    } catch (e) {
+      console.warn('[Evolution World] loadCharFlows failed:', e);
+      charFlows.value = [];
+    } finally {
+      charFlowsLoading.value = false;
+    }
+  }
+
+  async function saveCharFlows() {
+    try {
+      await writeCharFlows(settings.value, charFlows.value);
+    } catch (e) {
+      console.error('[Evolution World] saveCharFlows failed:', e);
+      showEwNotice({ title: 'Evolution World', message: '角色卡工作流保存失败: ' + (e as Error).message, level: 'error' });
+    }
+  }
+
+  const persistCharFlowsDebounced = _.debounce(() => {
+    saveCharFlows();
+  }, 500);
+
+  watch(
+    charFlows,
+    () => {
+      if (flowScope.value === 'character') {
+        persistCharFlowsDebounced();
+      }
+    },
+    { deep: true },
+  );
+
+  function addCharFlow() {
+    const apiPresets = settings.value.api_presets;
+    if (apiPresets.length === 0) {
+      const next = klona(settings.value);
+      next.api_presets.push(createDefaultApiPreset(1));
+      settings.value = next;
+    }
+    const newFlow = createDefaultFlow(
+      charFlows.value.length + 1,
+      settings.value.api_presets[0].id,
+    );
+    charFlows.value = [...charFlows.value, newFlow];
+    expandedFlowId.value = newFlow.id;
+  }
+
+  function removeCharFlow(flowId: string) {
+    charFlows.value = charFlows.value.filter(f => f.id !== flowId);
+    if (expandedFlowId.value === flowId) {
+      expandedFlowId.value = charFlows.value[0]?.id ?? null;
+    }
+  }
+
+  function setFlowScope(scope: 'global' | 'character') {
+    flowScope.value = scope;
+    if (scope === 'character') {
+      loadCharFlows();
+    }
+  }
+
   return {
     settings,
     lastRun,
@@ -412,6 +487,10 @@ export const useEwStore = defineStore('evolution-world-store', () => {
     expandedFlowId,
     importText,
     busy,
+    charFlows,
+    activeCharName,
+    flowScope,
+    charFlowsLoading,
     addApiPreset,
     removeApiPreset,
     addFlow,
@@ -435,5 +514,10 @@ export const useEwStore = defineStore('evolution-world-store', () => {
     setOpen,
     openPanel,
     closePanel,
+    loadCharFlows,
+    saveCharFlows,
+    addCharFlow,
+    removeCharFlow,
+    setFlowScope,
   };
 });

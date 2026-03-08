@@ -243,35 +243,93 @@
         </template>
 
         <template v-else-if="store.activeTab === 'flows'">
-          <EwSectionCard title="工作流编排" subtitle="每条工作流独立配置，按优先级合并结果。">
-            <template #actions>
-              <button type="button" class="ew-btn" @click="store.addFlow">新增工作流</button>
-              <button type="button" class="ew-btn" @click="openFlowImportPicker">导入工作流</button>
-              <button type="button" class="ew-btn" @click="store.exportAllFlows">导出全部工作流</button>
-              <input
-                ref="flowImportRef"
-                type="file"
-                accept=".json,application/json"
-                class="ew-hidden-file-input"
-                @change="onFlowImportChange"
-              />
-            </template>
+          <!-- ── 作用域切换标签 ── -->
+          <div class="ew-flow-scope-tabs">
+            <button
+              type="button"
+              class="ew-flow-scope-tab"
+              :class="{ 'ew-flow-scope-tab--active': store.flowScope === 'global' }"
+              @click="store.setFlowScope('global')"
+            >
+              🌐 全局
+            </button>
+            <button
+              type="button"
+              class="ew-flow-scope-tab"
+              :class="{ 'ew-flow-scope-tab--active': store.flowScope === 'character' }"
+              @click="store.setFlowScope('character')"
+            >
+              🎭 当前角色卡{{ store.activeCharName ? `: ${store.activeCharName}` : '' }}
+            </button>
+          </div>
 
-            <transition-group name="ew-list" tag="div" class="ew-flow-list">
-              <EwFlowCard
-                v-for="(flow, index) in store.settings.flows"
-                :key="flow.id"
-                :index="index"
-                :model-value="flow"
-                :api-presets="store.settings.api_presets"
-                :expanded="store.expandedFlowId === flow.id"
-                @toggle-expand="store.toggleFlowExpanded(flow.id)"
-                @remove="store.removeFlow(flow.id)"
-                @export="store.exportSingleFlow(flow.id)"
-                @update:model-value="value => updateFlow(index, value)"
-              />
-            </transition-group>
-          </EwSectionCard>
+          <!-- ── 全局工作流 ── -->
+          <template v-if="store.flowScope === 'global'">
+            <EwSectionCard title="全局工作流" subtitle="所有角色卡共享的工作流，优先级较低。">
+              <template #actions>
+                <button type="button" class="ew-btn" @click="store.addFlow">新增工作流</button>
+                <button type="button" class="ew-btn" @click="openFlowImportPicker">导入工作流</button>
+                <button type="button" class="ew-btn" @click="store.exportAllFlows">导出全部工作流</button>
+                <input
+                  ref="flowImportRef"
+                  type="file"
+                  accept=".json,application/json"
+                  class="ew-hidden-file-input"
+                  @change="onFlowImportChange"
+                />
+              </template>
+
+              <transition-group name="ew-list" tag="div" class="ew-flow-list">
+                <EwFlowCard
+                  v-for="(flow, index) in store.settings.flows"
+                  :key="flow.id"
+                  :index="index"
+                  :model-value="flow"
+                  :api-presets="store.settings.api_presets"
+                  :expanded="store.expandedFlowId === flow.id"
+                  @toggle-expand="store.toggleFlowExpanded(flow.id)"
+                  @remove="store.removeFlow(flow.id)"
+                  @export="store.exportSingleFlow(flow.id)"
+                  @update:model-value="value => updateFlow(index, value)"
+                />
+              </transition-group>
+            </EwSectionCard>
+          </template>
+
+          <!-- ── 角色卡绑定工作流 ── -->
+          <template v-else>
+            <EwSectionCard
+              :title="'角色卡工作流' + (store.activeCharName ? ` — ${store.activeCharName}` : '')"
+              subtitle="仅在当前角色卡生效的工作流，随角色卡导出/导入。优先级高于全局。"
+            >
+              <template #actions>
+                <button type="button" class="ew-btn" @click="store.addCharFlow">新增工作流</button>
+                <button type="button" class="ew-btn" @click="store.loadCharFlows">刷新</button>
+              </template>
+
+              <div v-if="store.charFlowsLoading" class="ew-flow-loading">
+                加载角色卡工作流中...
+              </div>
+
+              <transition-group v-else name="ew-list" tag="div" class="ew-flow-list">
+                <EwFlowCard
+                  v-for="(flow, index) in store.charFlows"
+                  :key="flow.id"
+                  :index="index"
+                  :model-value="flow"
+                  :api-presets="store.settings.api_presets"
+                  :expanded="store.expandedFlowId === flow.id"
+                  @toggle-expand="store.toggleFlowExpanded(flow.id)"
+                  @remove="store.removeCharFlow(flow.id)"
+                  @update:model-value="value => updateCharFlow(index, value)"
+                />
+              </transition-group>
+
+              <div v-if="!store.charFlowsLoading && store.charFlows.length === 0" class="ew-flow-empty">
+                当前角色卡还没有绑定工作流。点击「新增工作流」来创建。
+              </div>
+            </EwSectionCard>
+          </template>
         </template>
 
         <template v-else>
@@ -341,6 +399,14 @@ function help(key: string) {
 function updateFlow(index: number, nextFlow: EwFlowConfig) {
   const previousId = store.settings.flows[index]?.id;
   store.settings.flows.splice(index, 1, nextFlow);
+  if (store.expandedFlowId === previousId && previousId !== nextFlow.id) {
+    store.setExpandedFlow(nextFlow.id);
+  }
+}
+
+function updateCharFlow(index: number, nextFlow: EwFlowConfig) {
+  const previousId = store.charFlows[index]?.id;
+  store.charFlows.splice(index, 1, nextFlow);
   if (store.expandedFlowId === previousId && previousId !== nextFlow.id) {
     store.setExpandedFlow(nextFlow.id);
   }
@@ -1486,6 +1552,66 @@ body:has(.theme-moon-phase) #toast-container > div:hover {
     0 15px 50px rgba(0, 0, 0, 0.9),
     0 0 30px rgba(251, 191, 36, 0.15),
     inset 0 1px 0 rgba(251, 191, 36, 0.25) !important;
+}
+
+/* ── Flow Scope Tabs ── */
+.ew-flow-scope-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.ew-flow-scope-tab {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 180ms ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ew-flow-scope-tab:hover {
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ew-flow-scope-tab--active {
+  color: #e0e8f0;
+  background: rgba(115, 184, 255, 0.12);
+  border: 1px solid rgba(115, 184, 255, 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.ew-flow-loading,
+.ew-flow-empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 13px;
+  font-style: italic;
+}
+
+/* Moon theme overrides */
+body:has(.theme-moon-phase) .ew-flow-scope-tabs {
+  background: rgba(25, 20, 10, 0.3);
+  border-color: rgba(251, 191, 36, 0.08);
+}
+
+body:has(.theme-moon-phase) .ew-flow-scope-tab--active {
+  color: #fde68a;
+  background: rgba(251, 191, 36, 0.1);
+  border-color: rgba(251, 191, 36, 0.2);
 }
 
 </style>

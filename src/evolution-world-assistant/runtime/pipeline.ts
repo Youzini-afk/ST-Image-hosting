@@ -4,6 +4,7 @@ import { mergeFlowResults } from './merger';
 import { commitMergedPlan } from './transaction';
 import { injectReplyInstructionOnce } from './injection';
 import { getSettings, setLastIo, setLastRun } from './settings';
+import { getEffectiveFlows } from './char-flows';
 import { DispatchFlowAttempt, RunSummarySchema } from './types';
 import { uuidv4 } from './helpers';
 
@@ -86,7 +87,8 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowO
   let attempts: DispatchFlowAttempt[] = [];
 
   try {
-    const enabledFlows = settings.flows.filter(flow => flow.enabled);
+    // Merge global flows + per-character flows (from EW/Flows worldbook entry).
+    const enabledFlows = await getEffectiveFlows(settings);
     if (enabledFlows.length === 0) {
       throw new Error('no enabled flows');
     }
