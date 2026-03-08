@@ -293,6 +293,7 @@
 <script setup lang="ts">
 import type { EwApiPreset, EwFlowConfig, EwPromptOrderEntry } from '../../runtime/types';
 import { EwFlowConfigSchema } from '../../runtime/types';
+import { isSillyTavernPreset, convertStPresetToFlow } from '../convertStPreset';
 import { simpleHash } from '../../runtime/helpers';
 import { getFieldHelp } from '../help-meta';
 import EwFieldRow from './EwFieldRow.vue';
@@ -410,19 +411,22 @@ async function onImportFile(event: Event) {
     const text = await file.text();
     const parsed = JSON.parse(text);
 
-    // Support both raw flow object and wrapped { ew_flow_export, flows } format
-    let rawFlow: unknown;
+    // Support: EW wrapped format, ST preset, or raw flow object
+    let validated: EwFlowConfig;
     if (parsed?.ew_flow_export === true && Array.isArray(parsed.flows)) {
       if (parsed.flows.length === 0) {
         toastr.warning('导出文件中没有工作流', 'Evolution World');
         return;
       }
-      rawFlow = parsed.flows[0];
+      validated = EwFlowConfigSchema.parse(parsed.flows[0]);
+    } else if (isSillyTavernPreset(parsed)) {
+      const flowName = file.name.replace(/\.json$/i, '');
+      const raw = convertStPresetToFlow(parsed, flowName);
+      validated = EwFlowConfigSchema.parse(raw);
+      toastr.info(`已识别为酒馆预设「${flowName}」并转换`, 'Evolution World');
     } else {
-      rawFlow = parsed;
+      validated = EwFlowConfigSchema.parse(parsed);
     }
-
-    const validated = EwFlowConfigSchema.parse(rawFlow);
     // Preserve current flow's ID so it overwrites in-place
     validated.id = flow.value.id;
     emit('update:modelValue', validated);

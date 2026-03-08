@@ -7,6 +7,7 @@ import {
   RunSummary,
 } from '../runtime/types';
 import { createDefaultApiPreset, createDefaultFlow } from '../runtime/factory';
+import { isSillyTavernPreset, convertStPresetToFlow } from './convertStPreset';
 import type { TabKey } from './help-meta';
 import {
   getLastIo,
@@ -308,14 +309,25 @@ export const useEwStore = defineStore('evolution-world-store', () => {
 
     try {
       const parsed = JSON.parse(jsonText);
-      if (!parsed || parsed.ew_flow_export !== true || !Array.isArray(parsed.flows)) {
-        toastr.error('无效的工作流导出文件，缺少 ew_flow_export 标识', 'Evolution World');
-        return;
-      }
 
-      const validated: EwFlowConfig[] = [];
-      for (const raw of parsed.flows) {
-        validated.push(EwFlowConfigSchema.parse(raw));
+      let validated: EwFlowConfig[];
+
+      if (parsed && parsed.ew_flow_export === true && Array.isArray(parsed.flows)) {
+        // ── EW 原生格式 ──
+        validated = [];
+        for (const raw of parsed.flows) {
+          validated.push(EwFlowConfigSchema.parse(raw));
+        }
+      } else if (isSillyTavernPreset(parsed)) {
+        // ── ST 预设 → 转换为单个 flow ──
+        const flow = EwFlowConfigSchema.parse(
+          convertStPresetToFlow(parsed, 'ST Preset'),
+        );
+        validated = [flow];
+        toastr.info('已识别为酒馆预设并转换', 'Evolution World');
+      } else {
+        toastr.error('无效的工作流导出文件，缺少 ew_flow_export 标识且非酒馆预设', 'Evolution World');
+        return;
       }
 
       if (validated.length === 0) {
