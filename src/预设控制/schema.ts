@@ -1,119 +1,148 @@
 // ============================================================
-// Zod Schema 定义 — 数据结构校验与类型推导
+// Zod Schema 定义 — 抽象组件树 (Abstract Component Tree)
 // ============================================================
 
-// ---------- Widget 开关面板结构 ----------
+import { z } from 'zod';
 
-/** 单个开关项 */
-const WidgetItemSchema = z.object({
-  /** 显示名称 */
-  label: z.string(),
-  /** 映射的预设条目 ID */
-  preset_entry_id: z.string(),
-  /** 映射的预设条目名称（用于显示） */
-  preset_entry_name: z.string(),
-  /** 是否启用 */
-  enabled: z.boolean().default(true),
-  /** 可选颜色标记 */
-  color: z.string().optional(),
-});
-type WidgetItem = z.infer<typeof WidgetItemSchema>;
+// ---------- 工具函数 ----------
 
-/** 开关分组 */
-const WidgetGroupSchema = z.object({
-  /** 分组标题 */
-  title: z.string(),
-  /** 分组描述 */
-  description: z.string().optional(),
-  /** 开关列表 */
-  items: z.array(WidgetItemSchema),
-});
-type WidgetGroup = z.infer<typeof WidgetGroupSchema>;
+/** 生成唯一 ID（兼容不支持 crypto.randomUUID 的环境） */
+export function uid(): string {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return 'xxxx-xxxx-xxxx'.replace(/x/g, () => ((Math.random() * 16) | 0).toString(16));
+  }
+}
 
-/** 完整面板配置 — AI 返回的结构 */
-const WidgetConfigSchema = z.object({
-  /** 面板标题 */
-  title: z.string().default('预设控制'),
-  /** 分组列表 */
-  groups: z.array(WidgetGroupSchema).default([]),
+// ---------- 1. 布局与外观属性 ----------
+
+const LayoutPropsSchema = z.object({
+  direction: z.enum(['row', 'column']).optional(),
+  wrap: z.boolean().optional(),
+  justify: z.enum(['start', 'center', 'end', 'space-between']).optional(),
+  align: z.enum(['start', 'center', 'end', 'stretch']).optional(),
+  gap: z.enum(['none', 'small', 'medium', 'large']).optional(),
+  padding: z.enum(['none', 'small', 'medium', 'large']).optional(),
+  width: z.enum(['auto', 'full', 'half', 'hug']).optional(),
 });
-type WidgetConfig = z.infer<typeof WidgetConfigSchema>;
+export type LayoutProps = z.infer<typeof LayoutPropsSchema>;
+
+const AppearancePropsSchema = z.object({
+  theme: z.enum(['glass', 'solid', 'transparent']).optional(),
+  primaryColor: z.string().optional(),
+  typography: z.enum(['h1', 'h2', 'body', 'caption']).optional(),
+  elevation: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]).optional(),
+  corner: z.enum(['sharp', 'rounded', 'pill']).optional(),
+});
+export type AppearanceProps = z.infer<typeof AppearancePropsSchema>;
+
+// ---------- 2. 行为绑定 ----------
+
+const ActionBindingSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('none') }),
+  z.object({
+    type: z.literal('toggle_preset_entry'),
+    entry_id: z.string(),
+  }),
+  z.object({
+    type: z.literal('set_preset_param'),
+    param_name: z.string(),
+  }),
+]);
+export type ActionBinding = z.infer<typeof ActionBindingSchema>;
+
+// ---------- 3. Slider 元数据 ----------
+
+const SliderMetaSchema = z.object({
+  min: z.number().default(0),
+  max: z.number().default(2),
+  step: z.number().default(0.05),
+});
+export type SliderMeta = z.infer<typeof SliderMetaSchema>;
+
+// ---------- 4. UI 区块定义 (支持无限递归嵌套) ----------
+
+export type UIBlock = {
+  id: string;
+  type: 'container' | 'card' | 'text' | 'toggle' | 'slider' | 'button' | 'divider';
+  content?: string;
+  label?: string;
+  layout?: LayoutProps;
+  appearance?: AppearanceProps;
+  action?: ActionBinding;
+  slider_meta?: SliderMeta;
+  children?: UIBlock[];
+};
+
+export const UIBlockSchema: z.ZodType<UIBlock> = z.lazy(() =>
+  z.object({
+    id: z.string(),
+    type: z.enum(['container', 'card', 'text', 'toggle', 'slider', 'button', 'divider']),
+    content: z.string().optional(),
+    label: z.string().optional(),
+    layout: LayoutPropsSchema.optional(),
+    appearance: AppearancePropsSchema.optional(),
+    action: ActionBindingSchema.optional(),
+    slider_meta: SliderMetaSchema.optional(),
+    children: z.array(UIBlockSchema).optional(),
+  }),
+);
+
+// ---------- Widget 面板结构 ----------
+
+export const WidgetConfigSchema = z.object({
+  title: z.string().default('控制中心'),
+  root: UIBlockSchema,
+});
+export type WidgetConfig = z.infer<typeof WidgetConfigSchema>;
 
 // ---------- API 配置 ----------
 
-const ApiConfigSchema = z
+export const ApiConfigSchema = z
   .object({
-    /** 使用酒馆现有 API 还是自定义 API */
     mode: z.enum(['tavern', 'custom']).default('tavern'),
-    /** 自定义 API 地址 */
     custom_url: z.string().default(''),
-    /** 自定义 API 密钥 */
     custom_key: z.string().default(''),
-    /** 自定义模型名称 */
     custom_model: z.string().default(''),
-    /** 自定义 API 源 */
     custom_source: z.string().default('openai'),
   })
   .prefault({});
-type ApiConfig = z.infer<typeof ApiConfigSchema>;
+export type ApiConfig = z.infer<typeof ApiConfigSchema>;
 
 // ---------- 对话消息 ----------
 
-const ChatMessageSchema = z.object({
+export const ChatMessageSchema = z.object({
+  id: z.string(), // Fix #7: 添加唯一 ID
   role: z.enum(['user', 'assistant']),
   content: z.string(),
   timestamp: z.number(),
 });
-type ChatMessage = z.infer<typeof ChatMessageSchema>;
+export type ChatMessage = z.infer<typeof ChatMessageSchema>;
 
 // ---------- 脚本设置（持久化） ----------
 
-const SettingsSchema = z
+export const SettingsSchema = z
   .object({
-    /** API 配置 */
     api: ApiConfigSchema,
-    /** 面板是否开启 */
     panel_open: z.boolean().default(false),
-    /** 面板位置 */
     panel_x: z.number().default(-1),
     panel_y: z.number().default(-1),
-    /** 面板尺寸 */
-    panel_width: z.number().default(720),
-    panel_height: z.number().default(520),
-    /** 对话历史 */
+    panel_width: z.number().default(900),
+    panel_height: z.number().default(600),
     chat_history: z.array(ChatMessageSchema).default([]),
-    /** 当前面板配置 */
     widget_config: WidgetConfigSchema.optional(),
   })
   .prefault({});
-type Settings = z.infer<typeof SettingsSchema>;
+export type Settings = z.infer<typeof SettingsSchema>;
 
 // ---------- 预设条目快照 ----------
 
-const PresetEntrySnapshotSchema = z.object({
+export const PresetEntrySnapshotSchema = z.object({
   id: z.string(),
   name: z.string(),
   enabled: z.boolean(),
   role: z.string(),
   position_type: z.string(),
 });
-type PresetEntrySnapshot = z.infer<typeof PresetEntrySnapshotSchema>;
-
-export {
-  WidgetItemSchema,
-  WidgetGroupSchema,
-  WidgetConfigSchema,
-  ApiConfigSchema,
-  ChatMessageSchema,
-  SettingsSchema,
-  PresetEntrySnapshotSchema,
-};
-export type {
-  WidgetItem,
-  WidgetGroup,
-  WidgetConfig,
-  ApiConfig,
-  ChatMessage,
-  Settings,
-  PresetEntrySnapshot,
-};
+export type PresetEntrySnapshot = z.infer<typeof PresetEntrySnapshotSchema>;

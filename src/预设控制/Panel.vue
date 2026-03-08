@@ -82,7 +82,6 @@ import ControlArea from './ControlArea.vue';
 
 const store = useStore();
 const apiConfigOpen = ref(false);
-const panelRef = ref<HTMLElement>();
 const headerRef = ref<HTMLElement>();
 
 // ---------- 拖拽 ----------
@@ -91,17 +90,6 @@ const dragOffset = { x: 0, y: 0 };
 const panelPos = ref({
   x: store.settings.panel_x >= 0 ? store.settings.panel_x : -1,
   y: store.settings.panel_y >= 0 ? store.settings.panel_y : -1,
-});
-
-// 初始位置居中
-onMounted(() => {
-  if (panelPos.value.x < 0 || panelPos.value.y < 0) {
-    const doc = document;
-    const w = doc.documentElement.clientWidth || window.innerWidth;
-    const h = doc.documentElement.clientHeight || window.innerHeight;
-    panelPos.value.x = Math.max(40, (w - store.settings.panel_width) / 2);
-    panelPos.value.y = Math.max(40, (h - store.settings.panel_height) / 2);
-  }
 });
 
 const panelStyle = computed(() => ({
@@ -117,8 +105,16 @@ function onMouseDown(e: MouseEvent) {
   isDragging.value = true;
   dragOffset.x = e.clientX - panelPos.value.x;
   dragOffset.y = e.clientY - panelPos.value.y;
+
+  // Fix #3: 同时在 iframe document 和 parent document 上添加事件监听
   document.addEventListener('mousemove', onMouseMove);
   document.addEventListener('mouseup', onMouseUp);
+  try {
+    window.parent?.document?.addEventListener('mousemove', onMouseMove);
+    window.parent?.document?.addEventListener('mouseup', onMouseUp);
+  } catch {
+    // 跨域时静默忽略
+  }
 }
 
 function onMouseMove(e: MouseEvent) {
@@ -131,18 +127,38 @@ function onMouseUp() {
   isDragging.value = false;
   store.settings.panel_x = panelPos.value.x;
   store.settings.panel_y = panelPos.value.y;
-  document.removeEventListener('mousemove', onMouseMove);
-  document.removeEventListener('mouseup', onMouseUp);
+  cleanupDragListeners();
 }
 
+function cleanupDragListeners() {
+  document.removeEventListener('mousemove', onMouseMove);
+  document.removeEventListener('mouseup', onMouseUp);
+  try {
+    window.parent?.document?.removeEventListener('mousemove', onMouseMove);
+    window.parent?.document?.removeEventListener('mouseup', onMouseUp);
+  } catch {
+    // 跨域时静默忽略
+  }
+}
+
+// Fix #11: 合并为一个 onMounted
 onMounted(() => {
+  // 初始位置居中
+  if (panelPos.value.x < 0 || panelPos.value.y < 0) {
+    const doc = document;
+    const w = doc.documentElement.clientWidth || window.innerWidth;
+    const h = doc.documentElement.clientHeight || window.innerHeight;
+    panelPos.value.x = Math.max(40, (w - store.settings.panel_width) / 2);
+    panelPos.value.y = Math.max(40, (h - store.settings.panel_height) / 2);
+  }
+
+  // 注册拖拽
   headerRef.value?.addEventListener('mousedown', onMouseDown);
 });
 
 onUnmounted(() => {
   headerRef.value?.removeEventListener('mousedown', onMouseDown);
-  document.removeEventListener('mousemove', onMouseMove);
-  document.removeEventListener('mouseup', onMouseUp);
+  cleanupDragListeners();
 });
 </script>
 
@@ -165,7 +181,6 @@ onUnmounted(() => {
   color: rgba(255, 255, 255, 0.88);
 }
 
-/* --- Header --- */
 .pc-panel__header {
   display: flex;
   align-items: center;
@@ -223,7 +238,6 @@ onUnmounted(() => {
   color: rgba(255, 255, 255, 0.8);
 }
 
-/* --- API Config --- */
 .pc-panel__api-config {
   padding: 10px 14px;
   background: rgba(255, 255, 255, 0.02);
@@ -274,7 +288,6 @@ onUnmounted(() => {
   outline: none;
 }
 
-/* --- Body --- */
 .pc-panel__body {
   flex: 1;
   display: flex;
@@ -296,7 +309,6 @@ onUnmounted(() => {
   min-width: 0;
 }
 
-/* --- Scrollbar --- */
 :deep(::-webkit-scrollbar) {
   width: 4px;
 }

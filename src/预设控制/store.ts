@@ -1,15 +1,17 @@
 // ============================================================
-// Pinia Store — 所有运行时状态的唯一数据源
+// Pinia Store — 所有运行时状态的唯一数据源，提供树状 UI 状态与行为绑定
 // ============================================================
 
 import {
   SettingsSchema,
   WidgetConfigSchema,
   PresetEntrySnapshotSchema,
+  uid,
   type WidgetConfig,
   type ChatMessage,
   type PresetEntrySnapshot,
   type Settings,
+  type ActionBinding,
 } from './schema';
 import { callAI } from './ai';
 
@@ -19,17 +21,27 @@ export const useStore = defineStore('preset-control', () => {
     SettingsSchema.parse(getVariables({ type: 'script', script_id: getScriptId() })),
   );
 
-  // 自动持久化
-  watchEffect(() => {
-    insertOrAssignVariables(klona(settings.value), { type: 'script', script_id: getScriptId() });
-  });
+  // Fix #6: 用 debounce 代替 watchEffect 避免持久化风暴
+  let saveTimer: ReturnType<typeof setTimeout> | null = null;
+  watch(
+    settings,
+    () => {
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => {
+        insertOrAssignVariables(klona(settings.value), { type: 'script', script_id: getScriptId() });
+      }, 500);
+    },
+    { deep: true },
+  );
 
   // ========== 面板配置 ==========
   const widgetConfig = ref<WidgetConfig>(
-    settings.value.widget_config ?? WidgetConfigSchema.parse({}),
+    settings.value.widget_config ?? WidgetConfigSchema.parse({
+      title: '控制中心',
+      root: { id: uid(), type: 'container', layout: { direction: 'column', gap: 'medium', padding: 'medium' } }
+    }),
   );
 
-  // 当 widgetConfig 变化时，同步回 settings
   watch(
     widgetConfig,
     config => {
@@ -52,7 +64,10 @@ export const useStore = defineStore('preset-control', () => {
   // ========== 预设条目快照 ==========
   const presetEntries = ref<PresetEntrySnapshot[]>([]);
 
-  /** 扫描当前预设，提取所有条目信息 */
+  // Fix #2: 预设参数的响应式缓存
+  const presetParams = ref<Record<string, number>>({});
+
+  /** 扫描当前预设，提取所有条目信息和运行参数 */
   function scanPreset() {
     try {
       const preset = getPreset('in_use');
@@ -65,9 +80,31 @@ export const useStore = defineStore('preset-control', () => {
           position_type: p.position?.type ?? 'relative',
         }),
       );
+      // 同步参数缓存
+      refreshParamsCache(preset);
     } catch (err) {
       console.error('[预设控制] 扫描预设失败:', err);
       toastr.error('扫描预设失败，请检查是否有正在使用的预设');
+    }
+  }
+
+  function refreshParamsCache(preset?: Preset) {
+    try {
+      const p = preset ?? getPreset('in_use');
+      const s = p.settings;
+      presetParams.value = {
+        temperature: s.temperature,
+        max_context: s.max_context,
+        max_completion_tokens: s.max_completion_tokens,
+        frequency_penalty: s.frequency_penalty,
+        presence_penalty: s.presence_penalty,
+        top_p: s.top_p,
+        min_p: s.min_p,
+        top_k: s.top_k,
+        repetition_penalty: s.repetition_penalty,
+      };
+    } catch {
+      // 静默失败
     }
   }
 
@@ -83,10 +120,9 @@ export const useStore = defineStore('preset-control', () => {
 
   // ========== Actions ==========
 
-  /** 发送对话消息并调用 AI */
   async function sendChat(userMessage: string) {
-    // 添加用户消息
     chatHistory.value.push({
+      id: uid(), // Fix #7: 唯一 ID
       role: 'user',
       content: userMessage,
       timestamp: Date.now(),
@@ -94,26 +130,23 @@ export const useStore = defineStore('preset-control', () => {
 
     isLoading.value = true;
     try {
-      // 确保预设条目快照是最新的
       scanPreset();
 
-      // 调用 AI
-      const result = await callAI(userMessage, presetEntries.value, settings.value.api);
+      const result = await callAI(userMessage, presetEntries.value, presetParams.value, settings.value.api);
 
-      // 添加 AI 回复
       chatHistory.value.push({
+        id: uid(),
         role: 'assistant',
-        content: JSON.stringify(result, null, 2),
+        content: `✅ 成功生成新面板「${result.title}」`,
         timestamp: Date.now(),
       });
 
-      // 更新面板配置
       widgetConfig.value = result;
-
       toastr.success('面板已更新');
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       chatHistory.value.push({
+        id: uid(),
         role: 'assistant',
         content: `⚠️ 生成失败: ${errorMsg}`,
         timestamp: Date.now(),
@@ -124,92 +157,69 @@ export const useStore = defineStore('preset-control', () => {
     }
   }
 
-  /** 切换单个开关 */
-  async function toggleItem(groupIdx: number, itemIdx: number) {
-    const item = widgetConfig.value.groups[groupIdx]?.items[itemIdx];
-    if (!item) return;
+  // ========== Abstract UI Engine API ==========
 
-    item.enabled = !item.enabled;
-    await syncItemToPreset(item.preset_entry_id, item.enabled);
-  }
+  /**
+   * Fix #2: 引擎获取绑定状态值（全部走响应式缓存）
+   */
+  function getBoundValue(action?: ActionBinding): any {
+    if (!action || action.type === 'none') return null;
 
-  /** 批量切换整组 */
-  async function toggleGroup(groupIdx: number) {
-    const group = widgetConfig.value.groups[groupIdx];
-    if (!group) return;
-
-    // 如果全部开启则全部关闭，否则全部开启
-    const allEnabled = group.items.every(item => item.enabled);
-    const newState = !allEnabled;
-
-    for (const item of group.items) {
-      item.enabled = newState;
+    if (action.type === 'toggle_preset_entry') {
+      const entry = presetEntries.value.find(e => e.id === action.entry_id);
+      return entry ? entry.enabled : false;
     }
 
-    await syncAllToPreset();
-  }
-
-  /** 全部开启 */
-  async function enableAll() {
-    for (const group of widgetConfig.value.groups) {
-      for (const item of group.items) {
-        item.enabled = true;
-      }
+    if (action.type === 'set_preset_param') {
+      return presetParams.value[action.param_name] ?? 0;
     }
-    await syncAllToPreset();
+
+    return null;
   }
 
-  /** 全部关闭 */
-  async function disableAll() {
-    for (const group of widgetConfig.value.groups) {
-      for (const item of group.items) {
-        item.enabled = false;
-      }
-    }
-    await syncAllToPreset();
-  }
+  /**
+   * 引擎派发修改
+   */
+  async function executeAction(action?: ActionBinding, payload?: any) {
+    if (!action || action.type === 'none') return;
 
-  /** 同步单个条目到预设 */
-  async function syncItemToPreset(entryId: string, enabled: boolean) {
-    try {
-      await updatePresetWith('in_use', preset => {
-        const prompt = preset.prompts.find(p => p.id === entryId);
-        if (prompt) {
-          prompt.enabled = enabled;
-        }
-        return preset;
-      });
-    } catch (err) {
-      console.error('[预设控制] 同步条目失败:', err);
-      toastr.error('同步到预设失败');
-    }
-  }
-
-  /** 同步所有开关到预设 */
-  async function syncAllToPreset() {
-    try {
-      const enabledMap = new Map<string, boolean>();
-      for (const group of widgetConfig.value.groups) {
-        for (const item of group.items) {
-          enabledMap.set(item.preset_entry_id, item.enabled);
-        }
-      }
-
-      await updatePresetWith('in_use', preset => {
-        for (const prompt of preset.prompts) {
-          if (enabledMap.has(prompt.id)) {
-            prompt.enabled = enabledMap.get(prompt.id)!;
+    if (action.type === 'toggle_preset_entry') {
+      const state = Boolean(payload);
+      try {
+        await updatePresetWith('in_use', preset => {
+          const prompt = preset.prompts.find(p => p.id === action.entry_id);
+          if (prompt) {
+            prompt.enabled = state;
           }
-        }
-        return preset;
-      });
-    } catch (err) {
-      console.error('[预设控制] 批量同步失败:', err);
-      toastr.error('批量同步到预设失败');
+          return preset;
+        });
+        scanPreset();
+      } catch (err) {
+        toastr.error('同步条目到预设失败');
+      }
+      return;
+    }
+
+    if (action.type === 'set_preset_param') {
+      try {
+        // 先更新本地缓存保证 UI 即时响应
+        presetParams.value[action.param_name] = payload;
+
+        await updatePresetWith('in_use', preset => {
+          if (action.param_name in preset.settings) {
+            (preset.settings as any)[action.param_name] = payload;
+          }
+          return preset;
+        });
+      } catch (err) {
+        toastr.error('设置预设参数失败');
+        refreshParamsCache(); // 回滚缓存
+      }
+      return;
     }
   }
 
-  /** 从预设自动生成面板（不经过 AI） */
+  /** 无 AI 也能自动生成基础界面 */
   function autoGenerateFromPreset() {
     scanPreset();
 
@@ -219,36 +229,34 @@ export const useStore = defineStore('preset-control', () => {
           'charPersonality', 'scenario', 'dialogueExamples', 'chatHistory'].includes(e.id),
     );
 
-    widgetConfig.value = {
-      title: '预设控制',
-      groups: [
-        {
-          title: '提示词条目',
-          items: normalEntries.map(e => ({
-            label: e.name,
-            preset_entry_id: e.id,
-            preset_entry_name: e.name,
-            enabled: e.enabled,
-          })),
-        },
-      ],
-    };
+    widgetConfig.value = WidgetConfigSchema.parse({
+      title: '默认条目控制',
+      root: {
+        id: uid(),
+        type: 'container',
+        layout: { direction: 'column', gap: 'medium', padding: 'medium' },
+        children: [
+          {
+            id: uid(),
+            type: 'card',
+            appearance: { theme: 'glass', corner: 'rounded' },
+            layout: { direction: 'column', gap: 'small', padding: 'medium' },
+            children: normalEntries.map(e => ({
+              id: uid(),
+              type: 'toggle',
+              label: e.name,
+              action: { type: 'toggle_preset_entry', entry_id: e.id }
+            }))
+          }
+        ]
+      }
+    });
   }
 
-  /** 刷新面板状态（从预设同步回来） */
   function refreshFromPreset() {
     scanPreset();
-    for (const group of widgetConfig.value.groups) {
-      for (const item of group.items) {
-        const entry = presetEntries.value.find(e => e.id === item.preset_entry_id);
-        if (entry) {
-          item.enabled = entry.enabled;
-        }
-      }
-    }
   }
 
-  /** 清空对话历史 */
   function clearChat() {
     chatHistory.value = [];
   }
@@ -258,15 +266,13 @@ export const useStore = defineStore('preset-control', () => {
     widgetConfig,
     chatHistory,
     presetEntries,
+    presetParams,
     isLoading,
     panelOpen,
     scanPreset,
     sendChat,
-    toggleItem,
-    toggleGroup,
-    enableAll,
-    disableAll,
-    syncAllToPreset,
+    getBoundValue,
+    executeAction,
     autoGenerateFromPreset,
     refreshFromPreset,
     clearChat,

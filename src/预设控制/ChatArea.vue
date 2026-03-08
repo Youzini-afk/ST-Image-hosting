@@ -9,8 +9,8 @@
       </div>
 
       <div
-        v-for="(msg, idx) in store.chatHistory"
-        :key="idx"
+        v-for="msg in store.chatHistory"
+        :key="msg.id"
         class="chat-area__bubble"
         :class="{ 'chat-area__bubble--user': msg.role === 'user', 'chat-area__bubble--ai': msg.role === 'assistant' }"
       >
