@@ -36,7 +36,7 @@
         class="chat-area__shortcut-btn"
         :class="{ 'chat-area__shortcut-btn--active': store.settings.custom_system_prompt }"
         title="系统提示词"
-        @click="promptDialogOpen = true"
+        @click="openPromptDialog"
       >
         <i class="fa-solid fa-scroll" />
       </button>
@@ -96,6 +96,15 @@ import { useStore } from './store';
 const store = useStore();
 const inputText = ref('');
 const promptDialogOpen = ref(false);
+
+function openPromptDialog() {
+  // 打开时如果还没自定义，先填入当前自动生成的默认提示词
+  if (!store.settings.custom_system_prompt) {
+    store.scanPreset();
+    store.settings.custom_system_prompt = store.getDefaultSystemPrompt();
+  }
+  promptDialogOpen.value = true;
+}
 const messagesRef = ref<HTMLElement>();
 
 async function handleSend() {
