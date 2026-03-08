@@ -104,14 +104,24 @@ export async function commitMergedPlan(
   // Commit all changes in one atomic operation.
   await replaceWorldbook(target.worldbook_name, nextEntries, { render: 'debounced' });
 
-  // Mark floor binding: record which EW/Dyn/ entries + Controller snapshot belong to this message.
+  // Mark floor binding: record EW/Dyn entries, their content snapshots, and Controller snapshot.
   if (settings.floor_binding_enabled && messageId >= 0) {
-    const floorEntryNames = mergedPlan.worldbook.desired_entries
-      .map(entry => entry.name)
-      .filter(name => name.startsWith(settings.dynamic_entry_prefix));
+    const dynDesired = mergedPlan.worldbook.desired_entries
+      .filter(entry => entry.name.startsWith(settings.dynamic_entry_prefix));
 
-    if (floorEntryNames.length > 0 || controllerTemplate) {
-      await markFloorEntries(messageId, floorEntryNames, controllerTemplate);
+    const dynSnapshots = dynDesired.map(entry => ({
+      name: entry.name,
+      content: entry.content,
+      enabled: entry.enabled,
+    }));
+
+    if (dynSnapshots.length > 0 || controllerTemplate) {
+      await markFloorEntries(
+        messageId,
+        dynDesired.map(e => e.name),
+        controllerTemplate,
+        dynSnapshots,
+      );
     }
   }
 
