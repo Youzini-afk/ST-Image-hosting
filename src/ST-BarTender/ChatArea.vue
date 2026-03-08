@@ -47,7 +47,7 @@
 
     <!-- 系统提示词弹窗 -->
     <div v-if="promptDialogOpen" class="prompt-dialog__backdrop" @mousedown.self="promptDialogOpen = false">
-      <div class="prompt-dialog">
+      <div class="prompt-dialog" @mousedown.stop>
         <div class="prompt-dialog__header">
           <span class="prompt-dialog__title">系统提示词</span>
           <button class="prompt-dialog__close" @click="promptDialogOpen = false">
