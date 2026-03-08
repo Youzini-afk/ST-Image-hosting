@@ -251,7 +251,7 @@ export async function callAI(
       }
 
       console.info('[预设控制] 流式直接调用:', streamUrl);
-      const response = await fetch(streamUrl, {
+      const response = await fetchFn(streamUrl, {
         method: 'POST',
         headers: streamHeaders,
         body: JSON.stringify(streamBody),
