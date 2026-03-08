@@ -178,15 +178,19 @@ export async function callAI(
   console.info('[预设控制] system prompt 长度:', systemPrompt.length, '字符');
   console.info('[预设控制] API 模式:', apiConfig.mode, apiConfig.mode === 'custom' ? apiConfig.custom_url : '(使用酒馆API)');
 
+  // === 构建 generateRaw 配置 ===
+  // 关键：不使用 user_input + 'user_input' 占位符！
+  // 'user_input' 是 BuiltinPrompt，酒馆会注入整个预设 pipeline（角色描述、世界书等），
+  // 导致请求膨胀到 15K+ tokens。直接用 RolePrompt 数组绕过预设 pipeline。
   const config: GenerateRawConfig = {
-    user_input: userMessage,
-    should_silence: true,
     ordered_prompts: [
       { role: 'system', content: systemPrompt },
-      'user_input',
+      { role: 'user', content: userMessage },
     ],
+    should_stream: false,
   };
 
+  // 自定义 API
   if (apiConfig.mode === 'custom' && apiConfig.custom_url) {
     config.custom_api = {
       apiurl: apiConfig.custom_url,
@@ -196,28 +200,17 @@ export async function callAI(
     };
   }
 
-  console.info('[预设控制] 正在调用 generateRaw...', JSON.stringify({
-    has_custom_api: !!config.custom_api,
-    user_input_length: userMessage.length,
-    prompt_count: config.ordered_prompts?.length,
-  }));
+  console.info('[预设控制] 正在调用 generateRaw...', { custom_api: !!config.custom_api });
 
-  // 添加超时保护，防止无限等待
-  const TIMEOUT_MS = 90_000;
   let rawResponse: string;
   try {
-    rawResponse = await Promise.race([
-      generateRaw(config),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error(`generateRaw 超时 (${TIMEOUT_MS / 1000}s)，请检查 API 连接`)), TIMEOUT_MS),
-      ),
-    ]);
+    rawResponse = await generateRaw(config);
   } catch (err) {
     console.error('[预设控制] generateRaw 失败:', err);
     throw err;
   }
 
-  console.info('[预设控制] generateRaw 返回, 长度:', rawResponse?.length ?? 0);
+  console.info('[预设控制] AI 返回, 长度:', rawResponse?.length ?? 0);
 
   const jsonStr = extractJson(rawResponse);
 
