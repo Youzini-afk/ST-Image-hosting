@@ -82,20 +82,22 @@
         </div>
       </template>
 
-      <!-- 生成参数（所有模式通用） -->
+      <!-- 生成参数（自定义API时显示完整参数，酒馆API仅显示流式开关） -->
       <div class="pc-panel__api-sep">生成参数</div>
-      <div class="pc-panel__api-row">
-        <label class="pc-panel__api-label">最大Tokens</label>
-        <input v-model.number="store.settings.api.gen_max_tokens" class="pc-panel__api-input" type="number" min="1024" max="200000" step="1024" />
-      </div>
-      <div class="pc-panel__api-row">
-        <label class="pc-panel__api-label">温度</label>
-        <input v-model.number="store.settings.api.gen_temperature" class="pc-panel__api-input" type="number" min="0" max="2" step="0.05" />
-      </div>
-      <div class="pc-panel__api-row">
-        <label class="pc-panel__api-label">Top P</label>
-        <input v-model.number="store.settings.api.gen_top_p" class="pc-panel__api-input" type="number" min="0" max="1" step="0.05" />
-      </div>
+      <template v-if="store.settings.api.mode === 'custom'">
+        <div class="pc-panel__api-row">
+          <label class="pc-panel__api-label">最大Tokens</label>
+          <input v-model.number="store.settings.api.gen_max_tokens" class="pc-panel__api-input" type="number" min="1024" max="200000" step="1024" />
+        </div>
+        <div class="pc-panel__api-row">
+          <label class="pc-panel__api-label">温度</label>
+          <input v-model.number="store.settings.api.gen_temperature" class="pc-panel__api-input" type="number" min="0" max="2" step="0.05" />
+        </div>
+        <div class="pc-panel__api-row">
+          <label class="pc-panel__api-label">Top P</label>
+          <input v-model.number="store.settings.api.gen_top_p" class="pc-panel__api-input" type="number" min="0" max="1" step="0.05" />
+        </div>
+      </template>
       <div class="pc-panel__api-row">
         <label class="pc-panel__api-label">流式</label>
         <div class="pc-panel__api-toggle" @click="store.settings.api.gen_stream = !store.settings.api.gen_stream">
