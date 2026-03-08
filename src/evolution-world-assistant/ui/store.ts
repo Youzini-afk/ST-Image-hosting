@@ -231,6 +231,7 @@ export const useEwStore = defineStore('evolution-world-store', () => {
     for (const flow of safeSettings.flows) {
       (flow as any).api_url = '';
       (flow as any).api_key = '';
+      (flow as any).headers_json = '';
     }
     const payload = JSON.stringify(safeSettings, null, 2);
     navigator.clipboard
@@ -291,11 +292,12 @@ export const useEwStore = defineStore('evolution-world-store', () => {
   }
 
   function buildFlowExportPayload(flows: EwFlowConfig[]) {
-    // 安全导出：去除每条 flow 的 api_url / api_key 敏感字段
+    // 安全导出：去除每条 flow 的 api_url / api_key / headers_json 敏感字段
     const safeFlows = flows.map(flow => {
       const copy = klona(flow) as Record<string, unknown>;
       delete copy.api_url;
       delete copy.api_key;
+      delete copy.headers_json;
       return copy;
     });
     return { ew_flow_export: true, version: 1, flows: safeFlows };
