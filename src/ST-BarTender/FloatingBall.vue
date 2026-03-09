@@ -129,20 +129,43 @@ function openMainPanel() {
   store.panelOpen = true;
 }
 
-// ---------- 初始位置 ----------
-onMounted(() => {
+// ---------- 视口尺寸与位置约束 ----------
+function getViewportSize() {
+  let w = window.innerWidth;
+  let h = window.innerHeight;
+  try {
+    if (window.parent && window.parent !== window) {
+      w = window.parent.innerWidth;
+      h = window.parent.innerHeight;
+    }
+  } catch { /* 跨域静默 */ }
+  return { w, h };
+}
+
+/** 将悬浮球位置限制在可视区域内 */
+function clampBallPosition() {
+  const { w, h } = getViewportSize();
+  // 首次加载（坐标为 -1）→ 设置默认位置
   if (ballPos.value.x < 0 || ballPos.value.y < 0) {
-    let w = window.innerWidth;
-    let h = window.innerHeight;
-    try {
-      if (window.parent && window.parent !== window) {
-        w = window.parent.innerWidth;
-        h = window.parent.innerHeight;
-      }
-    } catch { /* 跨域静默 */ }
     ballPos.value.x = w - BALL_SIZE - 20;
     ballPos.value.y = h / 2 - BALL_SIZE / 2;
+    return;
   }
+  // 已有坐标 → 确保不超出当前视口
+  ballPos.value.x = Math.max(0, Math.min(ballPos.value.x, w - BALL_SIZE));
+  ballPos.value.y = Math.max(0, Math.min(ballPos.value.y, h - BALL_SIZE));
+}
+
+// 视口变化时（桌面↔移动切换、屏幕旋转）自动校正位置
+watch(() => store.isMobile, () => {
+  clampBallPosition();
+  // 同步保存校正后的位置
+  store.settings.ball_x = ballPos.value.x;
+  store.settings.ball_y = ballPos.value.y;
+});
+
+onMounted(() => {
+  clampBallPosition();
 
   // 首次加载时如果没有保存的配置，自动扫描预设生成基础界面
   if (!store.settings.widget_config) {
