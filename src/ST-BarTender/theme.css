@@ -73,9 +73,9 @@
    仅在切换期间激活，避免页面加载时闪烁
    ----------------------------------------- */
 .ub-theme-transitioning,
-.ub-theme-transitioning *,
-.ub-theme-transitioning *::before,
-.ub-theme-transitioning *::after {
+.ub-theme-transitioning *:not(.pc-panel__theme-overlay),
+.ub-theme-transitioning *:not(.pc-panel__theme-overlay)::before,
+.ub-theme-transitioning *:not(.pc-panel__theme-overlay)::after {
   transition: background 0.6s ease-out,
               background-color 0.6s ease-out,
               color 0.6s ease-out,
