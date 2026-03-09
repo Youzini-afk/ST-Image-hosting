@@ -109,6 +109,15 @@
             <span class="pc-panel__api-toggle-text">{{ store.settings.api.gen_stream ? '开启' : '关闭' }}</span>
           </div>
         </div>
+        <div class="pc-panel__api-row">
+          <label class="pc-panel__api-label">保留用户编辑</label>
+          <div class="pc-panel__api-toggle" @click="store.settings.preserve_user_edits = !store.settings.preserve_user_edits">
+            <div class="pc-panel__api-toggle-track" :class="{ 'active': store.settings.preserve_user_edits }">
+              <div class="pc-panel__api-toggle-thumb" />
+            </div>
+            <span class="pc-panel__api-toggle-text">{{ store.settings.preserve_user_edits ? '开启' : '关闭' }}</span>
+          </div>
+        </div>
       </div>
     </div>
 

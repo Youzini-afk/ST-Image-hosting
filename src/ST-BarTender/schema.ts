@@ -145,6 +145,7 @@ export const SettingsSchema = z
     bubble_width: z.number().default(320),
     bubble_height: z.number().default(480),
     show_in_wand: z.boolean().default(true),
+    preserve_user_edits: z.boolean().default(true),
     custom_system_prompt: z.string().default(''),
     chat_history: z.array(ChatMessageSchema).default([]),
     widget_config: WidgetConfigSchema.optional(),

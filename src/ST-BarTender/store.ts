@@ -245,7 +245,7 @@ export const useStore = defineStore('preset-control', () => {
         timestamp: Date.now(),
       });
 
-      widgetConfig.value = result;
+      applyNewWidgetConfig(result);
       toastr.success('面板已更新');
     } catch (err) {
       streamingText.value = '';
@@ -332,7 +332,7 @@ export const useStore = defineStore('preset-control', () => {
         content: `✅ 成功生成新面板「${result.title}」`,
         timestamp: Date.now(),
       });
-      widgetConfig.value = result;
+      applyNewWidgetConfig(result);
       toastr.success('面板已更新');
     } catch (err) {
       streamingText.value = '';
@@ -437,6 +437,39 @@ export const useStore = defineStore('preset-control', () => {
         }))
       }
     });
+  }
+
+  /** 收集树中所有 _userEdited 的区块 */
+  function collectUserEdited(block: UIBlock): UIBlock[] {
+    const result: UIBlock[] = [];
+    if (block._userEdited) result.push(block);
+    if (block.children) {
+      for (const child of block.children) {
+        result.push(...collectUserEdited(child));
+      }
+    }
+    return result;
+  }
+
+  /** 应用新的 widgetConfig，可选保留用户编辑 */
+  function applyNewWidgetConfig(newConfig: WidgetConfig) {
+    if (settings.value.preserve_user_edits) {
+      const userBlocks = collectUserEdited(widgetConfig.value.root);
+      if (userBlocks.length > 0 && newConfig.root.children) {
+        // 过滤掉新树中与用户编辑区块相同 action 的区块（避免重复）
+        const userActionIds = new Set(
+          userBlocks
+            .filter(b => b.action && 'entry_id' in b.action)
+            .map(b => (b.action as any).entry_id),
+        );
+        newConfig.root.children = newConfig.root.children.filter(child => {
+          if (!child.action || !('entry_id' in child.action)) return true;
+          return !userActionIds.has((child.action as any).entry_id);
+        });
+        newConfig.root.children.push(...userBlocks);
+      }
+    }
+    widgetConfig.value = newConfig;
   }
 
   function refreshFromPreset() {
