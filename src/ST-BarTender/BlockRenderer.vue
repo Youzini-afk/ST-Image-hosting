@@ -121,14 +121,23 @@ const appearanceClasses = computed(() => {
 .lo-alg-stretch { align-items: stretch; }
 
 .lo-gap-none { gap: 0; }
-.lo-gap-small { gap: 8px; }
-.lo-gap-medium { gap: 16px; }
-.lo-gap-large { gap: 24px; }
+.lo-gap-small { gap: 6px; }
+.lo-gap-medium { gap: 10px; }
+.lo-gap-large { gap: 16px; }
 
 .lo-pad-none { padding: 0; }
-.lo-pad-small { padding: 8px; }
-.lo-pad-medium { padding: 16px; }
-.lo-pad-large { padding: 24px; }
+.lo-pad-small { padding: 6px; }
+.lo-pad-medium { padding: 12px; }
+.lo-pad-large { padding: 16px; }
+
+/* 嵌套的 card/container 自动压缩 padding，避免层层叠加 */
+.ub-card .ub-card,
+.ub-container .ub-card {
+  padding: 8px !important;
+}
+.ub-card .ub-container {
+  padding: 0 !important;
+}
 
 .lo-w-auto { width: auto; }
 .lo-w-full { width: 100%; }
