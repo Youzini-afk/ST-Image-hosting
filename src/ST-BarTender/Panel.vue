@@ -1,5 +1,4 @@
 <template>
-  <transition :name="store.isMobile ? '' : 'panel-fade'">
     <div
       v-show="store.panelOpen"
       ref="panelRef"
@@ -192,7 +191,7 @@
     <!-- 主题切换径向扩散动画覆盖层 -->
     <div v-if="themeOverlayVisible" class="pc-panel__theme-overlay" :style="themeOverlayStyle" />
     </div>
-  </transition>
+
 
   <!-- 历史记录弹窗 -->
   <ConfigHistory />
@@ -503,18 +502,20 @@ onUnmounted(() => {
   transform: rotate(90deg);
 }
 
-/* --- Panel Fade Transition --- */
-.panel-fade-enter-active,
-.panel-fade-leave-active {
-  transition: opacity 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-              transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-  transform-origin: center center;
+/* --- Panel Fade Transition (CSS-only, no Vue <transition>) --- */
+.pc-panel {
+  animation: panel-appear 0.25s ease-out;
 }
 
-.panel-fade-enter-from,
-.panel-fade-leave-to {
-  opacity: 0;
-  transform: scale(0.96) translateY(10px);
+@keyframes panel-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 /* --- API Config Drawer (Grid transition) --- */
