@@ -1,5 +1,5 @@
 <template>
-  <transition name="panel-fade">
+  <transition :name="store.isMobile ? '' : 'panel-fade'">
     <div
       v-show="store.panelOpen"
       ref="panelRef"
