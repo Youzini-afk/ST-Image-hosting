@@ -264,16 +264,15 @@ function onResizeEnd() {
 }
 
 // ============================================================
-// 主题切换: 手动覆盖层 clip-path 径向扩散动画
+// 主题切换: 径向扩散动画 (克隆旧状态 → 收缩露出新主题)
 // ============================================================
 let themeAnimating = false;
 
 function toggleTheme(e: MouseEvent) {
-  if (themeAnimating) return; // 防止动画期间重复触发
+  if (themeAnimating) return;
 
   const nextTheme = store.settings.theme === 'dark' ? 'parchment' : 'dark';
 
-  // 获取面板根元素 (动画容器)
   const panelEl = document.querySelector('.pc-panel') as HTMLElement | null;
   if (!panelEl) {
     store.settings.theme = nextTheme;
@@ -282,52 +281,57 @@ function toggleTheme(e: MouseEvent) {
 
   themeAnimating = true;
 
-  // 1. 计算点击相对面板的坐标
+  // 1. 计算点击在面板内的坐标
   const panelRect = panelEl.getBoundingClientRect();
   const x = e.clientX - panelRect.left;
   const y = e.clientY - panelRect.top;
-
-  // 最大扩散半径 = 到面板四角最远距离
   const endRadius = Math.hypot(
     Math.max(x, panelRect.width - x),
     Math.max(y, panelRect.height - y)
   );
 
-  // 2. 创建覆盖层 (带有目标主题类，覆盖在面板之上)
-  const overlay = document.createElement('div');
-  overlay.className = `ub-theme-${nextTheme}`;
-  overlay.style.cssText = `
-    position: absolute;
-    inset: 0;
-    z-index: 999999;
-    background: var(--ub-bg-solid);
-    clip-path: circle(0px at ${x}px ${y}px);
+  // 2. 克隆面板当前视觉状态 (旧主题)
+  const clone = panelEl.cloneNode(true) as HTMLElement;
+
+  // 让克隆体成为纯展示层
+  clone.style.cssText = `
+    position: fixed;
+    left: ${panelRect.left}px;
+    top: ${panelRect.top}px;
+    width: ${panelRect.width}px;
+    height: ${panelRect.height}px;
+    z-index: 1000000;
     pointer-events: none;
-    border-radius: inherit;
+    clip-path: circle(${endRadius}px at ${x}px ${y}px);
+    border-radius: ${getComputedStyle(panelEl).borderRadius};
+    overflow: hidden;
   `;
-  panelEl.appendChild(overlay);
 
-  // 3. 播放扩散动画
-  const anim = overlay.animate(
-    [
-      { clipPath: `circle(0px at ${x}px ${y}px)` },
-      { clipPath: `circle(${endRadius}px at ${x}px ${y}px)` },
-    ],
-    {
-      duration: 500,
-      easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-      fill: 'forwards',
-    }
-  );
+  // 插入到面板的父级，确保在面板之上
+  panelEl.parentElement!.appendChild(clone);
 
-  // 4. 动画结束后切换真实主题并移除覆盖层
-  anim.onfinish = () => {
-    store.settings.theme = nextTheme;
-    nextTick(() => {
-      overlay.remove();
+  // 3. 立刻切换真正的主题 (面板本体变为新主题)
+  store.settings.theme = nextTheme;
+
+  // 4. 下一帧开始动画: 将克隆体 (旧主题) 的 clip-path 从全覆盖缩小到 0
+  requestAnimationFrame(() => {
+    const anim = clone.animate(
+      [
+        { clipPath: `circle(${endRadius}px at ${x}px ${y}px)` },
+        { clipPath: `circle(0px at ${x}px ${y}px)` },
+      ],
+      {
+        duration: 500,
+        easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+        fill: 'forwards',
+      }
+    );
+
+    anim.onfinish = () => {
+      clone.remove();
       themeAnimating = false;
-    });
-  };
+    };
+  });
 }
 
 // Fix #11: 合并为一个 onMounted
