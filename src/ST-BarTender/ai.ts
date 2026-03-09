@@ -25,6 +25,8 @@ export function buildSystemPrompt(presetEntries: PresetEntrySnapshot[], _presetP
     你是一个预设的高级 UI 控制台架构师。你的任务是根据用户的需求，自动搭建一个精美的控制面板。
     这个平台提供一套基于 JSON 抽象出的高级组件系统 (Abstract Component Tree)。你的输出将直接由我们的前端渲染引擎转化为极度精美的毛玻璃 UI (Glassmorphism)。
 
+    **重要上下文**：这个面板是一个紧凑的悬浮小窗口（约 400×500px），空间极其有限。你必须高度重视空间利用率，结构尽可能扁平，避免多余的嵌套和留白浪费。
+
     ## 上下文：酒馆当前状态
 
     当前预设的提示词条目 (可绑定 \`toggle_preset_entry\` action)：
@@ -83,11 +85,12 @@ export function buildSystemPrompt(presetEntries: PresetEntrySnapshot[], _presetP
     7. **禁止生成 slider**！不要生成任何生成参数相关的调节控件。只生成提示词条目的 toggle 开关。
     8. **严格保持条目原始顺序**！条目列表是预设作者精心排列的，你必须按原始顺序放置 toggle，不允许打乱、重新排序或把距离很远的条目拆开重组到一起。
     9. **分组基于相邻性**！只把列表中相邻的、语义相近的条目归入同一个 card。禁止把列表中距离很远的条目强行拉到一个分组里。如果连续几个条目之间看不出明确的语义关联，宁可每个条目单独一个 card 或把它们按原始顺序依次放在同一个 card 里，也不要自编一个笼统的分类名把不相关的条目塞在一起。
+    10. **严禁深层嵌套**！整棵树最多只允许 2 层：\`root(container) → card → [text/toggle/button/divider]\`。card 内部禁止再套 container 或 card。这是一个小悬浮窗，每多一层嵌套都会浪费大量宝贵空间。
 
     ## 最佳实践
 
     1. **只输出纯 JSON**（可包裹在\`\`\`json内），不要有任何其他文字。
-    2. **高级感来源于留白与嵌套**：顶层是一个 \`container(column, full)\`，里面是几个 \`card(glass, rounded, full)\`。
+    2. **结构必须扁平紧凑**：顶层 \`container(column, full)\` → 直接放若干 \`card(glass, rounded, full)\`，每个 card 里只放 text 标题 + toggle 列表。不要在 card 里再嵌套 container 或 card。悬浮窗空间有限，padding 和 gap 使用 'small' 即可，避免过多留白。
     3. **用 \`text\` 做区域标题**（\`appearance.typography: 'h2'\`），放在 card 内部最前面。标题应基于该组条目的实际含义，不要用笼统的"其他"或随意总结的名称。
     4. **严格引用上下文**：\`entry_id\` 必须从上面的列表中选取。
     5. **尊重预设作者的分区意图**：预设作者把条目排在一起通常意味着它们功能相关。按顺序扫描条目列表，遇到语义断点（功能明显不同）时断开为新的 card。
@@ -143,7 +146,7 @@ function extractJson(text: string): string {
 /**
  * 后处理：修正 AI 返回的不合理布局值
  */
-function sanitizeBlock(block: UIBlock, isRoot = false): UIBlock {
+function sanitizeBlock(block: UIBlock, isRoot = false, depth = 0): UIBlock {
   const b = { ...block };
 
   // card 和 container 强制 width: 'full' + direction: 'column'
@@ -172,9 +175,20 @@ function sanitizeBlock(block: UIBlock, isRoot = false): UIBlock {
     if (!b.layout.gap) b.layout.gap = 'medium';
   }
 
-  // 递归处理子节点
+  // 递归处理子节点，同时拍扁过深嵌套
   if (b.children) {
-    b.children = b.children.map(child => sanitizeBlock(child));
+    const flatChildren: UIBlock[] = [];
+    for (const child of b.children) {
+      // 如果深度 ≥ 2 且子节点是 container/card，把它的 children 提升上来（拍扁）
+      if (depth >= 2 && (child.type === 'container' || child.type === 'card')) {
+        if (child.children) {
+          flatChildren.push(...child.children.map(gc => sanitizeBlock(gc, false, depth + 1)));
+        }
+      } else {
+        flatChildren.push(sanitizeBlock(child, false, depth + 1));
+      }
+    }
+    b.children = flatChildren;
   }
 
   return b;
