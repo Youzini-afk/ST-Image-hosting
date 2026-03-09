@@ -144,6 +144,16 @@ function ensureFabStyle(): void {
   outline: none;
   transition: box-shadow 0.3s ease, border-color 0.3s ease;
   -webkit-tap-highlight-color: transparent;
+  animation: ew-fab-pop-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+#${FAB_ID}::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid rgba(139, 92, 246, 0.35);
+  animation: ew-fab-ring-pulse 2.5s ease-in-out infinite;
+  pointer-events: none;
 }
 #${FAB_ID}:hover {
   border-color: rgba(167, 139, 250, 0.7);
@@ -155,6 +165,23 @@ function ensureFabStyle(): void {
 #${FAB_ID}.dragging {
   cursor: grabbing;
   transition: none;
+  animation: none;
+}
+#${FAB_ID}.leaving {
+  animation: ew-fab-pop-out 0.25s ease forwards;
+  pointer-events: none;
+}
+@keyframes ew-fab-pop-in {
+  0% { opacity: 0; transform: scale(0.3); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes ew-fab-pop-out {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.3); }
+}
+@keyframes ew-fab-ring-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.08); }
 }
 `;
   doc.head.appendChild(style);
@@ -262,8 +289,18 @@ function createFab(): void {
 
 function removeFab(): void {
   const doc = resolveParentDocument();
-  doc.getElementById(FAB_ID)?.remove();
-  doc.getElementById(FAB_STYLE_ID)?.remove();
+  const fab = doc.getElementById(FAB_ID);
+  if (!fab) {
+    doc.getElementById(FAB_STYLE_ID)?.remove();
+    return;
+  }
+  fab.classList.add('leaving');
+  fab.addEventListener('animationend', () => {
+    fab.remove();
+    doc.getElementById(FAB_STYLE_ID)?.remove();
+  }, { once: true });
+  // Fallback if animationend doesn't fire
+  setTimeout(() => fab.remove(), 300);
 }
 
 function syncFabVisibility(): void {
@@ -272,8 +309,10 @@ function syncFabVisibility(): void {
   const fab = doc.getElementById(FAB_ID);
   if (settings.show_fab) {
     if (!fab) createFab();
-  } else {
-    fab?.remove();
+  } else if (fab) {
+    fab.classList.add('leaving');
+    fab.addEventListener('animationend', () => fab.remove(), { once: true });
+    setTimeout(() => fab.remove(), 300);
   }
 }
 
