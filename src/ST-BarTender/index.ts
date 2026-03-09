@@ -2,7 +2,7 @@
 // 预设控制脚本入口
 // ============================================================
 
-import { createScriptIdDiv, teleportStyle } from '@util/script';
+import { createScriptIdDiv } from '@util/script';
 import './theme.css';
 import Panel from './Panel.vue';
 import FloatingBall from './FloatingBall.vue';
@@ -22,6 +22,7 @@ let $ballRoot: JQuery<HTMLDivElement> | null = null;
 
 let destroyStyle: (() => void) | null = null;
 let menuRetryTimer: ReturnType<typeof setTimeout> | null = null;
+let styleObserver: MutationObserver | null = null;
 
 /** 获取挂载目标 body —— 优先使用 parent document（绕过 iframe 的触摸事件限制） */
 function resolveParentBody(): HTMLElement {
@@ -34,13 +35,65 @@ function resolveParentBody(): HTMLElement {
 }
 
 /** 获取挂载目标 head */
-function resolveParentHead(): JQuery {
+function resolveParentHead(): HTMLElement {
   try {
     if (window.parent && window.parent !== window) {
-      return $('head', window.parent.document);
+      return window.parent.document.head;
     }
   } catch { /* 跨域静默 */ }
-  return $('head');
+  return document.head;
+}
+
+/**
+ * 持续同步 iframe <head> 的 <style> 标签到 parent document <head>
+ * vue-style-loader 在组件挂载时才注入 <style>，所以必须持续监控而非一次性复制
+ */
+function setupContinuousStyleSync() {
+  const parentHead = resolveParentHead();
+  const iframeHead = document.head;
+  const scriptId = getScriptId();
+
+  // 用于追踪已同步的 style 元素（避免重复复制）
+  const syncedStyles = new WeakSet<Node>();
+
+  // 获取同步容器（整个生命周期复用）
+  let $syncContainer = $(parentHead).find(`div[script_id="${scriptId}"]`);
+  if (!$syncContainer.length) {
+    $syncContainer = $('<div>').attr('script_id', scriptId).appendTo(parentHead);
+  }
+
+  // 同步当前已存在的 style 标签
+  function syncExistingStyles() {
+    $(iframeHead).find('style').each(function () {
+      if (!syncedStyles.has(this)) {
+        syncedStyles.add(this);
+        $syncContainer.append($(this).clone());
+      }
+    });
+  }
+
+  // 初次同步
+  syncExistingStyles();
+
+  // 监控新增的 style 标签
+  styleObserver = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      for (const node of mutation.addedNodes) {
+        if (node instanceof HTMLStyleElement && !syncedStyles.has(node)) {
+          syncedStyles.add(node);
+          $syncContainer.append($(node).clone());
+        }
+      }
+    }
+  });
+
+  styleObserver.observe(iframeHead, { childList: true });
+
+  destroyStyle = () => {
+    styleObserver?.disconnect();
+    styleObserver = null;
+    $syncContainer.remove();
+  };
 }
 
 // 共享 Pinia 实例
@@ -130,8 +183,8 @@ function mountFloatingBall() {
   $ballRoot = createScriptIdDiv().appendTo(resolveParentBody());
   ballApp.mount($ballRoot[0]);
 
-  const style = teleportStyle(resolveParentHead());
-  destroyStyle = style.destroy;
+  // 持续同步样式到 parent document（vue-style-loader 会在组件挂载时动态注入 style 标签）
+  setupContinuousStyleSync();
 
   // 监听 panelOpen → 自动挂载并打开面板（供悬浮球齿轮按钮触发）
   // immediate: true → 如果上次 panel_open=true 被持久化，刷新后自动恢复面板
