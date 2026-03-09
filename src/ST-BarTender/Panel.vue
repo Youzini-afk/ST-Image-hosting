@@ -1,8 +1,8 @@
 <template>
   <transition name="panel-fade">
     <div
-      ref="panelRef"
       v-show="store.panelOpen"
+      ref="panelRef"
       class="pc-panel"
       :style="panelStyle"
   >
@@ -33,80 +33,81 @@
     <div class="pc-panel__api-config-wrapper" :class="{ 'pc-panel__api-config-wrapper--open': apiConfigOpen }">
       <div class="pc-panel__api-config">
         <div class="pc-panel__api-row">
-        <label class="pc-panel__api-label">API 模式</label>
-        <select v-model="store.settings.api.mode" class="pc-panel__api-select">
-          <option value="tavern">使用酒馆 API</option>
-          <option value="custom">自定义 API</option>
-        </select>
-      </div>
-      <template v-if="store.settings.api.mode === 'custom'">
-        <div class="pc-panel__api-row">
-          <label class="pc-panel__api-label">地址</label>
-          <input v-model="store.settings.api.custom_url" class="pc-panel__api-input" placeholder="https://api.example.com/v1" />
-        </div>
-        <div class="pc-panel__api-row">
-          <label class="pc-panel__api-label">密钥</label>
-          <input v-model="store.settings.api.custom_key" class="pc-panel__api-input" type="password" placeholder="sk-..." />
-        </div>
-        <div class="pc-panel__api-row">
-          <label class="pc-panel__api-label">模型</label>
-          <select
-            v-if="store.modelCandidates.length > 0"
-            v-model="store.settings.api.custom_model"
-            class="pc-panel__api-select pc-panel__api-model-select"
-          >
-            <option v-for="m in store.modelCandidates" :key="m" :value="m">{{ m }}</option>
-          </select>
-          <input
-            v-else
-            v-model="store.settings.api.custom_model"
-            class="pc-panel__api-input"
-            placeholder="gpt-4o-mini"
-          />
-          <button
-            class="pc-panel__api-fetch-btn"
-            :disabled="store.isLoadingModels"
-            title="获取模型列表"
-            @click="store.loadModels()"
-          >
-            <i :class="store.isLoadingModels ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-rotate'" />
-          </button>
-        </div>
-        <div class="pc-panel__api-row">
-          <label class="pc-panel__api-label">源</label>
-          <select v-model="store.settings.api.custom_source" class="pc-panel__api-select">
-            <option value="openai">OpenAI</option>
-            <option value="claude">Claude</option>
-            <option value="google">Google</option>
-            <option value="deepseek">DeepSeek</option>
-            <option value="custom">Custom</option>
+          <label class="pc-panel__api-label">API 模式</label>
+          <select v-model="store.settings.api.mode" class="pc-panel__api-select">
+            <option value="tavern">使用酒馆 API</option>
+            <option value="custom">自定义 API</option>
           </select>
         </div>
-      </template>
-
-      <!-- 生成参数（自定义API时显示完整参数，酒馆API仅显示流式开关） -->
-      <div class="pc-panel__api-sep">生成参数</div>
-      <template v-if="store.settings.api.mode === 'custom'">
-        <div class="pc-panel__api-row">
-          <label class="pc-panel__api-label">最大Tokens</label>
-          <input v-model.number="store.settings.api.gen_max_tokens" class="pc-panel__api-input" type="number" min="1024" max="200000" step="1024" />
-        </div>
-        <div class="pc-panel__api-row">
-          <label class="pc-panel__api-label">温度</label>
-          <input v-model.number="store.settings.api.gen_temperature" class="pc-panel__api-input" type="number" min="0" max="2" step="0.05" />
-        </div>
-        <div class="pc-panel__api-row">
-          <label class="pc-panel__api-label">Top P</label>
-          <input v-model.number="store.settings.api.gen_top_p" class="pc-panel__api-input" type="number" min="0" max="1" step="0.05" />
-        </div>
-      </template>
-      <div class="pc-panel__api-row">
-        <label class="pc-panel__api-label">流式</label>
-        <div class="pc-panel__api-toggle" @click="store.settings.api.gen_stream = !store.settings.api.gen_stream">
-          <div class="pc-panel__api-toggle-track" :class="{ 'active': store.settings.api.gen_stream }">
-            <div class="pc-panel__api-toggle-thumb" />
+        <template v-if="store.settings.api.mode === 'custom'">
+          <div class="pc-panel__api-row">
+            <label class="pc-panel__api-label">地址</label>
+            <input v-model="store.settings.api.custom_url" class="pc-panel__api-input" placeholder="https://api.example.com/v1" />
           </div>
-          <span class="pc-panel__api-toggle-text">{{ store.settings.api.gen_stream ? '开启' : '关闭' }}</span>
+          <div class="pc-panel__api-row">
+            <label class="pc-panel__api-label">密钥</label>
+            <input v-model="store.settings.api.custom_key" class="pc-panel__api-input" type="password" placeholder="sk-..." />
+          </div>
+          <div class="pc-panel__api-row">
+            <label class="pc-panel__api-label">模型</label>
+            <select
+              v-if="store.modelCandidates.length > 0"
+              v-model="store.settings.api.custom_model"
+              class="pc-panel__api-select pc-panel__api-model-select"
+            >
+              <option v-for="m in store.modelCandidates" :key="m" :value="m">{{ m }}</option>
+            </select>
+            <input
+              v-else
+              v-model="store.settings.api.custom_model"
+              class="pc-panel__api-input"
+              placeholder="gpt-4o-mini"
+            />
+            <button
+              class="pc-panel__api-fetch-btn"
+              :disabled="store.isLoadingModels"
+              title="获取模型列表"
+              @click="store.loadModels()"
+            >
+              <i :class="store.isLoadingModels ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-rotate'" />
+            </button>
+          </div>
+          <div class="pc-panel__api-row">
+            <label class="pc-panel__api-label">源</label>
+            <select v-model="store.settings.api.custom_source" class="pc-panel__api-select">
+              <option value="openai">OpenAI</option>
+              <option value="claude">Claude</option>
+              <option value="google">Google</option>
+              <option value="deepseek">DeepSeek</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+        </template>
+
+        <!-- 生成参数（自定义API时显示完整参数，酒馆API仅显示流式开关） -->
+        <div class="pc-panel__api-sep">生成参数</div>
+        <template v-if="store.settings.api.mode === 'custom'">
+          <div class="pc-panel__api-row">
+            <label class="pc-panel__api-label">最大Tokens</label>
+            <input v-model.number="store.settings.api.gen_max_tokens" class="pc-panel__api-input" type="number" min="1024" max="200000" step="1024" />
+          </div>
+          <div class="pc-panel__api-row">
+            <label class="pc-panel__api-label">温度</label>
+            <input v-model.number="store.settings.api.gen_temperature" class="pc-panel__api-input" type="number" min="0" max="2" step="0.05" />
+          </div>
+          <div class="pc-panel__api-row">
+            <label class="pc-panel__api-label">Top P</label>
+            <input v-model.number="store.settings.api.gen_top_p" class="pc-panel__api-input" type="number" min="0" max="1" step="0.05" />
+          </div>
+        </template>
+        <div class="pc-panel__api-row">
+          <label class="pc-panel__api-label">流式</label>
+          <div class="pc-panel__api-toggle" @click="store.settings.api.gen_stream = !store.settings.api.gen_stream">
+            <div class="pc-panel__api-toggle-track" :class="{ 'active': store.settings.api.gen_stream }">
+              <div class="pc-panel__api-toggle-thumb" />
+            </div>
+            <span class="pc-panel__api-toggle-text">{{ store.settings.api.gen_stream ? '开启' : '关闭' }}</span>
+          </div>
         </div>
       </div>
     </div>

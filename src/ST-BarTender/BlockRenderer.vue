@@ -1,3 +1,4 @@
+<template>
   <!-- 容器类型 (container) -->
   <div v-if="block.type === 'container'" class="ub-container ub-animated" :class="[layoutClasses, appearanceClasses]">
     <BlockRenderer v-for="child in block.children" :key="child.id" :block="child" />
