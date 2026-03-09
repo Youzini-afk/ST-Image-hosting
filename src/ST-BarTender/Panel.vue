@@ -144,6 +144,9 @@
     <div class="pc-panel__resize pc-panel__resize--right" @mousedown.prevent="onResizeStart($event, 'right')" />
     <div class="pc-panel__resize pc-panel__resize--bottom" @mousedown.prevent="onResizeStart($event, 'bottom')" />
     <div class="pc-panel__resize pc-panel__resize--corner" @mousedown.prevent="onResizeStart($event, 'corner')" />
+
+    <!-- 主题切换径向扩散动画覆盖层 -->
+    <div v-if="themeOverlayVisible" class="pc-panel__theme-overlay" :style="themeOverlayStyle" />
     </div>
   </transition>
 </template>
@@ -264,74 +267,61 @@ function onResizeEnd() {
 }
 
 // ============================================================
-// 主题切换: 径向扩散动画
+// 主题切换: 径向扩散动画 (Vue 模板覆盖层 + CSS transition)
 // ============================================================
-let themeAnimating = false;
+const themeOverlayVisible = ref(false);
+const themeOverlayStyle = ref<Record<string, string>>({});
 
 function toggleTheme(e: MouseEvent) {
-  if (themeAnimating) return;
+  if (themeOverlayVisible.value) return;
 
   const nextTheme = store.settings.theme === 'dark' ? 'parchment' : 'dark';
 
-  const panelEl = document.querySelector('.pc-panel') as HTMLElement | null;
-  if (!panelEl) {
-    store.settings.theme = nextTheme;
-    return;
-  }
-
-  themeAnimating = true;
-
-  // 获取点击坐标 (相对面板)
-  const panelRect = panelEl.getBoundingClientRect();
-  const x = e.clientX - panelRect.left;
-  const y = e.clientY - panelRect.top;
-  const endRadius = Math.hypot(
-    Math.max(x, panelRect.width - x),
-    Math.max(y, panelRect.height - y)
-  );
-
-  // 目标主题的背景色 (硬编码，确保不依赖 CSS 变量解析)
+  // 目标主题的背景色
   const targetBg = nextTheme === 'parchment'
-    ? 'rgb(246, 239, 221)'   // 羊皮纸
-    : 'rgb(30, 30, 38)';     // 暗色
+    ? 'rgb(246, 239, 221)'
+    : 'rgb(30, 30, 38)';
 
-  // 创建扩散覆盖层
-  const overlay = document.createElement('div');
-  overlay.style.cssText = [
-    'position: absolute',
-    'inset: 0',
-    'z-index: 999999',
-    `background: ${targetBg}`,
-    `clip-path: circle(0px at ${x}px ${y}px)`,
-    'pointer-events: none',
-  ].join(';');
+  // 点击坐标相对于面板
+  const panelEl = e.currentTarget as HTMLElement;
+  const btn = panelEl.closest('.pc-panel') as HTMLElement;
+  if (!btn) { store.settings.theme = nextTheme; return; }
 
-  panelEl.style.position = 'relative'; // 确保 absolute 子元素定位正确
-  panelEl.appendChild(overlay);
-
-  // 强制重排后启动动画
-  void overlay.offsetWidth;
-
-  const anim = overlay.animate(
-    [
-      { clipPath: `circle(0px at ${x}px ${y}px)` },
-      { clipPath: `circle(${endRadius}px at ${x}px ${y}px)` },
-    ],
-    {
-      duration: 800,
-      easing: 'ease-in-out',
-      fill: 'forwards',
-    }
+  const rect = btn.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const endRadius = Math.hypot(
+    Math.max(x, rect.width - x),
+    Math.max(y, rect.height - y)
   );
 
-  anim.onfinish = () => {
-    // 覆盖层完全展开后，切换真正的主题
-    store.settings.theme = nextTheme;
-    nextTick(() => {
-      overlay.remove();
-      themeAnimating = false;
-    });
+  // 1. 设置覆盖层初始状态 (圆形为0，不可见)
+  themeOverlayStyle.value = {
+    background: targetBg,
+    clipPath: `circle(0px at ${x}px ${y}px)`,
+    transition: 'none',
   };
+  themeOverlayVisible.value = true;
+
+  // 2. 等 Vue 渲染后开始动画
+  nextTick(() => {
+    requestAnimationFrame(() => {
+      // 启动 clip-path 过渡
+      themeOverlayStyle.value = {
+        background: targetBg,
+        clipPath: `circle(${endRadius}px at ${x}px ${y}px)`,
+        transition: 'clip-path 800ms ease-in-out',
+      };
+
+      // 动画结束后切换主题并移除覆盖层
+      setTimeout(() => {
+        store.settings.theme = nextTheme;
+        nextTick(() => {
+          themeOverlayVisible.value = false;
+        });
+      }, 820);
+    });
+  });
 }
 
 // Fix #11: 合并为一个 onMounted
@@ -695,5 +685,14 @@ onUnmounted(() => {
 
 .pc-panel__resize--corner:hover::after {
   border-color: var(--ub-text-muted);
+}
+
+/* 主题切换径向扩散覆盖层 */
+.pc-panel__theme-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 999999;
+  pointer-events: none;
+  border-radius: inherit;
 }
 </style>
