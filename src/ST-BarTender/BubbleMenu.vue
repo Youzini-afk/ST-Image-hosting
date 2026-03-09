@@ -70,8 +70,14 @@ const emit = defineEmits<{
 const store = useStore();
 const menuRef = ref<HTMLElement>();
 
-const menuWidth = ref(320);
-const menuHeight = ref(480);
+const menuWidth = computed({
+  get: () => store.settings.bubble_width,
+  set: (v: number) => { store.settings.bubble_width = v; },
+});
+const menuHeight = computed({
+  get: () => store.settings.bubble_height,
+  set: (v: number) => { store.settings.bubble_height = v; },
+});
 const MIN_W = 240;
 const MAX_W = 500;
 const MIN_H = 300;
