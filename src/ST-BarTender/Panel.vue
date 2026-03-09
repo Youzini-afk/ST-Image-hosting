@@ -2,7 +2,7 @@
     <div
       ref="panelRef"
       class="pc-panel"
-      :class="['ub-theme-' + store.settings.theme, { 'pc-panel--hidden': !store.panelOpen }]"
+      :class="['ub-theme-' + store.settings.theme]"
       :style="panelStyle"
   >
     <!-- 标题栏（拖拽手柄） -->
@@ -224,8 +224,27 @@ const panelPos = ref({
 });
 
 const panelStyle = computed(() => {
+  // 所有关键布局属性作为内联样式，不依赖 scoped CSS 跨文档同步
+  const base: Record<string, string> = {
+    position: 'fixed',
+    zIndex: '99999',
+    pointerEvents: 'auto',
+    display: store.panelOpen ? 'flex' : 'none',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    borderRadius: '12px',
+    background: 'var(--ub-bg-solid, rgba(15, 23, 42, 0.95))',
+    backdropFilter: 'blur(18px) saturate(180%)',
+    WebkitBackdropFilter: 'blur(18px) saturate(180%)',
+    border: '1px solid var(--ub-border, rgba(148, 163, 184, 0.15))',
+    boxShadow: '0 8px 32px var(--ub-shadow, rgba(0,0,0,0.4)), 0 0 0 1px var(--ub-border-light, rgba(255,255,255,0.05)) inset',
+    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', sans-serif",
+    color: 'var(--ub-text-main, #e2e8f0)',
+  };
+
   if (store.isMobile) {
     return {
+      ...base,
       left: '0px',
       bottom: '0px',
       top: 'auto',
@@ -236,6 +255,7 @@ const panelStyle = computed(() => {
     };
   }
   return {
+    ...base,
     left: `${panelPos.value.x}px`,
     top: `${panelPos.value.y}px`,
     width: `${store.settings.panel_width}px`,
@@ -411,27 +431,9 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* 核心布局属性已通过 panelStyle 内联（确保跨文档渲染正常） */
 .pc-panel {
-  position: fixed;
-  z-index: 99999;
-  pointer-events: auto;
-  display: flex;
-  flex-direction: column;
-  border-radius: 12px;
-  overflow: hidden;
-  background: var(--ub-bg-solid);
-  backdrop-filter: blur(18px) saturate(180%);
-  -webkit-backdrop-filter: blur(18px) saturate(180%);
-  border: 1px solid var(--ub-border);
-  box-shadow:
-    0 8px 32px var(--ub-shadow),
-    0 0 0 1px var(--ub-border-light) inset;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', sans-serif;
-  color: var(--ub-text-main);
-}
-
-.pc-panel--hidden {
-  display: none !important;
+  /* 仅保留不影响布局的装饰性样式 */
 }
 
 .pc-panel__header {
