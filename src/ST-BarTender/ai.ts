@@ -22,125 +22,87 @@ export function buildSystemPrompt(presetEntries: PresetEntrySnapshot[], _presetP
   );
 
   return dedent(`
-    你是一个预设的高级 UI 控制台架构师。你的任务是根据用户的需求，自动搭建一个精美的控制面板。
-    这个平台提供一套基于 JSON 抽象出的高级组件系统 (Abstract Component Tree)。你的输出将直接由我们的前端渲染引擎转化为极度精美的毛玻璃 UI (Glassmorphism)。
+    你是预设 UI 控制台架构师。根据预设条目列表，生成一个精美控制面板的 JSON 配置。
 
-    **重要上下文**：这个面板是一个紧凑的悬浮小窗口（约 400×500px），空间极其有限。你必须高度重视空间利用率，结构尽可能扁平，避免多余的嵌套和留白浪费。
+    # 条目列表
 
-    ## 上下文：酒馆当前状态
-
-    当前预设的提示词条目 (可绑定 \`toggle_preset_entry\` action)：
     \`\`\`json
     ${entriesJson}
     \`\`\`
 
-    ## 输出格式 (完整树状嵌套 JSON)
+    # 组件规格
 
-    \`\`\`typescript
-    type WidgetConfig = {
-      title: string;
-      root: UIBlock;
-    }
+    UIBlock = { id, type, content?, label?, layout?, appearance?, action?, children? }
 
-    type UIBlock = {
-      id: string;             // 唯一标识，请用 "b1", "b2" 等简短ID
-      type: 'container' | 'card' | 'text' | 'toggle' | 'button' | 'divider';
-      content?: string;       // text 类型的文字
-      label?: string;         // toggle/button 的标签
+    | 属性 | 值 |
+    |------|-----|
+    | type | container / card / text / toggle / divider |
+    | layout.direction | column (禁止 row) |
+    | layout.gap / padding | none / small / medium |
+    | layout.width | full (固定) |
+    | appearance.theme | glass / solid / transparent |
+    | appearance.typography | h2 / body / caption |
+    | appearance.corner | rounded |
+    | action | { type: "toggle_preset_entry", entry_id: "<id>" } |
 
-      layout?: {              // 仅 container/card 有意义
-        direction?: 'row' | 'column';
-        wrap?: boolean;
-        gap?: 'none' | 'small' | 'medium' | 'large';
-        padding?: 'none' | 'small' | 'medium' | 'large';
-        justify?: 'start' | 'center' | 'end' | 'space-between';
-        align?: 'start' | 'center' | 'end' | 'stretch';
-        width?: 'auto' | 'full' | 'half' | 'hug';
-      };
+    输出: \`{ title: string, root: UIBlock }\`
 
-      appearance?: {          // 视觉Token
-        theme?: 'glass' | 'solid' | 'transparent';
-        typography?: 'h1' | 'h2' | 'body' | 'caption';
-        elevation?: 0 | 1 | 2 | 3;
-        corner?: 'sharp' | 'rounded' | 'pill';
-      };
+    # 预设结构认知
 
-      // 行为绑定（只支持 toggle_preset_entry）
-      action?:
-        | { type: 'none' }
-        | { type: 'toggle_preset_entry', entry_id: '<条目id>' };
+    预设条目通常由预设作者精心排列成若干功能区：
 
-      children?: UIBlock[];
-    }
-    \`\`\`
+    - **系统级条目**：main、jailbreak 等系统提示词，通常在列表首尾
+    - **功能散项**：作者声明、变量初始化等单独存在的条目
+    - **功能分区**：连续出现的语义相近条目构成一个区域，常见的分区有：
+      - 角色扮演/视角/人称控制
+      - 写作指导/文风/风格要求
+      - 破限/越狱/道德设置
+      - CoT/思维链/推理引导
+      - 输出格式/语言/排版控制
+      - 场景/世界观/设定补充
 
-    ## ⚠️ 硬性规则（必须严格遵守！）
+    **识别分区的关键**：看名称的语义聚类和在列表中的位置邻近性。相邻且语义相关的条目属于同一区，语义断裂处就是分区边界。
 
-    1. **禁止使用 row 布局**！所有卡片必须垂直排列（\`direction: 'column'\`）。
-    2. **所有 card 和 container 必须设 \`layout.width: 'full'\`**，禁止 'hug' 或 'auto'。
-    3. **顶层 root** 必须是 \`container\` + \`direction: 'column'\` + \`width: 'full'\` + \`padding: 'medium'\`。
-    4. **toggle 的 label 必须是条目的完整名称**，不允许缩写、截断或修改。
-    5. **所有 card** 至少设置 \`padding: 'medium'\`。
-    6. **必须包含所有条目**！上面列出的每一个预设条目都必须生成对应的 toggle，不允许遗漏。
-    7. **禁止生成 slider**！不要生成任何生成参数相关的调节控件。只生成提示词条目的 toggle 开关。
-    8. **严格保持条目原始顺序**！条目列表是预设作者精心排列的，你必须按原始顺序放置 toggle，不允许打乱、重新排序或把距离很远的条目拆开重组到一起。
-    9. **分组基于相邻性**！只把列表中相邻的、语义相近的条目归入同一个 card。禁止把列表中距离很远的条目强行拉到一个分组里。如果连续几个条目之间看不出明确的语义关联，宁可每个条目单独一个 card 或把它们按原始顺序依次放在同一个 card 里，也不要自编一个笼统的分类名把不相关的条目塞在一起。
-    10. **严禁深层嵌套**！整棵树最多只允许 2 层：\`root(container) → card → [text/toggle/button/divider]\`。card 内部禁止再套 container 或 card。这是一个小悬浮窗，每多一层嵌套都会浪费大量宝贵空间。
+    # 思考指引 (必须先思考再输出)
 
-    ## 最佳实践
+    在输出 JSON 之前，你必须在 \`<think>\` 标签中完成以下分析：
 
-    1. **只输出纯 JSON**（可包裹在\`\`\`json内），不要有任何其他文字。
-    2. **结构必须扁平紧凑**：顶层 \`container(column, full)\` → 直接放若干 \`card(glass, rounded, full)\`，每个 card 里只放 text 标题 + toggle 列表。不要在 card 里再嵌套 container 或 card。悬浮窗空间有限，padding 和 gap 使用 'small' 即可，避免过多留白。
-    3. **用 \`text\` 做区域标题**（\`appearance.typography: 'h2'\`），放在 card 内部最前面。标题应基于该组条目的实际含义，不要用笼统的"其他"或随意总结的名称。
-    4. **严格引用上下文**：\`entry_id\` 必须从上面的列表中选取。
-    5. **尊重预设作者的分区意图**：预设作者把条目排在一起通常意味着它们功能相关。按顺序扫描条目列表，遇到语义断点（功能明显不同）时断开为新的 card。
+    1. **扫描条目**：按顺序浏览所有条目，标记哪些是散项、哪些可归入同一区
+    2. **划定边界**：在语义突变处断开分区，给每个分区起一个精确的标题（基于条目实际内容，不要用"其他"）
+    3. **确认完整性**：检查每个条目都已分配到某个 card，无遗漏
 
-    ## 完整输出示例
+    # 规则
 
-    以下示例展示了一个单栏布局的控制台。注意只有 toggle，没有 slider。
-
-    \`\`\`json
-    {
-      "title": "角色扮演控制台",
-      "root": {
-        "id": "root",
-        "type": "container",
-        "layout": { "direction": "column", "gap": "medium", "padding": "medium", "width": "full" },
-        "children": [
-          {
-            "id": "card-core",
-            "type": "card",
-            "appearance": { "theme": "glass", "corner": "rounded", "elevation": 1 },
-            "layout": { "direction": "column", "gap": "small", "padding": "medium", "width": "full" },
-            "children": [
-              { "id": "t1", "type": "text", "content": "核心提示词", "appearance": { "typography": "h2" } },
-              { "id": "sw1", "type": "toggle", "label": "主系统提示", "action": { "type": "toggle_preset_entry", "entry_id": "main" } },
-              { "id": "sw2", "type": "toggle", "label": "越狱提示", "action": { "type": "toggle_preset_entry", "entry_id": "jailbreak" } }
-            ]
-          }
-        ]
-      }
-    }
-    \`\`\`
+    1. 保持条目原始顺序，禁止重排
+    2. 分组基于相邻性+语义，禁止跨区域拉取条目
+    3. 结构严格 2 层：root(container) → card → [text/toggle/divider]
+    4. toggle.label = 条目完整名称，不得修改
+    5. 每个 card 以 h2 text 作标题，标题基于该组条目的实际功能
+    6. 只生成 toggle 控件，禁止 slider/button
+    7. 所有条目必须包含，不允许遗漏
+    8. 输出纯 JSON（可包裹在 \`\`\`json 内），思考过程放在 <think> 标签中
   `);
 }
 
 /**
- * 从 AI 回复中提取 JSON
+ * 从 AI 回复中提取 JSON (自动剥离 <think> 思考块)
  */
 function extractJson(text: string): string {
-  const fenceMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+  // 剥离 <think>...</think> 思考块
+  const stripped = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
+  const fenceMatch = stripped.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
   if (fenceMatch) {
     return fenceMatch[1].trim();
   }
 
-  const firstBrace = text.indexOf('{');
-  const lastBrace = text.lastIndexOf('}');
+  const firstBrace = stripped.indexOf('{');
+  const lastBrace = stripped.lastIndexOf('}');
   if (firstBrace !== -1 && lastBrace > firstBrace) {
-    return text.slice(firstBrace, lastBrace + 1);
+    return stripped.slice(firstBrace, lastBrace + 1);
   }
 
-  return text.trim();
+  return stripped;
 }
 
 /**
