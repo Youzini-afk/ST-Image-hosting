@@ -19,6 +19,13 @@
       <div class="pc-panel__header-actions">
         <button
           class="pc-panel__header-btn"
+          :title="store.settings.theme === 'dark' ? '切换羊皮纸主题' : '切换暗色主题'"
+          @click="store.settings.theme = store.settings.theme === 'dark' ? 'parchment' : 'dark'"
+        >
+          <i class="fa-solid fa-palette" />
+        </button>
+        <button
+          class="pc-panel__header-btn"
           title="API 配置"
           @click="apiConfigOpen = !apiConfigOpen"
         >
@@ -118,13 +125,6 @@
             </div>
             <span class="pc-panel__api-toggle-text">{{ store.settings.preserve_user_edits ? '开启' : '关闭' }}</span>
           </div>
-        </div>
-        <div class="pc-panel__api-row">
-          <label class="pc-panel__api-label">界面主题</label>
-          <select v-model="store.settings.theme" class="pc-panel__api-select">
-            <option value="dark">暗色 (Dark)</option>
-            <option value="parchment">羊皮纸 (Parchment)</option>
-          </select>
         </div>
       </div>
     </div>
