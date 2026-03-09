@@ -7,7 +7,8 @@
       class="ew-fab"
       :style="fabStyle"
       title="打开 Evolution World"
-      @pointerdown="onFabPointerDown"
+      @mousedown="onFabDragStart"
+      @touchstart="onFabDragStart"
     >
       <span class="ew-fab__icon">🌕</span>
       <span class="ew-fab__ring" />
@@ -451,50 +452,68 @@ function clampFab(x: number, y: number) {
   };
 }
 
-function onFabPointerDown(e: PointerEvent) {
+function getEventXY(e: MouseEvent | TouchEvent): { x: number; y: number } {
+  if ('touches' in e && e.touches.length > 0) {
+    return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }
+  if ('changedTouches' in e && e.changedTouches.length > 0) {
+    return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+  }
+  return { x: (e as MouseEvent).clientX, y: (e as MouseEvent).clientY };
+}
+
+function onFabDragStart(e: MouseEvent | TouchEvent) {
+  // Ignore right click
+  if ('button' in e && e.button !== 0) return;
   e.preventDefault();
+  e.stopPropagation();
+
   const el = fabRef.value;
   if (!el) return;
 
-  const startX = e.clientX;
-  const startY = e.clientY;
+  const start = getEventXY(e);
   const rect = el.getBoundingClientRect();
-  const offsetX = e.clientX - rect.left;
-  const offsetY = e.clientY - rect.top;
+  const offsetX = start.x - rect.left;
+  const offsetY = start.y - rect.top;
   let dragging = false;
 
-  el.setPointerCapture(e.pointerId);
+  const doc = document;
 
-  function onMove(ev: PointerEvent) {
-    const dx = ev.clientX - startX;
-    const dy = ev.clientY - startY;
+  function onMove(ev: MouseEvent | TouchEvent) {
+    const cur = getEventXY(ev);
+    const dx = cur.x - start.x;
+    const dy = cur.y - start.y;
     if (!dragging && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
     dragging = true;
-    const pos = clampFab(ev.clientX - offsetX, ev.clientY - offsetY);
+    ev.preventDefault();
+    const pos = clampFab(cur.x - offsetX, cur.y - offsetY);
     el!.style.left = `${pos.x}px`;
     el!.style.top = `${pos.y}px`;
     el!.style.right = 'auto';
     el!.style.bottom = 'auto';
   }
 
-  function onUp(ev: PointerEvent) {
-    el!.releasePointerCapture(ev.pointerId);
-    el!.removeEventListener('pointermove', onMove);
-    el!.removeEventListener('pointerup', onUp);
+  function onUp() {
+    doc.removeEventListener('mousemove', onMove, true);
+    doc.removeEventListener('mouseup', onUp, true);
+    doc.removeEventListener('touchmove', onMove, true as any);
+    doc.removeEventListener('touchend', onUp, true);
+    doc.removeEventListener('touchcancel', onUp, true);
     if (dragging) {
-      // Save position
       const finalRect = el!.getBoundingClientRect();
       const pos = clampFab(finalRect.left, finalRect.top);
       store.settings.fab_x = pos.x;
       store.settings.fab_y = pos.y;
     } else {
-      // Click — open panel
       store.openPanel();
     }
   }
 
-  el.addEventListener('pointermove', onMove);
-  el.addEventListener('pointerup', onUp);
+  doc.addEventListener('mousemove', onMove, true);
+  doc.addEventListener('mouseup', onUp, true);
+  doc.addEventListener('touchmove', onMove, { capture: true, passive: false } as any);
+  doc.addEventListener('touchend', onUp, true);
+  doc.addEventListener('touchcancel', onUp, true);
 }
 
 const enabledFlowCount = computed(() => store.settings.flows.filter(flow => flow.enabled).length);
