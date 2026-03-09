@@ -9,9 +9,9 @@ import FloatingBall from './FloatingBall.vue';
 import { useStore } from './store';
 
 const MENU_ITEM_NAME = '预设控制';
-const MENU_CONTAINER_ID = 'st-bartender-menu-container';
-const MENU_ITEM_ID = 'st-bartender-menu-item';
-const MENU_EVENT_NS = '.st_bartender';
+const MENU_CONTAINER_ID = 'st-preset-assistant-menu-container';
+const MENU_ITEM_ID = 'st-preset-assistant-menu-item';
+const MENU_EVENT_NS = '.st_preset_assistant';
 const MENU_RETRY_MS = 1500;
 
 let panelApp: ReturnType<typeof createApp> | null = null;
@@ -177,7 +177,7 @@ $(() => {
     console.error('[预设控制] 初始化失败:', error);
   }
 
-  toastr.success('预设控制脚本已加载', '🍸 BarTender', { timeOut: 2000 });
+  toastr.success('预设控制脚本已加载', '🎛️ 预设助手', { timeOut: 2000 });
   console.info('[预设控制] 脚本已加载');
 });
 

@@ -82,9 +82,9 @@ async function writeFile(fileName: string, data: unknown): Promise<void> {
   });
 
   if (!resp.ok) {
-    throw new Error(`[BarTender] Failed to write file "${fileName}": ${resp.status}`);
+    throw new Error(`[PresetAssistant] Failed to write file "${fileName}": ${resp.status}`);
   }
-  console.debug(`[BarTender] File written: ${fileName}`);
+  console.debug(`[PresetAssistant] File written: ${fileName}`);
 }
 
 async function readFile<T>(fileName: string): Promise<T | null> {
@@ -93,7 +93,7 @@ async function readFile<T>(fileName: string): Promise<T | null> {
     if (!resp.ok) return null;
     return await resp.json() as T;
   } catch (e) {
-    console.warn(`[BarTender] Failed to read file "${fileName}":`, e);
+    console.warn(`[PresetAssistant] Failed to read file "${fileName}":`, e);
     return null;
   }
 }
@@ -105,9 +105,9 @@ async function deleteFile(fileName: string): Promise<void> {
       headers: getHeaders(),
       body: JSON.stringify({ path: `user/files/${fileName}` }),
     });
-    console.debug(`[BarTender] File deleted: ${fileName}`);
+    console.debug(`[PresetAssistant] File deleted: ${fileName}`);
   } catch (e) {
-    console.warn(`[BarTender] Failed to delete file "${fileName}":`, e);
+    console.warn(`[PresetAssistant] Failed to delete file "${fileName}":`, e);
   }
 }
 
@@ -221,10 +221,10 @@ export async function detectAndFixRenames(
     }
 
     await saveMapping(mapping);
-    console.info(`[BarTender] Preset renamed: "${oldName}" → "${newName}"`);
+    console.info(`[PresetAssistant] Preset renamed: "${oldName}" → "${newName}"`);
   } else if (missing.length > 0) {
     // 多个缺失，无法确定对应关系，暂不处理
-    console.warn(`[BarTender] ${missing.length} mapped presets not found, cannot auto-rename:`, missing);
+    console.warn(`[PresetAssistant] ${missing.length} mapped presets not found, cannot auto-rename:`, missing);
   }
 
   return { mapping, renamed };

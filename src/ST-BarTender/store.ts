@@ -95,7 +95,7 @@ export const useStore = defineStore('preset-control', () => {
 
       // 迁移: 如果 settings 中有旧的 widget_config 且映射表中没有当前预设，则将其写入文件
       if (currentPresetName.value && settings.value.widget_config && !presetMapping.value[currentPresetName.value]) {
-        console.info('[BarTender] 迁移旧版 widget_config 到文件存储');
+        console.info('[PresetAssistant] 迁移旧版 widget_config 到文件存储');
         presetMapping.value = await savePresetConfig(
           currentPresetName.value,
           presetMapping.value,
@@ -117,7 +117,7 @@ export const useStore = defineStore('preset-control', () => {
 
       configStorageReady = true;
     } catch (err) {
-      console.error('[BarTender] 配置存储初始化失败:', err);
+      console.error('[PresetAssistant] 配置存储初始化失败:', err);
       configStorageReady = true; // 失败也继续运行
     }
   }
@@ -166,7 +166,7 @@ export const useStore = defineStore('preset-control', () => {
             widgetConfig.value = WidgetConfigSchema.parse(saved.widget_config);
             chatHistory.value = saved.chat_history ?? [];
             configHistory.value = saved.history ?? [];
-            console.info(`[BarTender] 已恢复预设 "${newPresetName}" 的 UI 配置`);
+            console.info(`[PresetAssistant] 已恢复预设 "${newPresetName}" 的 UI 配置`);
           } else {
             // 新预设没有保存的配置，重置为默认
             widgetConfig.value = WidgetConfigSchema.parse({
@@ -175,7 +175,7 @@ export const useStore = defineStore('preset-control', () => {
             });
             chatHistory.value = [];
             configHistory.value = [];
-            console.info(`[BarTender] 预设 "${newPresetName}" 无保存配置，已重置`);
+            console.info(`[PresetAssistant] 预设 "${newPresetName}" 无保存配置，已重置`);
           }
 
           currentPresetName.value = newPresetName;
@@ -566,7 +566,7 @@ export const useStore = defineStore('preset-control', () => {
         widgetConfig.value,
         chatHistory.value,
         configHistory.value,
-      ).catch(err => console.warn('[BarTender] 持久化失败:', err));
+      ).catch(err => console.warn('[PresetAssistant] 持久化失败:', err));
     }
   }
 
@@ -593,7 +593,7 @@ export const useStore = defineStore('preset-control', () => {
         widgetConfig.value,
         chatHistory.value,
         configHistory.value,
-      ).catch(err => console.warn('[BarTender] 快照持久化失败:', err));
+      ).catch(err => console.warn('[PresetAssistant] 快照持久化失败:', err));
     }
   }
 
@@ -710,7 +710,7 @@ export const useStore = defineStore('preset-control', () => {
   /** 导出当前面板配置为 JSON 文件（不包含 API 配置、对话历史等敏感信息） */
   function exportConfig() {
     const exportData = {
-      _format: 'bartender_ui_config',
+      _format: 'preset_assistant_ui_config',
       _version: 1,
       widget_config: klona(widgetConfig.value),
     };
@@ -719,7 +719,7 @@ export const useStore = defineStore('preset-control', () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${widgetConfig.value.title || 'bartender_ui'}.json`;
+    a.download = `${widgetConfig.value.title || 'preset_assistant_ui'}.json`;
     a.click();
     URL.revokeObjectURL(url);
     toastr.success('已导出面板配置');
@@ -738,7 +738,7 @@ export const useStore = defineStore('preset-control', () => {
         const data = JSON.parse(text);
 
         // 支持两种格式：包装格式 { _format, widget_config } 或裸 WidgetConfig
-        const raw = data._format === 'bartender_ui_config' ? data.widget_config : data;
+        const raw = (data._format === 'preset_assistant_ui_config' || data._format === 'bartender_ui_config') ? data.widget_config : data;
         const config = WidgetConfigSchema.parse(raw);
 
         pushSnapshot(); // 先快照当前配置
