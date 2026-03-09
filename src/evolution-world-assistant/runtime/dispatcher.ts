@@ -1,6 +1,5 @@
 import { buildFlowRequest } from './context-builder';
 import { FlowResponseSchema } from './contracts';
-import { parseJsonObject } from './helpers';
 import { collectPromptComponents, assembleOrderedPrompts, PromptComponents } from './prompt-assembler';
 import { DispatchFlowAttempt, DispatchFlowResult, EwApiPreset, EwFlowConfig, EwSettings } from './types';
 
@@ -138,9 +137,11 @@ function resolveApiPreset(settings: EwSettings, flow: EwFlowConfig): EwApiPreset
   throw new Error(`[${flow.id}] api preset not found`);
 }
 
+/**
+ * 主 API 路径：通过 TavernHelper.generateRaw 使用酒馆当前配置的 API。
+ */
 async function executeFlowViaLlmConnector(
   flow: EwFlowConfig,
-  apiPreset: EwApiPreset,
   body: Record<string, any>,
   components: PromptComponents,
 ): Promise<NonNullable<DispatchFlowAttempt['response']>> {
@@ -148,41 +149,16 @@ async function executeFlowViaLlmConnector(
     throw new Error(`[${flow.id}] generateRaw is unavailable`);
   }
 
-  // Use pre-collected components (from executeFlow) to avoid double collection
   const orderedPrompts = assembleOrderedPrompts(flow.prompt_order, components);
+  orderedPrompts.push({ role: 'system', content: LLM_WORKFLOW_SYSTEM_PROMPT });
+  orderedPrompts.push({ role: 'user', content: JSON.stringify(body, null, 2) });
 
-  // Append workflow instruction and metadata at the end
-  orderedPrompts.push({
-    role: 'system',
-    content: LLM_WORKFLOW_SYSTEM_PROMPT,
-  });
-  orderedPrompts.push({
-    role: 'user',
-    content: JSON.stringify(body, null, 2),
-  });
-
-  const generateConfig: Parameters<typeof generateRaw>[0] = {
+  const rawText = await generateRaw({
     should_stream: false,
     should_silence: true,
     ordered_prompts: orderedPrompts,
-  };
+  });
 
-  if (!apiPreset.use_main_api) {
-    if (!apiPreset.api_url.trim()) {
-      throw new Error(`[${flow.id}] custom api_url is empty`);
-    }
-    if (!apiPreset.model.trim()) {
-      throw new Error(`[${flow.id}] model is empty`);
-    }
-    generateConfig.custom_api = {
-      apiurl: apiPreset.api_url.trim(),
-      key: apiPreset.api_key.trim() || undefined,
-      model: apiPreset.model.trim(),
-      source: apiPreset.api_source.trim() || 'openai',
-    };
-  }
-
-  const rawText = await generateRaw(generateConfig);
   const parsedJson = parseJsonFromText(rawText, flow.id);
   const parsed = FlowResponseSchema.safeParse(parsedJson);
   if (!parsed.success) {
@@ -193,6 +169,101 @@ async function executeFlowViaLlmConnector(
     );
   }
   return parsed.data;
+}
+
+/**
+ * 自定义 API 路径：通过 ST 后端代理 /api/backends/chat-completions/generate 转发请求。
+ * 直接控制 model / temperature / max_tokens 等参数，不依赖 TavernHelper。
+ * 参考 shujuku(神·数据库) 的 callApi_ACU 实现。
+ */
+async function executeFlowViaStBackend(
+  flow: EwFlowConfig,
+  apiPreset: EwApiPreset,
+  body: Record<string, any>,
+  components: PromptComponents,
+): Promise<NonNullable<DispatchFlowAttempt['response']>> {
+  if (!apiPreset.api_url.trim()) {
+    throw new Error(`[${flow.id}] custom api_url is empty`);
+  }
+  if (!apiPreset.model.trim()) {
+    throw new Error(`[${flow.id}] model is empty`);
+  }
+
+  const orderedPrompts = assembleOrderedPrompts(flow.prompt_order, components);
+  orderedPrompts.push({ role: 'system', content: LLM_WORKFLOW_SYSTEM_PROMPT });
+  orderedPrompts.push({ role: 'user', content: JSON.stringify(body, null, 2) });
+
+  const genOpts = flow.generation_options;
+  const requestBody = {
+    messages: orderedPrompts,
+    model: apiPreset.model.trim().replace(/^models\//, ''),
+    max_tokens: genOpts.max_reply_tokens,
+    temperature: genOpts.temperature,
+    top_p: genOpts.top_p,
+    frequency_penalty: genOpts.frequency_penalty,
+    presence_penalty: genOpts.presence_penalty,
+    stream: false,
+    chat_completion_source: 'custom',
+    reverse_proxy: apiPreset.api_url.trim(),
+    custom_url: apiPreset.api_url.trim(),
+    custom_include_headers: apiPreset.api_key.trim()
+      ? `Authorization: Bearer ${apiPreset.api_key.trim()}`
+      : '',
+    custom_prompt_post_processing: 'strict',
+  };
+
+  const stHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (typeof SillyTavern !== 'undefined' && SillyTavern.getRequestHeaders) {
+    Object.assign(stHeaders, SillyTavern.getRequestHeaders());
+    stHeaders['Content-Type'] = 'application/json'; // ensure not overwritten
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), flow.timeout_ms);
+
+  try {
+    const response = await fetch('/api/backends/chat-completions/generate', {
+      method: 'POST',
+      headers: stHeaders,
+      body: JSON.stringify(requestBody),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const errTxt = await response.text();
+      throw new Error(`[${flow.id}] ST backend error: ${response.status} ${errTxt}`);
+    }
+
+    const data = await response.json();
+
+    // 提取 AI 回复文本 — 兼容 OpenAI 格式和简化格式
+    const rawText =
+      data?.choices?.[0]?.message?.content?.trim() ??
+      data?.content?.trim() ??
+      '';
+
+    if (!rawText) {
+      throw new Error(`[${flow.id}] API returned empty response: ${JSON.stringify(data).slice(0, 200)}`);
+    }
+
+    const parsedJson = parseJsonFromText(rawText, flow.id);
+    const parsed = FlowResponseSchema.safeParse(parsedJson);
+    if (!parsed.success) {
+      throw new Error(
+        `[${flow.id}] response schema invalid: ${parsed.error.issues
+          .map(issue => `${issue.path.join('.')}: ${issue.message}`)
+          .join('; ')}`,
+      );
+    }
+    return parsed.data;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error(`[${flow.id}] timeout (${flow.timeout_ms}ms)`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function executeFlow(
@@ -207,9 +278,6 @@ async function executeFlow(
   const startedAt = Date.now();
   const apiPreset = resolveApiPreset(settings, flow);
   const usesTavernMain = apiPreset.mode === 'llm_connector';
-  const usesCustomConnector = apiPreset.mode === 'workflow_http' && Boolean(apiPreset.model.trim());
-  const usesLegacyWorkflowHttp =
-    apiPreset.mode === 'workflow_http' && !apiPreset.model.trim() && Boolean(apiPreset.headers_json.trim());
   const attemptApiUrl = usesTavernMain ? 'tavern://main_api' : apiPreset.api_url;
 
   // Collect prompt components once — shared by buildFlowRequest (metadata) and assembler (messages)
@@ -228,114 +296,27 @@ async function executeFlow(
   try {
     const body = applyTemplate(request as unknown as Record<string, any>, flow.request_template);
 
+    let response: NonNullable<DispatchFlowAttempt['response']>;
+
     if (usesTavernMain) {
-      const response = await executeFlowViaLlmConnector(
-        flow,
-        {
-          ...apiPreset,
-          use_main_api: true,
-        },
-        body,
-        promptComponents,
-      );
-      return {
-        flow,
-        flow_order: flowOrder,
-        api_preset_id: apiPreset.id,
-        api_preset_name: apiPreset.name,
-        api_url: attemptApiUrl,
-        request,
-        response,
-        ok: true,
-        elapsed_ms: Date.now() - startedAt,
-      };
+      // 主 API：通过 TavernHelper.generateRaw，使用酒馆当前配置
+      response = await executeFlowViaLlmConnector(flow, body, promptComponents);
+    } else {
+      // 自定义 API：通过 ST 后端代理，完全控制参数
+      response = await executeFlowViaStBackend(flow, apiPreset, body, promptComponents);
     }
 
-    if (usesCustomConnector) {
-      const response = await executeFlowViaLlmConnector(
-        flow,
-        {
-          ...apiPreset,
-          use_main_api: false,
-        },
-        body,
-        promptComponents,
-      );
-      return {
-        flow,
-        flow_order: flowOrder,
-        api_preset_id: apiPreset.id,
-        api_preset_name: apiPreset.name,
-        api_url: attemptApiUrl,
-        request,
-        response,
-        ok: true,
-        elapsed_ms: Date.now() - startedAt,
-      };
-    }
-
-    if (apiPreset.mode === 'workflow_http' && !usesLegacyWorkflowHttp) {
-      throw new Error(`[${flow.id}] model is empty (自定义API模式必须选择模型)`);
-    }
-
-    if (!apiPreset.api_url.trim()) {
-      throw new Error(`[${flow.id}] api_url is empty`);
-    }
-
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...parseJsonObject(apiPreset.headers_json),
+    return {
+      flow,
+      flow_order: flowOrder,
+      api_preset_id: apiPreset.id,
+      api_preset_name: apiPreset.name,
+      api_url: attemptApiUrl,
+      request,
+      response,
+      ok: true,
+      elapsed_ms: Date.now() - startedAt,
     };
-
-    if (apiPreset.api_key.trim()) {
-      headers.Authorization = `Bearer ${apiPreset.api_key.trim()}`;
-    }
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), flow.timeout_ms);
-
-    try {
-      const response = await fetch(apiPreset.api_url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-
-      if (!response.ok) {
-        throw new Error(`[${flow.id}] HTTP ${response.status}`);
-      }
-
-      const json = await response.json();
-      const parsed = FlowResponseSchema.safeParse(json);
-      if (!parsed.success) {
-        throw new Error(
-          `[${flow.id}] response schema invalid: ${parsed.error.issues
-            .map(issue => `${issue.path.join('.')}: ${issue.message}`)
-            .join('; ')}`,
-        );
-      }
-
-      return {
-        flow,
-        flow_order: flowOrder,
-        api_preset_id: apiPreset.id,
-        api_preset_name: apiPreset.name,
-        api_url: attemptApiUrl,
-        request,
-        response: parsed.data,
-        ok: true,
-        elapsed_ms: Date.now() - startedAt,
-      };
-    } catch (error) {
-      const aborted = error instanceof DOMException && error.name === 'AbortError';
-      if (aborted) {
-        throw new Error(`[${flow.id}] timeout (${flow.timeout_ms}ms)`);
-      }
-      throw error;
-    } finally {
-      clearTimeout(timeout);
-    }
   } catch (error) {
     return {
       flow,
