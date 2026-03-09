@@ -264,46 +264,70 @@ function onResizeEnd() {
 }
 
 // ============================================================
-// 主题切换: View Transitions API 径向渐变
+// 主题切换: 手动覆盖层 clip-path 径向扩散动画
 // ============================================================
+let themeAnimating = false;
+
 function toggleTheme(e: MouseEvent) {
+  if (themeAnimating) return; // 防止动画期间重复触发
+
   const nextTheme = store.settings.theme === 'dark' ? 'parchment' : 'dark';
 
-  if (!document.startViewTransition) {
+  // 获取面板根元素 (动画容器)
+  const panelEl = document.querySelector('.pc-panel') as HTMLElement | null;
+  if (!panelEl) {
     store.settings.theme = nextTheme;
     return;
   }
 
-  const x = e.clientX;
-  const y = e.clientY;
+  themeAnimating = true;
+
+  // 1. 计算点击相对面板的坐标
+  const panelRect = panelEl.getBoundingClientRect();
+  const x = e.clientX - panelRect.left;
+  const y = e.clientY - panelRect.top;
+
+  // 最大扩散半径 = 到面板四角最远距离
   const endRadius = Math.hypot(
-    Math.max(x, window.innerWidth - x),
-    Math.max(y, window.innerHeight - y)
+    Math.max(x, panelRect.width - x),
+    Math.max(y, panelRect.height - y)
   );
 
-  const transition = document.startViewTransition(async () => {
-    store.settings.theme = nextTheme;
-    await nextTick();
-  });
+  // 2. 创建覆盖层 (带有目标主题类，覆盖在面板之上)
+  const overlay = document.createElement('div');
+  overlay.className = `ub-theme-${nextTheme}`;
+  overlay.style.cssText = `
+    position: absolute;
+    inset: 0;
+    z-index: 999999;
+    background: var(--ub-bg-solid);
+    clip-path: circle(0px at ${x}px ${y}px);
+    pointer-events: none;
+    border-radius: inherit;
+  `;
+  panelEl.appendChild(overlay);
 
-  transition.ready.then(() => {
-    const clipPath = [
-      `circle(0px at ${x}px ${y}px)`,
-      `circle(${endRadius}px at ${x}px ${y}px)`,
-    ];
-    document.documentElement.animate(
-      {
-        clipPath: nextTheme === 'dark' ? clipPath.slice().reverse() : clipPath,
-      },
-      {
-        duration: 500,
-        easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-        pseudoElement: nextTheme === 'dark'
-          ? '::view-transition-old(root)'
-          : '::view-transition-new(root)',
-      }
-    );
-  });
+  // 3. 播放扩散动画
+  const anim = overlay.animate(
+    [
+      { clipPath: `circle(0px at ${x}px ${y}px)` },
+      { clipPath: `circle(${endRadius}px at ${x}px ${y}px)` },
+    ],
+    {
+      duration: 500,
+      easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+      fill: 'forwards',
+    }
+  );
+
+  // 4. 动画结束后切换真实主题并移除覆盖层
+  anim.onfinish = () => {
+    store.settings.theme = nextTheme;
+    nextTick(() => {
+      overlay.remove();
+      themeAnimating = false;
+    });
+  };
 }
 
 // Fix #11: 合并为一个 onMounted
