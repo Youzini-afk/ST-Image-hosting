@@ -122,6 +122,11 @@
         <ControlArea />
       </div>
     </div>
+
+    <!-- 拖拽缩放手柄 -->
+    <div class="pc-panel__resize pc-panel__resize--right" @mousedown.prevent="onResizeStart($event, 'right')" />
+    <div class="pc-panel__resize pc-panel__resize--bottom" @mousedown.prevent="onResizeStart($event, 'bottom')" />
+    <div class="pc-panel__resize pc-panel__resize--corner" @mousedown.prevent="onResizeStart($event, 'corner')" />
     </div>
   </transition>
 </template>
@@ -192,6 +197,55 @@ function cleanupDragListeners() {
   }
 }
 
+// ---------- 拖拽缩放 ----------
+const MIN_W = 400;
+const MIN_H = 300;
+const MAX_W = 1400;
+const MAX_H = 900;
+
+const isResizing = ref(false);
+let resizeDir: 'right' | 'bottom' | 'corner' = 'corner';
+let resizeOrigin = { x: 0, y: 0, w: 0, h: 0 };
+
+function onResizeStart(e: MouseEvent, dir: 'right' | 'bottom' | 'corner') {
+  isResizing.value = true;
+  resizeDir = dir;
+  resizeOrigin = {
+    x: e.clientX,
+    y: e.clientY,
+    w: store.settings.panel_width,
+    h: store.settings.panel_height,
+  };
+  document.addEventListener('mousemove', onResizeMove);
+  document.addEventListener('mouseup', onResizeEnd);
+  try {
+    window.parent?.document?.addEventListener('mousemove', onResizeMove);
+    window.parent?.document?.addEventListener('mouseup', onResizeEnd);
+  } catch { /* 跨域静默 */ }
+}
+
+function onResizeMove(e: MouseEvent) {
+  if (!isResizing.value) return;
+  const dx = e.clientX - resizeOrigin.x;
+  const dy = e.clientY - resizeOrigin.y;
+  if (resizeDir === 'right' || resizeDir === 'corner') {
+    store.settings.panel_width = Math.max(MIN_W, Math.min(MAX_W, resizeOrigin.w + dx));
+  }
+  if (resizeDir === 'bottom' || resizeDir === 'corner') {
+    store.settings.panel_height = Math.max(MIN_H, Math.min(MAX_H, resizeOrigin.h + dy));
+  }
+}
+
+function onResizeEnd() {
+  isResizing.value = false;
+  document.removeEventListener('mousemove', onResizeMove);
+  document.removeEventListener('mouseup', onResizeEnd);
+  try {
+    window.parent?.document?.removeEventListener('mousemove', onResizeMove);
+    window.parent?.document?.removeEventListener('mouseup', onResizeEnd);
+  } catch { /* 跨域静默 */ }
+}
+
 // Fix #11: 合并为一个 onMounted
 onMounted(() => {
   // 初始位置居中
@@ -216,6 +270,7 @@ onMounted(() => {
 onUnmounted(() => {
   headerRef.value?.removeEventListener('mousedown', onMouseDown);
   cleanupDragListeners();
+  onResizeEnd();
 });
 </script>
 
@@ -506,5 +561,51 @@ onUnmounted(() => {
 
 :deep(::-webkit-scrollbar-thumb:hover) {
   background: rgba(255, 255, 255, 0.2);
+}
+
+/* --- Resize Handles --- */
+.pc-panel__resize {
+  position: absolute;
+  z-index: 10;
+}
+
+.pc-panel__resize--right {
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 100%;
+  cursor: ew-resize;
+}
+
+.pc-panel__resize--bottom {
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 6px;
+  cursor: ns-resize;
+}
+
+.pc-panel__resize--corner {
+  bottom: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+}
+
+.pc-panel__resize--corner::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  right: 3px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid rgba(255, 255, 255, 0.15);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.15);
+  transition: border-color 0.2s;
+}
+
+.pc-panel__resize--corner:hover::after {
+  border-color: rgba(255, 255, 255, 0.35);
 }
 </style>
