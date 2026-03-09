@@ -21,6 +21,7 @@ import {
   loadPresetConfig,
   detectAndFixRenames,
   type PresetMapping,
+  type ConfigSnapshot,
 } from './config-storage';
 
 export const useStore = defineStore('preset-control', () => {
@@ -74,6 +75,10 @@ export const useStore = defineStore('preset-control', () => {
   const presetMapping = ref<PresetMapping>({});
   let configStorageReady = false;
 
+  // ========== 历史记录 ==========
+  const configHistory = ref<ConfigSnapshot[]>([]);
+  const historyOpen = ref(false);
+
   /** 初始化文件存储，读取映射表，迁移旧数据 */
   async function initConfigStorage() {
     try {
@@ -96,6 +101,7 @@ export const useStore = defineStore('preset-control', () => {
           presetMapping.value,
           widgetConfig.value,
           chatHistory.value,
+          configHistory.value,
         );
       }
 
@@ -105,6 +111,7 @@ export const useStore = defineStore('preset-control', () => {
         if (saved) {
           widgetConfig.value = WidgetConfigSchema.parse(saved.widget_config);
           chatHistory.value = saved.chat_history ?? [];
+          configHistory.value = saved.history ?? [];
         }
       }
 
@@ -149,6 +156,7 @@ export const useStore = defineStore('preset-control', () => {
               presetMapping.value,
               widgetConfig.value,
               chatHistory.value,
+              configHistory.value,
             );
           }
 
@@ -157,6 +165,7 @@ export const useStore = defineStore('preset-control', () => {
           if (saved) {
             widgetConfig.value = WidgetConfigSchema.parse(saved.widget_config);
             chatHistory.value = saved.chat_history ?? [];
+            configHistory.value = saved.history ?? [];
             console.info(`[BarTender] 已恢复预设 "${newPresetName}" 的 UI 配置`);
           } else {
             // 新预设没有保存的配置，重置为默认
@@ -165,6 +174,7 @@ export const useStore = defineStore('preset-control', () => {
               root: { id: uid(), type: 'container', layout: { direction: 'column', gap: 'medium', padding: 'medium' } }
             });
             chatHistory.value = [];
+            configHistory.value = [];
             console.info(`[BarTender] 预设 "${newPresetName}" 无保存配置，已重置`);
           }
 
@@ -541,8 +551,41 @@ export const useStore = defineStore('preset-control', () => {
     return result;
   }
 
+  // ========== 历史快照操作 ==========
+  const MAX_HISTORY = 20;
+
+  /** 将当前配置推入历史 */
+  function pushSnapshot() {
+    configHistory.value.unshift({
+      id: uid(),
+      timestamp: Date.now(),
+      title: widgetConfig.value.title,
+      config: klona(widgetConfig.value),
+    });
+    // 限制历史数量
+    if (configHistory.value.length > MAX_HISTORY) {
+      configHistory.value = configHistory.value.slice(0, MAX_HISTORY);
+    }
+  }
+
+  /** 回滚到指定快照 */
+  function rollbackTo(snapshotId: string) {
+    const snap = configHistory.value.find(s => s.id === snapshotId);
+    if (!snap) return;
+    widgetConfig.value = klona(snap.config);
+    toastr.success(`已回滚到「${snap.title}」`);
+  }
+
+  /** 删除单条历史 */
+  function deleteSnapshot(snapshotId: string) {
+    configHistory.value = configHistory.value.filter(s => s.id !== snapshotId);
+  }
+
   /** 应用新的 widgetConfig，可选保留用户编辑 */
   function applyNewWidgetConfig(newConfig: WidgetConfig) {
+    // 先快照当前配置
+    pushSnapshot();
+
     if (settings.value.preserve_user_edits) {
       const userBlocks = collectUserEdited(widgetConfig.value.root);
       if (userBlocks.length > 0 && newConfig.root.children) {
@@ -668,6 +711,11 @@ export const useStore = defineStore('preset-control', () => {
     currentPresetName,
     presetMapping,
     initConfigStorage,
+    configHistory,
+    historyOpen,
+    pushSnapshot,
+    rollbackTo,
+    deleteSnapshot,
     getDefaultSystemPrompt: () => buildSystemPrompt(presetEntries.value, presetParams.value),
   };
 });

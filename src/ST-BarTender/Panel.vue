@@ -19,6 +19,13 @@
       <div class="pc-panel__header-actions">
         <button
           class="pc-panel__header-btn"
+          title="历史记录"
+          @click="store.historyOpen = true"
+        >
+          <i class="fa-solid fa-clock-rotate-left" />
+        </button>
+        <button
+          class="pc-panel__header-btn"
           :title="store.settings.theme === 'dark' ? '切换羊皮纸主题' : '切换暗色主题'"
           @click="toggleTheme"
         >
@@ -149,12 +156,16 @@
     <div v-if="themeOverlayVisible" class="pc-panel__theme-overlay" :style="themeOverlayStyle" />
     </div>
   </transition>
+
+  <!-- 历史记录弹窗 -->
+  <ConfigHistory />
 </template>
 
 <script setup lang="ts">
 import { useStore } from './store';
 import ChatArea from './ChatArea.vue';
 import ControlArea from './ControlArea.vue';
+import ConfigHistory from './ConfigHistory.vue';
 
 const store = useStore();
 const apiConfigOpen = ref(false);

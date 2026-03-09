@@ -14,12 +14,20 @@ import type { WidgetConfig, ChatMessage } from './schema';
 
 export type PresetMapping = Record<string, string>; // presetName → uuid
 
+export type ConfigSnapshot = {
+  id: string;
+  timestamp: number;
+  title: string;
+  config: WidgetConfig;
+};
+
 export type PresetConfigData = {
   version: 1;
   preset_name: string;
   updated_at: string;
   widget_config: WidgetConfig;
   chat_history: ChatMessage[];
+  history?: ConfigSnapshot[];
 };
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -120,6 +128,7 @@ export async function savePresetConfig(
   mapping: PresetMapping,
   widgetConfig: WidgetConfig,
   chatHistory: ChatMessage[],
+  history?: ConfigSnapshot[],
 ): Promise<PresetMapping> {
   // 获取或创建 UUID
   let uuid = mapping[presetName];
@@ -134,6 +143,7 @@ export async function savePresetConfig(
     updated_at: new Date().toISOString(),
     widget_config: widgetConfig,
     chat_history: chatHistory,
+    history: history ?? [],
   };
 
   await Promise.all([
