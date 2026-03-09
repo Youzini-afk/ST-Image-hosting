@@ -43,7 +43,7 @@ export function buildSystemPrompt(presetEntries: PresetEntrySnapshot[], _presetP
     | appearance.theme | glass / solid / transparent |
     | appearance.typography | h2 / body / caption |
     | appearance.corner | rounded |
-    | action | { type: "toggle_preset_entry", entry_id: "<id>" } |
+    | action | { type: "toggle_preset_entry", entry_id: "<id>", linked_entry_ids?: ["<id2>", ...] } |
 
     输出: \\\`{ title: string, root: UIBlock }\\\`
 
@@ -77,6 +77,15 @@ export function buildSystemPrompt(presetEntries: PresetEntrySnapshot[], _presetP
     ⚠️ 注意：一个预设中可能有多个不同功能的互斥组。
     原则：按功能类型区分，功能相同的互斥条目归入同一 card，功能不同的分开。
 
+    ## 第四步：识别绑定关系
+
+    有些条目必须同时开启或关闭。作者通常会在名称中标注绑定关系：
+    - 「搭配xx一起开」「必须开xx」「需要搭配xx」
+    - 两个条目互相引用对方的名称
+
+    处理方式：在主条目的 action 中添加 linked_entry_ids，将被绑定条目的 id 填入。
+    这样用户切换主条目时，被绑定的条目会自动同步开关。
+
     # 规则
 
     1. 保持条目原始顺序，禁止重排
@@ -102,6 +111,10 @@ export function buildSystemPrompt(presetEntries: PresetEntrySnapshot[], _presetP
     - 「⭐功能区开始/结束」是边界标记 → 用作 card 标题
     - 两个📝文风条目被边界包裹且同为文风互斥 → 一个「文风」card
     - 两个✨节奏条目是另一种功能的互斥 → 单独一个「节奏」card
+
+    绑定示例：
+    - 「🌕 病名为爱(搭配纯爱思维链一起开)」 → linked_entry_ids 填入「💭(纯爱版)思考ing」的 id
+    - 「💭(纯爱版,必须开病名为爱)思考ing」 → linked_entry_ids 填入「🌕 病名为爱」的 id
   `);
 }
 

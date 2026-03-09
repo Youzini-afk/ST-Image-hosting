@@ -482,11 +482,14 @@ export const useStore = defineStore('preset-control', () => {
 
     if (action.type === 'toggle_preset_entry') {
       const state = Boolean(payload);
+      const ids = [action.entry_id, ...(action.linked_entry_ids ?? [])];
       try {
         await updatePresetWith('in_use', preset => {
-          const prompt = preset.prompts.find(p => p.id === action.entry_id);
-          if (prompt) {
-            prompt.enabled = state;
+          for (const id of ids) {
+            const prompt = preset.prompts.find(p => p.id === id);
+            if (prompt) {
+              prompt.enabled = state;
+            }
           }
           return preset;
         });
@@ -552,6 +555,19 @@ export const useStore = defineStore('preset-control', () => {
       }
     }
     return result;
+  }
+
+  /** 持久化当前 widgetConfig 到文件 */
+  async function persistWidgetConfig() {
+    if (configStorageReady && currentPresetName.value) {
+      await savePresetConfig(
+        currentPresetName.value,
+        presetMapping.value,
+        widgetConfig.value,
+        chatHistory.value,
+        configHistory.value,
+      ).catch(err => console.warn('[BarTender] 持久化失败:', err));
+    }
   }
 
   // ========== 历史快照操作 ==========
@@ -777,6 +793,7 @@ export const useStore = defineStore('preset-control', () => {
     deleteSnapshot,
     exportConfig,
     importConfig,
+    persistWidgetConfig,
     getDefaultSystemPrompt: () => buildSystemPrompt(presetEntries.value, presetParams.value),
   };
 });

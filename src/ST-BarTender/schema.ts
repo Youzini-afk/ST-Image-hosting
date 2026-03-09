@@ -44,6 +44,7 @@ const ActionBindingSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('toggle_preset_entry'),
     entry_id: z.string(),
+    linked_entry_ids: z.array(z.string()).optional(),
   }),
   z.object({
     type: z.literal('set_preset_param'),

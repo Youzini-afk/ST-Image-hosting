@@ -40,10 +40,32 @@
       :checked="boundValue as boolean"
       @update:checked="execute(block.action, $event)"
     />
+    <span v-if="linkedCount > 0" class="ub-linked-badge" :title="'已绑定 ' + linkedCount + ' 个条目'">
+      <i class="fa-solid fa-link" /> {{ linkedCount }}
+    </span>
     <div v-if="store.editMode" class="ub-leaf-actions" @mousedown.stop>
       <button class="ub-edit-btn" title="上移" @click="store.moveBlock(block.id, 'up')"><i class="fa-solid fa-arrow-up" /></button>
       <button class="ub-edit-btn" title="下移" @click="store.moveBlock(block.id, 'down')"><i class="fa-solid fa-arrow-down" /></button>
+      <button class="ub-edit-btn" :class="{ 'ub-edit-btn--active': showLinkEditor }" title="绑定条目" @click="showLinkEditor = !showLinkEditor"><i class="fa-solid fa-link" /></button>
       <button class="ub-edit-btn ub-edit-btn--danger" title="删除" @click="store.removeBlock(block.id)"><i class="fa-solid fa-trash-can" /></button>
+    </div>
+    <!-- 绑定编辑器 -->
+    <div v-if="showLinkEditor && store.editMode" class="ub-link-editor" @mousedown.stop>
+      <div class="ub-link-editor__title">选择要绑定的条目：</div>
+      <div class="ub-link-editor__list">
+        <label
+          v-for="entry in linkableEntries"
+          :key="entry.id"
+          class="ub-link-editor__item"
+        >
+          <input
+            type="checkbox"
+            :checked="isLinked(entry.id)"
+            @change="toggleLink(entry.id)"
+          />
+          <span>{{ entry.name }}</span>
+        </label>
+      </div>
     </div>
   </div>
 
@@ -78,7 +100,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import type { UIBlock, ActionBinding } from './schema';
 import { useStore } from './store';
 import PremiumToggle from './PremiumToggle.vue';
@@ -95,6 +117,45 @@ const boundValue = computed(() => store.getBoundValue(props.block.action));
 
 function execute(action?: ActionBinding, payload?: any) {
   store.executeAction(action, payload);
+}
+
+// ---------- 条目绑定 ----------
+const showLinkEditor = ref(false);
+
+const linkedCount = computed(() => {
+  const action = props.block.action;
+  if (action?.type === 'toggle_preset_entry') {
+    return action.linked_entry_ids?.length ?? 0;
+  }
+  return 0;
+});
+
+const linkableEntries = computed(() => {
+  const action = props.block.action;
+  if (action?.type !== 'toggle_preset_entry') return [];
+  return store.presetEntries.filter(e => e.id !== action.entry_id);
+});
+
+function isLinked(entryId: string): boolean {
+  const action = props.block.action;
+  if (action?.type !== 'toggle_preset_entry') return false;
+  return action.linked_entry_ids?.includes(entryId) ?? false;
+}
+
+function toggleLink(entryId: string) {
+  const action = props.block.action;
+  if (action?.type !== 'toggle_preset_entry') return;
+  if (!action.linked_entry_ids) {
+    action.linked_entry_ids = [];
+  }
+  const idx = action.linked_entry_ids.indexOf(entryId);
+  if (idx >= 0) {
+    action.linked_entry_ids.splice(idx, 1);
+  } else {
+    action.linked_entry_ids.push(entryId);
+  }
+  // 持久化
+  store.persistWidgetConfig();
 }
 
 // ---------- 自定义尺寸 ----------
@@ -448,6 +509,79 @@ const appearanceClasses = computed(() => {
 
 .ub-editable-leaf:hover > .ub-leaf-actions {
   display: flex;
+}
+
+/* 绑定指示器 */
+.ub-linked-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 9px;
+  color: var(--ub-accent-text);
+  background: var(--ub-accent-bg);
+  border-radius: 8px;
+  padding: 1px 5px;
+  pointer-events: none;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.ub-edit-btn--active {
+  background: var(--ub-accent-bg) !important;
+  color: var(--ub-accent-text) !important;
+}
+
+/* 绑定编辑器 */
+.ub-link-editor {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 100;
+  width: 280px;
+  max-height: 240px;
+  background: var(--ub-bg-overlay);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--ub-border);
+  border-radius: 8px;
+  padding: 8px;
+  box-shadow: 0 8px 24px var(--ub-shadow);
+  overflow-y: auto;
+}
+
+.ub-link-editor__title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ub-text-secondary);
+  margin-bottom: 6px;
+}
+
+.ub-link-editor__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ub-link-editor__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ub-text-main);
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.ub-link-editor__item:hover {
+  background: var(--ub-bg-hover);
+}
+
+.ub-link-editor__item input[type="checkbox"] {
+  accent-color: var(--ub-accent-active);
 }
 
 </style>
