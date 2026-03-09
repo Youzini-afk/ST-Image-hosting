@@ -144,7 +144,8 @@ function rollback(id: string) {
 
 .ch-item {
   display: flex;
-  gap: 12px;
+  flex-direction: column;
+  gap: 8px;
   padding: 10px;
   border-radius: 12px;
   border: 1px solid var(--ub-border);
@@ -156,8 +157,8 @@ function rollback(id: string) {
 }
 
 .ch-preview-wrap {
-  width: 160px;
-  height: 120px;
+  width: 100%;
+  height: 160px;
   flex-shrink: 0;
   border-radius: 8px;
   overflow: hidden;
@@ -169,8 +170,8 @@ function rollback(id: string) {
   position: absolute;
   top: 0;
   left: 0;
-  width: 320px;
-  height: 240px;
+  width: 200%;
+  height: 320px;
   transform: scale(0.5);
   transform-origin: top left;
   pointer-events: none;
