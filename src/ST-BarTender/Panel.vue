@@ -11,6 +11,7 @@
     <div
       ref="headerRef"
       class="pc-panel__header"
+      :class="{ 'pc-panel__header--mobile': store.isMobile }"
     >
       <div class="pc-panel__header-left">
         <i class="fa-solid fa-sliders pc-panel__icon" />
@@ -150,21 +151,43 @@
       </div>
     </div>
 
+    <!-- 移动端标签页切换 -->
+    <div v-if="store.isMobile" class="pc-panel__mobile-tabs">
+      <button
+        class="pc-panel__mobile-tab-btn"
+        :class="{ 'active': mobileTab === 'chat' }"
+        @click="mobileTab = 'chat'"
+      >
+        <i class="fa-regular fa-comments" />
+        <span>对话</span>
+      </button>
+      <button
+        class="pc-panel__mobile-tab-btn"
+        :class="{ 'active': mobileTab === 'control' }"
+        @click="mobileTab = 'control'"
+      >
+        <i class="fa-solid fa-sliders" />
+        <span>控制</span>
+      </button>
+    </div>
+
     <!-- 主体分栏 -->
     <div class="pc-panel__body">
-      <div class="pc-panel__chat-col">
+      <div v-show="!store.isMobile || mobileTab === 'chat'" class="pc-panel__chat-col">
         <ChatArea />
       </div>
-      <div class="pc-panel__divider" />
-      <div class="pc-panel__control-col">
+      <div v-if="!store.isMobile" class="pc-panel__divider" />
+      <div v-show="!store.isMobile || mobileTab === 'control'" class="pc-panel__control-col">
         <ControlArea />
       </div>
     </div>
 
     <!-- 拖拽缩放手柄 -->
-    <div class="pc-panel__resize pc-panel__resize--right" @mousedown.prevent="onResizeStart($event, 'right')" />
-    <div class="pc-panel__resize pc-panel__resize--bottom" @mousedown.prevent="onResizeStart($event, 'bottom')" />
-    <div class="pc-panel__resize pc-panel__resize--corner" @mousedown.prevent="onResizeStart($event, 'corner')" />
+    <template v-if="!store.isMobile">
+      <div class="pc-panel__resize pc-panel__resize--right" @mousedown.prevent="onResizeStart($event, 'right')" />
+      <div class="pc-panel__resize pc-panel__resize--bottom" @mousedown.prevent="onResizeStart($event, 'bottom')" />
+      <div class="pc-panel__resize pc-panel__resize--corner" @mousedown.prevent="onResizeStart($event, 'corner')" />
+    </template>
 
     <!-- 主题切换径向扩散动画覆盖层 -->
     <div v-if="themeOverlayVisible" class="pc-panel__theme-overlay" :style="themeOverlayStyle" />
@@ -184,6 +207,7 @@ import ConfigHistory from './ConfigHistory.vue';
 const store = useStore();
 const apiConfigOpen = ref(false);
 const headerRef = ref<HTMLElement>();
+const mobileTab = ref<'chat' | 'control'>('control');
 
 // ---------- 拖拽 ----------
 const isDragging = ref(false);
@@ -193,14 +217,28 @@ const panelPos = ref({
   y: store.settings.panel_y >= 0 ? store.settings.panel_y : -1,
 });
 
-const panelStyle = computed(() => ({
-  left: `${panelPos.value.x}px`,
-  top: `${panelPos.value.y}px`,
-  width: `${store.settings.panel_width}px`,
-  height: `${store.settings.panel_height}px`,
-}));
+const panelStyle = computed(() => {
+  if (store.isMobile) {
+    return {
+      left: '0px',
+      bottom: '0px',
+      top: 'auto',
+      width: '100%',
+      height: '85vh',
+      borderBottomLeftRadius: '0px',
+      borderBottomRightRadius: '0px',
+    };
+  }
+  return {
+    left: `${panelPos.value.x}px`,
+    top: `${panelPos.value.y}px`,
+    width: `${store.settings.panel_width}px`,
+    height: `${store.settings.panel_height}px`,
+  };
+});
 
 function onMouseDown(e: MouseEvent) {
+  if (store.isMobile) return;
   if (!(e.target as HTMLElement).closest('.pc-panel__header')) return;
   if ((e.target as HTMLElement).closest('.pc-panel__header-btn')) return;
   isDragging.value = true;
@@ -253,6 +291,7 @@ let resizeDir: 'right' | 'bottom' | 'corner' = 'corner';
 let resizeOrigin = { x: 0, y: 0, w: 0, h: 0 };
 
 function onResizeStart(e: MouseEvent, dir: 'right' | 'bottom' | 'corner') {
+  if (store.isMobile) return;
   isResizing.value = true;
   resizeDir = dir;
   resizeOrigin = {
@@ -412,7 +451,11 @@ onUnmounted(() => {
   user-select: none;
 }
 
-.pc-panel__header:active {
+.pc-panel__header--mobile {
+  cursor: default;
+}
+
+.pc-panel__header:active:not(.pc-panel__header--mobile) {
   cursor: grabbing;
 }
 
@@ -630,6 +673,41 @@ onUnmounted(() => {
 .pc-panel__api-toggle-text {
   font-size: 12px;
   color: var(--ub-text-muted);
+}
+
+/* --- Mobile Tabs --- */
+.pc-panel__mobile-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--ub-border);
+  background: var(--ub-bg-glass);
+  padding: 4px 10px 0;
+  gap: 8px;
+}
+
+.pc-panel__mobile-tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 0;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--ub-text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pc-panel__mobile-tab-btn.active {
+  color: var(--ub-accent-text);
+  border-bottom-color: var(--ub-accent-active);
+}
+
+.pc-panel__mobile-tab-btn i {
+  font-size: 15px;
 }
 
 .pc-panel__body {

@@ -25,6 +25,10 @@ import {
 } from './config-storage';
 
 export const useStore = defineStore('preset-control', () => {
+  // ========== 视口检测 (移动端适配) ==========
+  const { width: windowWidth, height: windowHeight } = useWindowSize();
+  const isMobile = computed(() => windowHeight.value >= windowWidth.value);
+
   // ========== 持久化设置（存入酒馆脚本变量）==========
   const settings = ref<Settings>(
     SettingsSchema.parse(getVariables({ type: 'script', script_id: getScriptId() })),
@@ -795,5 +799,6 @@ export const useStore = defineStore('preset-control', () => {
     importConfig,
     persistWidgetConfig,
     getDefaultSystemPrompt: () => buildSystemPrompt(presetEntries.value, presetParams.value),
+    isMobile,
   };
 });

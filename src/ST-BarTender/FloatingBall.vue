@@ -6,7 +6,8 @@
       class="fb-ball"
       :class="[{ 'fb-ball--active': store.ballMenuOpen }, 'ub-theme-' + store.settings.theme]"
       :style="ballStyle"
-      @mousedown.prevent="onMouseDown"
+      @mousedown.prevent="onPointerDown"
+      @touchstart.prevent="onPointerDown"
     >
       <i class="fa-solid fa-sliders" />
     </div>
@@ -52,58 +53,73 @@ const hasMoved = ref(false);
 const startPos = { x: 0, y: 0 };
 const dragOffset = { x: 0, y: 0 };
 
-function onMouseDown(e: MouseEvent) {
+/** 从 MouseEvent 或 TouchEvent 中提取坐标 */
+function getPointerXY(e: MouseEvent | TouchEvent): { x: number; y: number } {
+  if ('touches' in e) {
+    const t = e.touches[0] ?? e.changedTouches[0];
+    return { x: t.clientX, y: t.clientY };
+  }
+  return { x: e.clientX, y: e.clientY };
+}
+
+function onPointerDown(e: MouseEvent | TouchEvent) {
+  const { x, y } = getPointerXY(e);
   isDragging.value = true;
   hasMoved.value = false;
-  startPos.x = e.clientX;
-  startPos.y = e.clientY;
-  dragOffset.x = e.clientX - ballPos.value.x;
-  dragOffset.y = e.clientY - ballPos.value.y;
+  startPos.x = x;
+  startPos.y = y;
+  dragOffset.x = x - ballPos.value.x;
+  dragOffset.y = y - ballPos.value.y;
 
-  document.addEventListener('mousemove', onMouseMove);
-  document.addEventListener('mouseup', onMouseUp);
+  document.addEventListener('mousemove', onPointerMove);
+  document.addEventListener('mouseup', onPointerUp);
+  document.addEventListener('touchmove', onPointerMove, { passive: false });
+  document.addEventListener('touchend', onPointerUp);
+  document.addEventListener('touchcancel', onPointerUp);
   try {
-    window.parent?.document?.addEventListener('mousemove', onMouseMove);
-    window.parent?.document?.addEventListener('mouseup', onMouseUp);
+    window.parent?.document?.addEventListener('mousemove', onPointerMove);
+    window.parent?.document?.addEventListener('mouseup', onPointerUp);
   } catch { /* 跨域静默 */ }
 }
 
-function onMouseMove(e: MouseEvent) {
+function onPointerMove(e: MouseEvent | TouchEvent) {
   if (!isDragging.value) return;
+  if ('cancelable' in e && e.cancelable) e.preventDefault(); // 阻止触摸滚动
 
-  // 用起始位置判断是否真的拖拽了
-  const dx = Math.abs(e.clientX - startPos.x);
-  const dy = Math.abs(e.clientY - startPos.y);
+  const { x, y } = getPointerXY(e);
+  const dx = Math.abs(x - startPos.x);
+  const dy = Math.abs(y - startPos.y);
   if (!hasMoved.value && dx + dy > CLICK_THRESHOLD) {
     hasMoved.value = true;
   }
 
   if (hasMoved.value) {
-    ballPos.value.x = e.clientX - dragOffset.x;
-    ballPos.value.y = e.clientY - dragOffset.y;
+    ballPos.value.x = x - dragOffset.x;
+    ballPos.value.y = y - dragOffset.y;
   }
 }
 
-function onMouseUp() {
+function onPointerUp() {
   isDragging.value = false;
   cleanupDragListeners();
 
   if (hasMoved.value) {
-    // 拖拽结束：保存位置
     store.settings.ball_x = ballPos.value.x;
     store.settings.ball_y = ballPos.value.y;
   } else {
-    // 点击：切换菜单
     store.toggleBallMenu();
   }
 }
 
 function cleanupDragListeners() {
-  document.removeEventListener('mousemove', onMouseMove);
-  document.removeEventListener('mouseup', onMouseUp);
+  document.removeEventListener('mousemove', onPointerMove);
+  document.removeEventListener('mouseup', onPointerUp);
+  document.removeEventListener('touchmove', onPointerMove);
+  document.removeEventListener('touchend', onPointerUp);
+  document.removeEventListener('touchcancel', onPointerUp);
   try {
-    window.parent?.document?.removeEventListener('mousemove', onMouseMove);
-    window.parent?.document?.removeEventListener('mouseup', onMouseUp);
+    window.parent?.document?.removeEventListener('mousemove', onPointerMove);
+    window.parent?.document?.removeEventListener('mouseup', onPointerUp);
   } catch { /* 跨域静默 */ }
 }
 
