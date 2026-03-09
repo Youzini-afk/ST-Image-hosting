@@ -437,10 +437,10 @@ onUnmounted(() => {
 .pc-panel__api-input {
   flex: 1;
   padding: 5px 8px;
-  border: 1px solid var(--ub-border);
+  border: 1px solid var(--ub-border) !important;
   border-radius: 5px;
-  background: var(--ub-input-bg);
-  color: var(--ub-text-main);
+  background: var(--ub-input-bg) !important;
+  color: var(--ub-text-main) !important;
   font-size: 12px;
   outline: none;
   transition: border-color 0.2s;
@@ -453,9 +453,9 @@ onUnmounted(() => {
 .pc-panel__api-select {
   flex: 1;
   padding: 5px 8px;
-  border: 1px solid var(--ub-border);
+  border: 1px solid var(--ub-border) !important;
   border-radius: 5px;
-  background: var(--ub-bg-solid);
+  background: var(--ub-input-bg) !important;
   color: var(--ub-text-main);
   font-size: 12px;
   outline: none;

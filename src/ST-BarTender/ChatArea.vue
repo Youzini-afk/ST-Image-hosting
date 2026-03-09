@@ -517,10 +517,10 @@ watch(
 .chat-area__input {
   flex: 1;
   padding: 8px 12px;
-  border: 1px solid var(--ub-border);
+  border: 1px solid var(--ub-border) !important;
   border-radius: 8px;
-  background: var(--ub-input-bg);
-  color: var(--ub-text-main);
+  background: var(--ub-input-bg) !important;
+  color: var(--ub-text-main) !important;
   font-size: 13px;
   outline: none;
   transition: border-color 0.2s;
