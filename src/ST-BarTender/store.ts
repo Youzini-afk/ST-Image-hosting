@@ -26,8 +26,32 @@ import {
 
 export const useStore = defineStore('preset-control', () => {
   // ========== 视口检测 (移动端适配) ==========
-  const { width: windowWidth, height: windowHeight } = useWindowSize();
-  const isMobile = computed(() => windowHeight.value >= windowWidth.value);
+  // UI 挂载在 parent document 中，所以需要测量 parent window 的尺寸（不是 iframe 的）
+  const parentWidth = ref(0);
+  const parentHeight = ref(0);
+
+  function updateParentSize() {
+    try {
+      const w = window.parent && window.parent !== window ? window.parent : window;
+      parentWidth.value = w.innerWidth;
+      parentHeight.value = w.innerHeight;
+    } catch {
+      parentWidth.value = window.innerWidth;
+      parentHeight.value = window.innerHeight;
+    }
+  }
+
+  updateParentSize();
+
+  // 监听 parent window 的 resize 事件
+  try {
+    const targetWin = window.parent && window.parent !== window ? window.parent : window;
+    targetWin.addEventListener('resize', updateParentSize);
+  } catch {
+    window.addEventListener('resize', updateParentSize);
+  }
+
+  const isMobile = computed(() => parentHeight.value >= parentWidth.value);
 
   // ========== 持久化设置（存入酒馆脚本变量）==========
   const settings = ref<Settings>(
