@@ -44,9 +44,9 @@
             <!-- 正常显示 -->
             <div v-else class="chat-area__bubble-content">{{ msg.content }}</div>
 
-            <!-- 操作栏（消息下方） -->
+            <!-- 操作栏（消息下方，常驻显示） -->
             <div
-              v-if="hoveredMsgId === msg.id && editingMsgId !== msg.id && !store.isLoading"
+              v-if="editingMsgId !== msg.id && !store.isLoading"
               class="chat-area__bubble-toolbar"
             >
               <template v-if="msg.role === 'user'">
@@ -385,6 +385,7 @@ watch(
 }
 
 .chat-area__bubble-content--streaming {
+  max-height: 300px;
   overflow-y: auto;
   font-size: 11px;
   opacity: 0.7;

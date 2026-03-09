@@ -29,14 +29,14 @@
           title="导出面板"
           @click="store.exportConfig()"
         >
-          <i class="fa-solid fa-download" />
+          <i class="fa-solid fa-file-export" />
         </button>
         <button
           class="pc-panel__header-btn"
           title="导入面板"
           @click="store.importConfig()"
         >
-          <i class="fa-solid fa-upload" />
+          <i class="fa-solid fa-file-import" />
         </button>
         <button
           class="pc-panel__header-btn"

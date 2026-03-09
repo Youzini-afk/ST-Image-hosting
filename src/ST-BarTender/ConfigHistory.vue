@@ -1,51 +1,49 @@
 <template>
-  <teleport to="body">
-    <transition name="ch-fade">
-      <div v-if="store.historyOpen" class="ch-overlay" :class="['ub-theme-' + store.settings.theme]" @mousedown.self="store.historyOpen = false">
-        <div class="ch-dialog">
-          <!-- 标题栏 -->
-          <div class="ch-header">
-            <span class="ch-title"><i class="fa-solid fa-clock-rotate-left" /> 历史记录</span>
-            <button class="ch-close" @click="store.historyOpen = false">
-              <i class="fa-solid fa-xmark" />
-            </button>
-          </div>
+  <transition name="ch-fade">
+    <div v-if="store.historyOpen" class="ch-overlay" :class="['ub-theme-' + store.settings.theme]" @mousedown.self="store.historyOpen = false">
+      <div class="ch-dialog">
+        <!-- 标题栏 -->
+        <div class="ch-header">
+          <span class="ch-title"><i class="fa-solid fa-clock-rotate-left" /> 历史记录</span>
+          <button class="ch-close" @click="store.historyOpen = false">
+            <i class="fa-solid fa-xmark" />
+          </button>
+        </div>
 
-          <!-- 空状态 -->
-          <div v-if="store.configHistory.length === 0" class="ch-empty">
-            <i class="fa-solid fa-inbox" />
-            <span>暂无历史记录</span>
-          </div>
+        <!-- 空状态 -->
+        <div v-if="store.configHistory.length === 0" class="ch-empty">
+          <i class="fa-solid fa-inbox" />
+          <span>暂无历史记录</span>
+        </div>
 
-          <!-- 历史列表 -->
-          <div v-else class="ch-list">
-            <div v-for="snap in store.configHistory" :key="snap.id" class="ch-item">
-              <!-- 缩略预览 -->
-              <div class="ch-preview-wrap">
-                <div class="ch-preview" :class="['ub-theme-' + store.settings.theme]">
-                  <BlockRenderer :block="snap.config.root" :is-root="true" />
-                </div>
+        <!-- 历史列表 -->
+        <div v-else class="ch-list">
+          <div v-for="snap in store.configHistory" :key="snap.id" class="ch-item">
+            <!-- 缩略预览 -->
+            <div class="ch-preview-wrap">
+              <div class="ch-preview" :class="['ub-theme-' + store.settings.theme]">
+                <BlockRenderer :block="snap.config.root" :is-root="true" />
               </div>
+            </div>
 
-              <!-- 信息 & 操作 -->
-              <div class="ch-info">
-                <span class="ch-snap-title">{{ snap.title }}</span>
-                <span class="ch-snap-time">{{ formatTime(snap.timestamp) }}</span>
-                <div class="ch-actions">
-                  <button class="ch-btn ch-btn--primary" @click="rollback(snap.id)">
-                    <i class="fa-solid fa-rotate-left" /> 回滚
-                  </button>
-                  <button class="ch-btn ch-btn--danger" @click="store.deleteSnapshot(snap.id)">
-                    <i class="fa-solid fa-trash" />
-                  </button>
-                </div>
+            <!-- 信息 & 操作 -->
+            <div class="ch-info">
+              <span class="ch-snap-title">{{ snap.title }}</span>
+              <span class="ch-snap-time">{{ formatTime(snap.timestamp) }}</span>
+              <div class="ch-actions">
+                <button class="ch-btn ch-btn--primary" @click="rollback(snap.id)">
+                  <i class="fa-solid fa-rotate-left" /> 回滚
+                </button>
+                <button class="ch-btn ch-btn--danger" @click="store.deleteSnapshot(snap.id)">
+                  <i class="fa-solid fa-trash" />
+                </button>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </transition>
-  </teleport>
+    </div>
+  </transition>
 </template>
 
 <script setup lang="ts">
