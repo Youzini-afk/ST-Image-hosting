@@ -1,4 +1,5 @@
 <template>
+  <transition name="ew-panel">
   <EwPanelShell
     v-if="store.settings.ui_open"
     :class="{ 'theme-moon-phase': store.settings.theme_moon }"
@@ -391,6 +392,7 @@
       </div>
     </transition>
   </EwPanelShell>
+  </transition>
 </template>
 
 <script setup lang="ts">
@@ -549,6 +551,32 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* ── Panel Open / Close Transition ── */
+.ew-panel-enter-active {
+  transition: opacity 0.3s ease;
+}
+.ew-panel-leave-active {
+  transition: opacity 0.22s ease;
+}
+.ew-panel-enter-from,
+.ew-panel-leave-to {
+  opacity: 0;
+}
+.ew-panel-enter-active :deep(.ew-panel) {
+  animation: ew-panel-slide-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.ew-panel-leave-active :deep(.ew-panel) {
+  animation: ew-panel-slide-out 0.22s ease both;
+}
+@keyframes ew-panel-slide-in {
+  0% { opacity: 0; transform: translateY(32px) scale(0.96); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes ew-panel-slide-out {
+  0% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(18px) scale(0.97); }
+}
+
 /* ── Content Stack ── */
 .ew-content-stack {
   display: flex;
