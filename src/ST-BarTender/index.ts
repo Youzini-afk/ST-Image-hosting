@@ -4,8 +4,7 @@
 
 import { createScriptIdDiv } from '@util/script';
 import './theme.css';
-import Panel from './Panel.vue';
-import FloatingBall from './FloatingBall.vue';
+import AppRoot from './AppRoot.vue';
 import { useStore } from './store';
 
 const MENU_ITEM_NAME = '预设控制';
@@ -14,11 +13,8 @@ const MENU_ITEM_ID = 'st-preset-assistant-menu-item';
 const MENU_EVENT_NS = '.st_preset_assistant';
 const MENU_RETRY_MS = 1500;
 
-let panelApp: ReturnType<typeof createApp> | null = null;
-let $panelRoot: JQuery<HTMLDivElement> | null = null;
-
-let ballApp: ReturnType<typeof createApp> | null = null;
-let $ballRoot: JQuery<HTMLDivElement> | null = null;
+let app: ReturnType<typeof createApp> | null = null;
+let $appRoot: JQuery<HTMLDivElement> | null = null;
 
 let destroyStyle: (() => void) | null = null;
 let menuRetryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -172,32 +168,29 @@ function uninstallMagicWandMenuItem() {
 }
 
 // ============================================================
-// 2. 悬浮球（始终挂载）
+// 2. 挂载唯一 Vue 应用（含悬浮球 + 面板）
 // ============================================================
 
-function mountFloatingBall() {
-  if (ballApp) return;
+function mountApp() {
+  if (app) return;
 
-  ballApp = createApp(FloatingBall).use(pinia);
-  // 挂载到 parent document body，绕过 iframe 移动端触摸事件不可达的问题
-  $ballRoot = createScriptIdDiv().appendTo(resolveParentBody());
-  ballApp.mount($ballRoot[0]);
+  app = createApp(AppRoot).use(pinia);
+  // 挂载到 parent document body，绕过 iframe 移动端视口不可见问题
+  $appRoot = createScriptIdDiv().appendTo(resolveParentBody());
+  app.mount($appRoot[0]);
 
   // 持续同步样式到 parent document（vue-style-loader 会在组件挂载时动态注入 style 标签）
   setupContinuousStyleSync();
 
-  // 监听 panelOpen → 自动挂载并打开面板（供悬浮球齿轮按钮触发）
-  // immediate: true → 如果上次 panel_open=true 被持久化，刷新后自动恢复面板
   const store = useStore(pinia);
 
   // 初始化文件持久化 (异步，不阻塞 UI)
   store.initConfigStorage();
 
-  watch(() => store.panelOpen, (open) => {
-    if (open) {
-      openMainPanel();
-    }
-  }, { immediate: true });
+  // 如果上次 panelOpen=true 被持久化，恢复时自动扫描预设
+  if (store.panelOpen) {
+    store.scanPreset();
+  }
 
   // 监听 show_in_wand → 动态安装/卸载魔法棒菜单项
   watch(() => store.settings.show_in_wand, (show) => {
@@ -208,32 +201,17 @@ function mountFloatingBall() {
     }
   });
 
-  console.info('[预设控制] 悬浮球已挂载');
+  console.info('[预设控制] 应用已挂载');
 }
 
 // ============================================================
-// 3. 主面板（按需挂载）
+// 3. 打开主面板（供魔法棒菜单、悬浮球齿轮调用）
 // ============================================================
 
 function openMainPanel() {
-  if (!panelApp) {
-    mountPanel();
-  }
-
   const store = useStore(pinia);
   store.panelOpen = true;
   store.scanPreset();
-}
-
-function mountPanel() {
-  if (panelApp) return;
-
-  panelApp = createApp(Panel).use(pinia);
-  // 挂载到 parent document body，绕过 iframe 移动端触摸事件不可达的问题
-  $panelRoot = createScriptIdDiv().appendTo(resolveParentBody());
-  panelApp.mount($panelRoot[0]);
-
-  console.info('[预设控制] 面板已挂载');
 }
 
 // ============================================================
@@ -242,7 +220,7 @@ function mountPanel() {
 
 $(() => {
   try {
-    mountFloatingBall();
+    mountApp();
     // 魔法棒菜单仅在设置开启时安装（watcher 会处理后续变更）
     const store = useStore(pinia);
     if (store.settings.show_in_wand) {
@@ -263,15 +241,10 @@ $(() => {
 $(window).on('pagehide', () => {
   uninstallMagicWandMenuItem();
 
-  ballApp?.unmount();
-  ballApp = null;
-  $ballRoot?.remove();
-  $ballRoot = null;
-
-  panelApp?.unmount();
-  panelApp = null;
-  $panelRoot?.remove();
-  $panelRoot = null;
+  app?.unmount();
+  app = null;
+  $appRoot?.remove();
+  $appRoot = null;
 
   destroyStyle?.();
   destroyStyle = null;
