@@ -21,17 +21,13 @@
         <button type="button" class="ew-flow-card__action" @click="$emit('toggle-expand')">
           {{ expanded ? '收起' : '编辑' }}
         </button>
-        <button type="button" class="ew-flow-card__action" @click="$emit('export')">
-          导出
-        </button>
-        <button type="button" class="ew-flow-card__action" @click="openFlowFilePicker">
-          导入
-        </button>
+        <button type="button" class="ew-flow-card__action" @click="$emit('export')">导出</button>
+        <button type="button" class="ew-flow-card__action" @click="openFlowFilePicker">导入</button>
         <input
           ref="flowFileInput"
           type="file"
           accept=".json,application/json"
-          style="display:none"
+          style="display: none"
           @change="onImportFile"
         />
         <button type="button" class="ew-flow-card__action ew-flow-card__action--danger" @click="$emit('remove')">
@@ -60,13 +56,32 @@
               </select>
             </EwFieldRow>
             <EwFieldRow label="优先级" :help="help('flow.priority')">
-              <input :value="flow.priority" type="number" min="-9999" max="9999" step="1" @input="setFlowNumber('priority', $event)" />
+              <input
+                :value="flow.priority"
+                type="number"
+                min="-9999"
+                max="9999"
+                step="1"
+                @input="setFlowNumber('priority', $event)"
+              />
             </EwFieldRow>
             <EwFieldRow label="超时(ms)" :help="help('flow.timeout_ms')">
-              <input :value="flow.timeout_ms" type="number" min="1000" step="500" @input="setFlowNumber('timeout_ms', $event)" />
+              <input
+                :value="flow.timeout_ms"
+                type="number"
+                min="1000"
+                step="500"
+                @input="setFlowNumber('timeout_ms', $event)"
+              />
             </EwFieldRow>
             <EwFieldRow label="上下文楼层数" :help="help('flow.context_turns')">
-              <input :value="flow.context_turns" type="number" min="1" step="1" @input="setFlowNumber('context_turns', $event)" />
+              <input
+                :value="flow.context_turns"
+                type="number"
+                min="1"
+                step="1"
+                @input="setFlowNumber('context_turns', $event)"
+              />
             </EwFieldRow>
           </div>
         </section>
@@ -79,52 +94,145 @@
           <div class="ew-grid ew-grid--two">
             <EwFieldRow label="解锁上下文长度">
               <label class="ew-switch ew-switch--field">
-                <input :checked="flow.generation_options.unlock_context_length" type="checkbox" @change="setGenerationBool('unlock_context_length', $event)" />
+                <input
+                  :checked="flow.generation_options.unlock_context_length"
+                  type="checkbox"
+                  @change="setGenerationBool('unlock_context_length', $event)"
+                />
                 <span class="ew-switch__slider"></span>
-                <span class="ew-switch__label">{{ flow.generation_options.unlock_context_length ? '已启用' : '已关闭' }}</span>
+                <span class="ew-switch__label">{{
+                  flow.generation_options.unlock_context_length ? '已启用' : '已关闭'
+                }}</span>
               </label>
             </EwFieldRow>
             <EwFieldRow label="流式传输">
               <label class="ew-switch ew-switch--field">
-                <input :checked="flow.generation_options.stream" type="checkbox" @change="setGenerationBool('stream', $event)" />
+                <input
+                  :checked="flow.generation_options.stream"
+                  type="checkbox"
+                  @change="setGenerationBool('stream', $event)"
+                />
                 <span class="ew-switch__slider"></span>
                 <span class="ew-switch__label">{{ flow.generation_options.stream ? '已启用' : '已关闭' }}</span>
               </label>
             </EwFieldRow>
             <EwFieldRow label="上下文长度（词符）">
               <div class="ew-range">
-                <input :value="flow.generation_options.max_context_tokens" type="range" min="16000" max="500000" step="1000" :disabled="!flow.generation_options.unlock_context_length" @input="setGenerationNumber('max_context_tokens', $event)" />
-                <input :value="flow.generation_options.max_context_tokens" type="number" min="16000" step="1000" :disabled="!flow.generation_options.unlock_context_length" @input="setGenerationNumber('max_context_tokens', $event)" />
+                <input
+                  :value="flow.generation_options.max_context_tokens"
+                  type="range"
+                  min="16000"
+                  max="500000"
+                  step="1000"
+                  :disabled="!flow.generation_options.unlock_context_length"
+                  @input="setGenerationNumber('max_context_tokens', $event)"
+                />
+                <input
+                  :value="flow.generation_options.max_context_tokens"
+                  type="number"
+                  min="16000"
+                  step="1000"
+                  :disabled="!flow.generation_options.unlock_context_length"
+                  @input="setGenerationNumber('max_context_tokens', $event)"
+                />
               </div>
             </EwFieldRow>
             <EwFieldRow label="最大回复长度（词符）">
-              <input :value="flow.generation_options.max_reply_tokens" type="number" min="1" step="32" @input="setGenerationNumber('max_reply_tokens', $event)" />
+              <input
+                :value="flow.generation_options.max_reply_tokens"
+                type="number"
+                min="1"
+                step="32"
+                @input="setGenerationNumber('max_reply_tokens', $event)"
+              />
             </EwFieldRow>
             <EwFieldRow label="备选回复数">
-              <input :value="flow.generation_options.n_candidates" type="number" min="1" step="1" @input="setGenerationNumber('n_candidates', $event)" />
+              <input
+                :value="flow.generation_options.n_candidates"
+                type="number"
+                min="1"
+                step="1"
+                @input="setGenerationNumber('n_candidates', $event)"
+              />
             </EwFieldRow>
             <EwFieldRow label="温度">
               <div class="ew-range">
-                <input :value="flow.generation_options.temperature" type="range" min="0" max="2" step="0.01" @input="setGenerationNumber('temperature', $event)" />
-                <input :value="flow.generation_options.temperature" type="number" min="0" max="2" step="0.01" @input="setGenerationNumber('temperature', $event)" />
+                <input
+                  :value="flow.generation_options.temperature"
+                  type="range"
+                  min="0"
+                  max="2"
+                  step="0.01"
+                  @input="setGenerationNumber('temperature', $event)"
+                />
+                <input
+                  :value="flow.generation_options.temperature"
+                  type="number"
+                  min="0"
+                  max="2"
+                  step="0.01"
+                  @input="setGenerationNumber('temperature', $event)"
+                />
               </div>
             </EwFieldRow>
             <EwFieldRow label="频率惩罚">
               <div class="ew-range">
-                <input :value="flow.generation_options.frequency_penalty" type="range" min="0" max="2" step="0.01" @input="setGenerationNumber('frequency_penalty', $event)" />
-                <input :value="flow.generation_options.frequency_penalty" type="number" min="0" max="2" step="0.01" @input="setGenerationNumber('frequency_penalty', $event)" />
+                <input
+                  :value="flow.generation_options.frequency_penalty"
+                  type="range"
+                  min="0"
+                  max="2"
+                  step="0.01"
+                  @input="setGenerationNumber('frequency_penalty', $event)"
+                />
+                <input
+                  :value="flow.generation_options.frequency_penalty"
+                  type="number"
+                  min="0"
+                  max="2"
+                  step="0.01"
+                  @input="setGenerationNumber('frequency_penalty', $event)"
+                />
               </div>
             </EwFieldRow>
             <EwFieldRow label="存在惩罚">
               <div class="ew-range">
-                <input :value="flow.generation_options.presence_penalty" type="range" min="0" max="2" step="0.01" @input="setGenerationNumber('presence_penalty', $event)" />
-                <input :value="flow.generation_options.presence_penalty" type="number" min="0" max="2" step="0.01" @input="setGenerationNumber('presence_penalty', $event)" />
+                <input
+                  :value="flow.generation_options.presence_penalty"
+                  type="range"
+                  min="0"
+                  max="2"
+                  step="0.01"
+                  @input="setGenerationNumber('presence_penalty', $event)"
+                />
+                <input
+                  :value="flow.generation_options.presence_penalty"
+                  type="number"
+                  min="0"
+                  max="2"
+                  step="0.01"
+                  @input="setGenerationNumber('presence_penalty', $event)"
+                />
               </div>
             </EwFieldRow>
             <EwFieldRow label="Top P">
               <div class="ew-range">
-                <input :value="flow.generation_options.top_p" type="range" min="0" max="1" step="0.01" @input="setGenerationNumber('top_p', $event)" />
-                <input :value="flow.generation_options.top_p" type="number" min="0" max="1" step="0.01" @input="setGenerationNumber('top_p', $event)" />
+                <input
+                  :value="flow.generation_options.top_p"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  @input="setGenerationNumber('top_p', $event)"
+                />
+                <input
+                  :value="flow.generation_options.top_p"
+                  type="number"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  @input="setGenerationNumber('top_p', $event)"
+                />
               </div>
             </EwFieldRow>
           </div>
@@ -137,7 +245,10 @@
           <!-- Selects row -->
           <div class="ew-grid ew-grid--two">
             <EwFieldRow label="角色名称行为">
-              <select :value="flow.behavior_options.name_behavior" @change="setBehaviorSelectByEvent('name_behavior', $event)">
+              <select
+                :value="flow.behavior_options.name_behavior"
+                @change="setBehaviorSelectByEvent('name_behavior', $event)"
+              >
                 <option value="none">无</option>
                 <option value="default">默认</option>
                 <option value="complete_target">补全对象</option>
@@ -145,13 +256,22 @@
               </select>
             </EwFieldRow>
             <EwFieldRow label="推理强度">
-              <select :value="flow.behavior_options.reasoning_effort" @change="setBehaviorSelectByEvent('reasoning_effort', $event)">
-                <option value="auto">自动</option><option value="low">低</option><option value="medium">中</option><option value="high">高</option>
+              <select
+                :value="flow.behavior_options.reasoning_effort"
+                @change="setBehaviorSelectByEvent('reasoning_effort', $event)"
+              >
+                <option value="auto">自动</option>
+                <option value="low">低</option>
+                <option value="medium">中</option>
+                <option value="high">高</option>
               </select>
             </EwFieldRow>
             <EwFieldRow label="详细程度">
               <select :value="flow.behavior_options.verbosity" @change="setBehaviorSelectByEvent('verbosity', $event)">
-                <option value="auto">自动</option><option value="low">低</option><option value="medium">中</option><option value="high">高</option>
+                <option value="auto">自动</option>
+                <option value="low">低</option>
+                <option value="medium">中</option>
+                <option value="high">高</option>
               </select>
             </EwFieldRow>
           </div>
@@ -159,9 +279,13 @@
           <!-- Toggle switches grid -->
           <div class="ew-toggle-grid">
             <div class="ew-toggle-item">
-              <button type="button" class="ew-switch" role="switch"
+              <button
+                type="button"
+                class="ew-switch"
+                role="switch"
                 :aria-checked="flow.behavior_options.continue_prefill ? 'true' : 'false'"
-                @click="setBehaviorToggle('continue_prefill')">
+                @click="setBehaviorToggle('continue_prefill')"
+              >
                 <span class="ew-switch__track" :data-enabled="flow.behavior_options.continue_prefill ? '1' : '0'">
                   <span class="ew-switch__thumb" />
                 </span>
@@ -169,9 +293,13 @@
               <span class="ew-toggle-item__label">继续预填充</span>
             </div>
             <div class="ew-toggle-item">
-              <button type="button" class="ew-switch" role="switch"
+              <button
+                type="button"
+                class="ew-switch"
+                role="switch"
                 :aria-checked="flow.behavior_options.squash_system_messages ? 'true' : 'false'"
-                @click="setBehaviorToggle('squash_system_messages')">
+                @click="setBehaviorToggle('squash_system_messages')"
+              >
                 <span class="ew-switch__track" :data-enabled="flow.behavior_options.squash_system_messages ? '1' : '0'">
                   <span class="ew-switch__thumb" />
                 </span>
@@ -179,19 +307,30 @@
               <span class="ew-toggle-item__label">压缩系统消息</span>
             </div>
             <div class="ew-toggle-item">
-              <button type="button" class="ew-switch" role="switch"
+              <button
+                type="button"
+                class="ew-switch"
+                role="switch"
                 :aria-checked="flow.behavior_options.enable_function_calling ? 'true' : 'false'"
-                @click="setBehaviorToggle('enable_function_calling')">
-                <span class="ew-switch__track" :data-enabled="flow.behavior_options.enable_function_calling ? '1' : '0'">
+                @click="setBehaviorToggle('enable_function_calling')"
+              >
+                <span
+                  class="ew-switch__track"
+                  :data-enabled="flow.behavior_options.enable_function_calling ? '1' : '0'"
+                >
                   <span class="ew-switch__thumb" />
                 </span>
               </button>
               <span class="ew-toggle-item__label">启用函数调用</span>
             </div>
             <div class="ew-toggle-item">
-              <button type="button" class="ew-switch" role="switch"
+              <button
+                type="button"
+                class="ew-switch"
+                role="switch"
                 :aria-checked="flow.behavior_options.send_inline_media ? 'true' : 'false'"
-                @click="setBehaviorToggle('send_inline_media')">
+                @click="setBehaviorToggle('send_inline_media')"
+              >
                 <span class="ew-switch__track" :data-enabled="flow.behavior_options.send_inline_media ? '1' : '0'">
                   <span class="ew-switch__thumb" />
                 </span>
@@ -199,9 +338,13 @@
               <span class="ew-toggle-item__label">发送内联媒体</span>
             </div>
             <div class="ew-toggle-item">
-              <button type="button" class="ew-switch" role="switch"
+              <button
+                type="button"
+                class="ew-switch"
+                role="switch"
                 :aria-checked="flow.behavior_options.request_thinking ? 'true' : 'false'"
-                @click="setBehaviorToggle('request_thinking')">
+                @click="setBehaviorToggle('request_thinking')"
+              >
                 <span class="ew-switch__track" :data-enabled="flow.behavior_options.request_thinking ? '1' : '0'">
                   <span class="ew-switch__thumb" />
                 </span>
@@ -218,16 +361,22 @@
           <div class="ew-flow-card__subsection">
             <h5>正则处理</h5>
             <div class="ew-toggle-item">
-              <button type="button" class="ew-switch" role="switch"
+              <button
+                type="button"
+                class="ew-switch"
+                role="switch"
                 :aria-checked="flow.use_tavern_regex ? 'true' : 'false'"
-                @click="patch({ use_tavern_regex: !flow.use_tavern_regex })">
+                @click="patch({ use_tavern_regex: !flow.use_tavern_regex })"
+              >
                 <span class="ew-switch__track" :data-enabled="flow.use_tavern_regex ? '1' : '0'">
                   <span class="ew-switch__thumb" />
                 </span>
               </button>
               <span class="ew-toggle-item__label">使用酒馆已启用的正则</span>
             </div>
-            <p class="ew-flow-card__hint-text">开启后，聊天消息会先经过酒馆当前激活的正则脚本处理（全局 + 角色卡正则）。</p>
+            <p class="ew-flow-card__hint-text">
+              开启后，聊天消息会先经过酒馆当前激活的正则脚本处理（全局 + 角色卡正则）。
+            </p>
             <button type="button" class="ew-mini-btn ew-mini-btn--info" @click="openRegexPreview">查看当前正则</button>
 
             <div class="ew-flow-card__custom-regex-head">
@@ -235,24 +384,42 @@
               <button type="button" class="ew-mini-btn" @click="addCustomRegex">新增</button>
             </div>
             <div v-if="flow.custom_regex_rules.length === 0" class="ew-empty">暂无自定义正则。</div>
-          <transition-group v-else name="ew-list" tag="div" class="ew-regex-list">
-            <article
-              v-for="(rule, ruleIndex) in flow.custom_regex_rules"
-              :key="rule.id"
-              class="ew-regex-item"
-            >
-              <header class="ew-regex-item__head">
-                <label class="ew-checkbox"><input :checked="rule.enabled" type="checkbox" @change="setRegexEnabled(ruleIndex, $event)" /></label>
-                <span class="ew-regex-item__name" :title="rule.name">{{ rule.name || `规则 ${ruleIndex + 1}` }}</span>
-                <button type="button" class="ew-mini-btn ew-mini-btn--danger" @click="removeCustomRegex(ruleIndex)">删除</button>
-              </header>
-              <div class="ew-regex-item__body">
-                <EwFieldRow label="名称"><input :value="rule.name" type="text" placeholder="起个名字..." @input="patchRegexText(ruleIndex, 'name', $event)" /></EwFieldRow>
-                <EwFieldRow label="正则表达式"><input :value="rule.find_regex" type="text" placeholder="/pattern/gi" @input="patchRegexText(ruleIndex, 'find_regex', $event)" /></EwFieldRow>
-                <EwFieldRow label="替换文本"><input :value="rule.replace_string" type="text" placeholder="留空则删除" @input="patchRegexText(ruleIndex, 'replace_string', $event)" /></EwFieldRow>
-              </div>
-            </article>
-          </transition-group>
+            <transition-group v-else name="ew-list" tag="div" class="ew-regex-list">
+              <article v-for="(rule, ruleIndex) in flow.custom_regex_rules" :key="rule.id" class="ew-regex-item">
+                <header class="ew-regex-item__head">
+                  <label class="ew-checkbox"
+                    ><input :checked="rule.enabled" type="checkbox" @change="setRegexEnabled(ruleIndex, $event)"
+                  /></label>
+                  <span class="ew-regex-item__name" :title="rule.name">{{ rule.name || `规则 ${ruleIndex + 1}` }}</span>
+                  <button type="button" class="ew-mini-btn ew-mini-btn--danger" @click="removeCustomRegex(ruleIndex)">
+                    删除
+                  </button>
+                </header>
+                <div class="ew-regex-item__body">
+                  <EwFieldRow label="名称"
+                    ><input
+                      :value="rule.name"
+                      type="text"
+                      placeholder="起个名字..."
+                      @input="patchRegexText(ruleIndex, 'name', $event)"
+                  /></EwFieldRow>
+                  <EwFieldRow label="正则表达式"
+                    ><input
+                      :value="rule.find_regex"
+                      type="text"
+                      placeholder="/pattern/gi"
+                      @input="patchRegexText(ruleIndex, 'find_regex', $event)"
+                  /></EwFieldRow>
+                  <EwFieldRow label="替换文本"
+                    ><input
+                      :value="rule.replace_string"
+                      type="text"
+                      placeholder="留空则删除"
+                      @input="patchRegexText(ruleIndex, 'replace_string', $event)"
+                  /></EwFieldRow>
+                </div>
+              </article>
+            </transition-group>
           </div>
 
           <div class="ew-flow-card__subsection">
@@ -261,12 +428,20 @@
               <section>
                 <div class="ew-subhead"><h6>提取规则</h6></div>
                 <p class="ew-flow-card__hint-text">只保留 start～end 之间的文本发给 AI（如：只提取正文）。</p>
-                <EwRulesEditor title="提取规则" :model-value="flow.extract_rules" @update:model-value="value => patch({ extract_rules: value })" />
+                <EwRulesEditor
+                  title="提取规则"
+                  :model-value="flow.extract_rules"
+                  @update:model-value="value => patch({ extract_rules: value })"
+                />
               </section>
               <section>
                 <div class="ew-subhead"><h6>排除规则</h6></div>
                 <p class="ew-flow-card__hint-text">删掉 start～end 之间的文本（如：去掉思考标记）。</p>
-                <EwRulesEditor title="排除规则" :model-value="flow.exclude_rules" @update:model-value="value => patch({ exclude_rules: value })" />
+                <EwRulesEditor
+                  title="排除规则"
+                  :model-value="flow.exclude_rules"
+                  @update:model-value="value => patch({ exclude_rules: value })"
+                />
               </section>
             </div>
           </div>
@@ -276,80 +451,112 @@
           <div class="ew-flow-card__section-head">
             <h4>提示词编排</h4>
           </div>
-          <EwPromptOrderList
-            :prompt-order="flow.prompt_order"
-            @update:prompt-order="updatePromptOrder"
-          />
+          <EwPromptOrderList :prompt-order="flow.prompt_order" @update:prompt-order="updatePromptOrder" />
         </section>
 
-
         <EwFieldRow label="请求模板(JSON merge)" :help="help('flow.request_template')">
-          <textarea :value="flow.request_template" rows="4" :placeholder="help('flow.request_template')?.placeholder" @input="setText('request_template', $event)" />
+          <textarea
+            :value="flow.request_template"
+            rows="4"
+            :placeholder="help('flow.request_template')?.placeholder"
+            @input="setText('request_template', $event)"
+          />
         </EwFieldRow>
       </div>
     </transition>
 
     <!-- 正则预览弹窗 -->
-    <Teleport to="body">
-      <transition name="ew-modal">
-        <div v-if="showRegexModal" class="ew-modal-overlay" @click.self="showRegexModal = false">
-          <div class="ew-modal ew-modal--regex">
-            <header class="ew-modal__header">
-              <h3>当前正则脚本一览</h3>
-              <button type="button" class="ew-modal__close" @click="showRegexModal = false">✕</button>
-            </header>
-            <div class="ew-modal__body">
-              <p v-if="regexPreviewList.length === 0" class="ew-empty">没有收集到任何已启用的正则脚本。</p>
-              <div v-for="(script, i) in regexPreviewList" :key="script.id" class="ew-regex-preview-item">
-                <div class="ew-regex-preview-item__head">
-                  <span class="ew-regex-preview-item__index">#{{ i + 1 }}</span>
-                  <span class="ew-regex-preview-item__name">{{ script.scriptName || '未命名' }}</span>
-                  <span v-if="script.isBeautification" class="ew-regex-preview-item__badge ew-regex-preview-item__badge--beauty">美化 → 清空</span>
-                  <span v-else class="ew-regex-preview-item__badge ew-regex-preview-item__badge--transform">转义</span>
-                  <span v-if="script.markdownOnly" class="ew-regex-preview-item__badge ew-regex-preview-item__badge--skip">跳过(MD)</span>
+    <transition name="ew-modal">
+      <div v-if="showRegexModal" class="ew-modal-overlay" @click.self="showRegexModal = false">
+        <div class="ew-modal ew-modal--regex">
+          <header class="ew-modal__header">
+            <h3>当前正则脚本一览</h3>
+            <button type="button" class="ew-modal__close" @click="showRegexModal = false">✕</button>
+          </header>
+          <div class="ew-modal__body">
+            <p v-if="regexPreviewList.length === 0" class="ew-empty">没有收集到任何已启用的正则脚本。</p>
+            <div v-for="(script, i) in regexPreviewList" :key="script.id" class="ew-regex-preview-item">
+              <div class="ew-regex-preview-item__head">
+                <span class="ew-regex-preview-item__index">#{{ i + 1 }}</span>
+                <span class="ew-regex-preview-item__name">{{ script.scriptName || '未命名' }}</span>
+                <span
+                  v-if="script.isBeautification"
+                  class="ew-regex-preview-item__badge ew-regex-preview-item__badge--beauty"
+                  >美化 → 清空</span
+                >
+                <span v-else class="ew-regex-preview-item__badge ew-regex-preview-item__badge--transform">转义</span>
+                <span v-if="script.markdownOnly" class="ew-regex-preview-item__badge ew-regex-preview-item__badge--skip"
+                  >跳过(MD)</span
+                >
+              </div>
+              <div class="ew-regex-preview-item__details">
+                <div class="ew-regex-preview-item__row">
+                  <span class="ew-regex-preview-item__label">查找</span><code>{{ script.findRegex }}</code>
                 </div>
-                <div class="ew-regex-preview-item__details">
-                  <div class="ew-regex-preview-item__row"><span class="ew-regex-preview-item__label">查找</span><code>{{ script.findRegex }}</code></div>
-                  <div class="ew-regex-preview-item__row"><span class="ew-regex-preview-item__label">替换</span><code>{{ script.effectiveReplace }}</code></div>
-                  <div class="ew-regex-preview-item__row"><span class="ew-regex-preview-item__label">作用域</span><span>{{ script.placementLabel }}</span></div>
+                <div class="ew-regex-preview-item__row">
+                  <span class="ew-regex-preview-item__label">替换</span><code>{{ script.effectiveReplace }}</code>
+                </div>
+                <div class="ew-regex-preview-item__row">
+                  <span class="ew-regex-preview-item__label">作用域</span><span>{{ script.placementLabel }}</span>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </transition>
-    </Teleport>
+      </div>
+    </transition>
   </article>
 </template>
 
 <script setup lang="ts">
-import type { EwApiPreset, EwFlowConfig, EwPromptOrderEntry } from '../../runtime/types';
-import { EwFlowConfigSchema } from '../../runtime/types';
-import { isSillyTavernPreset, convertStPresetToFlow } from '../convertStPreset';
 import { simpleHash } from '../../runtime/helpers';
 import { collectAllRegexScripts, isBeautificationReplace } from '../../runtime/regex-engine';
+import type { EwApiPreset, EwFlowConfig, EwPromptOrderEntry } from '../../runtime/types';
+import { EwFlowConfigSchema } from '../../runtime/types';
+import { convertStPresetToFlow, isSillyTavernPreset } from '../convertStPreset';
 import { getFieldHelp } from '../help-meta';
 import EwFieldRow from './EwFieldRow.vue';
 
-import EwRulesEditor from './EwRulesEditor.vue';
 import EwPromptOrderList from './EwPromptOrderList.vue';
+import EwRulesEditor from './EwRulesEditor.vue';
 
 type FlowNumberKey = 'priority' | 'timeout_ms' | 'context_turns';
-type GenerationNumberKey = 'max_context_tokens' | 'max_reply_tokens' | 'n_candidates' | 'temperature' | 'frequency_penalty' | 'presence_penalty' | 'top_p';
+type GenerationNumberKey =
+  | 'max_context_tokens'
+  | 'max_reply_tokens'
+  | 'n_candidates'
+  | 'temperature'
+  | 'frequency_penalty'
+  | 'presence_penalty'
+  | 'top_p';
 type GenerationBoolKey = 'unlock_context_length' | 'stream';
-type BehaviorBoolKey = 'continue_prefill' | 'squash_system_messages' | 'enable_function_calling' | 'send_inline_media' | 'request_thinking';
+type BehaviorBoolKey =
+  | 'continue_prefill'
+  | 'squash_system_messages'
+  | 'enable_function_calling'
+  | 'send_inline_media'
+  | 'request_thinking';
 type BehaviorSelectKey = 'name_behavior' | 'reasoning_effort' | 'verbosity';
 
-
 const props = defineProps<{ modelValue: EwFlowConfig; apiPresets: EwApiPreset[]; index: number; expanded: boolean }>();
-const emit = defineEmits<{ (event: 'toggle-expand'): void; (event: 'remove'): void; (event: 'export'): void; (event: 'update:modelValue', value: EwFlowConfig): void }>();
+const emit = defineEmits<{
+  (event: 'toggle-expand'): void;
+  (event: 'remove'): void;
+  (event: 'export'): void;
+  (event: 'update:modelValue', value: EwFlowConfig): void;
+}>();
 
 const flow = computed(() => props.modelValue);
 
 // "已展开过"模式：首次展开后保持 DOM 存活（v-show）
 // 避免后续切换时重新挂载的开销。
 const hasBeenExpanded = ref(props.expanded);
-watch(() => props.expanded, (val) => { if (val) hasBeenExpanded.value = true; });
+watch(
+  () => props.expanded,
+  val => {
+    if (val) hasBeenExpanded.value = true;
+  },
+);
 
 const selectedPreset = computed(() => props.apiPresets.find(preset => preset.id === flow.value.api_preset_id) ?? null);
 const endpointSummary = computed(() => {
@@ -373,17 +580,42 @@ const endpointSummary = computed(() => {
 });
 const presetLabel = computed(() => selectedPreset.value?.name?.trim() || '未绑定');
 
-function help(key: string) { return getFieldHelp(key); }
-function patch(partial: Partial<EwFlowConfig>) { emit('update:modelValue', { ...flow.value, ...partial }); }
-function patchGeneration(partial: Partial<EwFlowConfig['generation_options']>) { patch({ generation_options: { ...flow.value.generation_options, ...partial } }); }
-function patchBehavior(partial: Partial<EwFlowConfig['behavior_options']>) { patch({ behavior_options: { ...flow.value.behavior_options, ...partial } }); }
-function updatePromptOrder(order: EwPromptOrderEntry[]) { patch({ prompt_order: order }); }
-function toNumber(raw: string, fallback: number) { const parsed = Number(raw); return Number.isFinite(parsed) ? parsed : fallback; }
-function clamp(value: number, min: number, max: number) { return Math.min(max, Math.max(min, value)); }
-function setEnabled(event: Event) { patch({ enabled: (event.target as HTMLInputElement).checked }); }
-function setText(key: 'name' | 'id' | 'request_template', event: Event) { patch({ [key]: (event.target as HTMLInputElement | HTMLTextAreaElement).value } as Partial<EwFlowConfig>); }
-function setFlowNumber(key: FlowNumberKey, event: Event) { patch({ [key]: Math.trunc(toNumber((event.target as HTMLInputElement).value, flow.value[key] as number)) } as Partial<EwFlowConfig>); }
-function setApiPresetId(event: Event) { patch({ api_preset_id: (event.target as HTMLSelectElement).value }); }
+function help(key: string) {
+  return getFieldHelp(key);
+}
+function patch(partial: Partial<EwFlowConfig>) {
+  emit('update:modelValue', { ...flow.value, ...partial });
+}
+function patchGeneration(partial: Partial<EwFlowConfig['generation_options']>) {
+  patch({ generation_options: { ...flow.value.generation_options, ...partial } });
+}
+function patchBehavior(partial: Partial<EwFlowConfig['behavior_options']>) {
+  patch({ behavior_options: { ...flow.value.behavior_options, ...partial } });
+}
+function updatePromptOrder(order: EwPromptOrderEntry[]) {
+  patch({ prompt_order: order });
+}
+function toNumber(raw: string, fallback: number) {
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+function setEnabled(event: Event) {
+  patch({ enabled: (event.target as HTMLInputElement).checked });
+}
+function setText(key: 'name' | 'id' | 'request_template', event: Event) {
+  patch({ [key]: (event.target as HTMLInputElement | HTMLTextAreaElement).value } as Partial<EwFlowConfig>);
+}
+function setFlowNumber(key: FlowNumberKey, event: Event) {
+  patch({
+    [key]: Math.trunc(toNumber((event.target as HTMLInputElement).value, flow.value[key] as number)),
+  } as Partial<EwFlowConfig>);
+}
+function setApiPresetId(event: Event) {
+  patch({ api_preset_id: (event.target as HTMLSelectElement).value });
+}
 function setGenerationNumber(key: GenerationNumberKey, event: Event) {
   const raw = toNumber((event.target as HTMLInputElement).value, flow.value.generation_options[key]);
   if (key === 'max_context_tokens') return patchGeneration({ max_context_tokens: Math.max(16000, Math.trunc(raw)) });
@@ -394,22 +626,29 @@ function setGenerationNumber(key: GenerationNumberKey, event: Event) {
   if (key === 'presence_penalty') return patchGeneration({ presence_penalty: Number(clamp(raw, 0, 2).toFixed(4)) });
   return patchGeneration({ top_p: Number(clamp(raw, 0, 1).toFixed(4)) });
 }
-function setGenerationBool(key: GenerationBoolKey, event: Event) { patchGeneration({ [key]: (event.target as HTMLInputElement).checked } as Partial<EwFlowConfig['generation_options']>); }
+function setGenerationBool(key: GenerationBoolKey, event: Event) {
+  patchGeneration({ [key]: (event.target as HTMLInputElement).checked } as Partial<EwFlowConfig['generation_options']>);
+}
 function setBehaviorToggle(key: BehaviorBoolKey) {
   patchBehavior({ [key]: !flow.value.behavior_options[key] } as Partial<EwFlowConfig['behavior_options']>);
 }
 function setBehaviorSelectByEvent(key: BehaviorSelectKey, event: Event) {
-  patchBehavior({ [key]: (event.target as HTMLSelectElement).value as EwFlowConfig['behavior_options'][typeof key] } as Partial<EwFlowConfig['behavior_options']>);
+  patchBehavior({
+    [key]: (event.target as HTMLSelectElement).value as EwFlowConfig['behavior_options'][typeof key],
+  } as Partial<EwFlowConfig['behavior_options']>);
 }
 
 function addCustomRegex() {
-  const nextRules = [...flow.value.custom_regex_rules, {
-    id: `regex_${simpleHash(`${flow.value.id}-${flow.value.custom_regex_rules.length}-${Date.now()}`)}`,
-    name: '',
-    enabled: true,
-    find_regex: '',
-    replace_string: '',
-  }];
+  const nextRules = [
+    ...flow.value.custom_regex_rules,
+    {
+      id: `regex_${simpleHash(`${flow.value.id}-${flow.value.custom_regex_rules.length}-${Date.now()}`)}`,
+      name: '',
+      enabled: true,
+      find_regex: '',
+      replace_string: '',
+    },
+  ];
   patch({ custom_regex_rules: nextRules });
 }
 function removeCustomRegex(index: number) {
@@ -498,7 +737,7 @@ function openRegexPreview() {
         id: s.id,
         scriptName: s.scriptName,
         findRegex: s.findRegex,
-        effectiveReplace: isBeau ? '（美化正则，EW中替换为空）' : (s.replaceString || '（空 — 删除匹配内容）'),
+        effectiveReplace: isBeau ? '（美化正则，EW中替换为空）' : s.replaceString || '（空 — 删除匹配内容）',
         isBeautification: isBeau,
         markdownOnly: s.markdownOnly,
         placementLabel: s.placement.map(p => placementNames[p] ?? `#${p}`).join(', ') || '无',
@@ -519,7 +758,10 @@ function openRegexPreview() {
   background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 5%, rgba(10, 14, 20, 0.4));
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   overflow: visible;
-  transition: box-shadow 0.3s ease, border-color 0.3s ease, transform 0.3s ease;
+  transition:
+    box-shadow 0.3s ease,
+    border-color 0.3s ease,
+    transform 0.3s ease;
 }
 
 .ew-flow-card:focus-within,
@@ -853,7 +1095,9 @@ function openRegexPreview() {
 .ew-switch--field {
   gap: 0.6rem;
 }
-.ew-switch--field input { display: none; }
+.ew-switch--field input {
+  display: none;
+}
 .ew-switch__slider {
   width: 36px;
   height: 20px;
@@ -872,7 +1116,9 @@ function openRegexPreview() {
   background: #888;
   top: 2px;
   left: 2px;
-  transition: transform 0.2s, background 0.2s;
+  transition:
+    transform 0.2s,
+    background 0.2s;
 }
 .ew-switch--field input:checked + .ew-switch__slider {
   background: var(--ew-accent, #8b5cf6);
@@ -1068,9 +1314,11 @@ function openRegexPreview() {
 
 @media (max-width: 900px) {
   .ew-flow-card {
-    transition: box-shadow 0.3s ease, border-color 0.3s ease,
-                margin 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-                border-radius 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    transition:
+      box-shadow 0.3s ease,
+      border-color 0.3s ease,
+      margin 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+      border-radius 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   }
   .ew-flow-card__header {
     flex-direction: column;
@@ -1135,7 +1383,6 @@ function openRegexPreview() {
   background: color-mix(in srgb, var(--ew-accent) 25%, transparent);
   color: #fff;
 }
-
 </style>
 
 <!-- 弹窗样式需要 unscoped，因为 Teleport 渲染在 body 下 -->
@@ -1186,7 +1433,9 @@ function openRegexPreview() {
   cursor: pointer;
   padding: 0.2rem 0.5rem;
   border-radius: 6px;
-  transition: background 0.2s, color 0.2s;
+  transition:
+    background 0.2s,
+    color 0.2s;
 }
 
 .ew-modal__close:hover {
@@ -1338,4 +1587,3 @@ function openRegexPreview() {
   }
 }
 </style>
-
