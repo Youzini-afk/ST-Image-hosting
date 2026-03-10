@@ -1,6 +1,7 @@
 ﻿import type { EwFlowConfig, EwPromptOrderEntry } from './types';
 import { renderEjsContent } from './ejs-bridge';
 import { collectLatestSnapshotFast } from './floor-binding';
+import { applyTavernRegex } from './regex-engine';
 
 // SillyTavern 运行时全局变量，在扩展上下文中可用
 declare function getCharacterCardFields(): {
@@ -159,6 +160,13 @@ export function collectPromptComponents(flow: EwFlowConfig): PromptComponents {
     }
   } catch (e) {
     console.debug('[Evolution World] getChatMessages failed:', e);
+  }
+
+  // ── 4. 正则处理 ─────────────────────────────────────────────────────
+  // 当 flow 启用 use_tavern_regex 时，对聊天消息应用酒馆的正则脚本
+  // （预设 + 全局 + 角色卡局部，跳过 markdownOnly）
+  if (flow.use_tavern_regex && components.chatMessages.length > 0) {
+    applyTavernRegex(components.chatMessages);
   }
 
   return components;
