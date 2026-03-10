@@ -143,9 +143,8 @@ function ensureFabStyle(): void {
   touch-action: none;
   user-select: none;
   outline: none;
-  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+  transition: box-shadow 0.3s ease, border-color 0.3s ease, opacity 0.4s ease, transform 0.4s ease;
   -webkit-tap-highlight-color: transparent;
-  animation: ew-fab-pop-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 #${FAB_ID}::after {
   content: '';
@@ -285,6 +284,12 @@ function createFab(): void {
 
   // Append to <html> to sit above all transformed containers
   doc.documentElement.appendChild(fab);
+
+  // Trigger pop-in animation via JS to avoid fill-mode: both making element
+  // invisible when CSS animation doesn't fire on first load.
+  requestAnimationFrame(() => {
+    fab.style.animation = 'ew-fab-pop-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both';
+  });
 }
 
 function removeFab(): void {
