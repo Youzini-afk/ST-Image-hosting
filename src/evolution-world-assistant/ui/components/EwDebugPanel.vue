@@ -595,5 +595,58 @@ function formatTime(ts: number): string {
   font-style: italic;
 }
 
-/* ew-btn / ew-actions-wrap / ew-btn--danger are inherited from App.vue parent scope */
+/* ── Buttons (duplicated from App.vue scoped — cannot inherit) ── */
+.ew-actions-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.ew-btn {
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 45%, transparent);
+  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 20%, transparent);
+  color: var(--SmartThemeBodyColor, #edf2f9);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.4rem 0.85rem;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.2s ease;
+}
+
+.ew-btn:hover,
+.ew-btn:focus-visible {
+  border-color: var(--ew-accent);
+  background: color-mix(in srgb, var(--ew-accent) 25%, transparent);
+  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--ew-accent-glow);
+  outline: none;
+}
+
+.ew-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.ew-btn--danger {
+  border-color: color-mix(in srgb, var(--ew-danger) 45%, transparent);
+  background: color-mix(in srgb, var(--ew-danger) 15%, transparent);
+  color: color-mix(in srgb, var(--ew-danger) 90%, #fff);
+}
+
+.ew-btn--danger:hover,
+.ew-btn--danger:focus-visible {
+  background: color-mix(in srgb, var(--ew-danger) 80%, transparent);
+  border-color: var(--ew-danger);
+  color: #fff;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--ew-danger) 30%, transparent);
+}
 </style>
