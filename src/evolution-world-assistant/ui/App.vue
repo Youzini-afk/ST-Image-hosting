@@ -356,12 +356,12 @@
           </template>
         </template>
 
-        <template v-else-if="store.activeTab === 'debug'">
-          <EwDebugPanel />
+        <template v-else-if="store.activeTab === 'history'">
+          <EwHistoryPanel />
         </template>
 
         <template v-else>
-          <EwHistoryPanel />
+          <EwDebugPanel />
         </template>
       </div>
     </transition>

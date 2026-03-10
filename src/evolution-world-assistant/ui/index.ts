@@ -318,6 +318,42 @@ function syncFabVisibility(): void {
   }
 }
 
+let fabRetryTimer: ReturnType<typeof setTimeout> | null = null;
+let fabRetryCount = 0;
+const FAB_RETRY_MS = 800;
+const FAB_MAX_RETRIES = 10;
+
+function clearFabRetryTimer() {
+  if (fabRetryTimer) {
+    clearTimeout(fabRetryTimer);
+    fabRetryTimer = null;
+  }
+}
+
+function scheduleFabRetry() {
+  if (fabRetryTimer || fabRetryCount >= FAB_MAX_RETRIES) return;
+  fabRetryCount++;
+  fabRetryTimer = setTimeout(() => {
+    fabRetryTimer = null;
+    tryCreateFab();
+  }, FAB_RETRY_MS);
+}
+
+function tryCreateFab() {
+  const doc = resolveParentDocument();
+  // If we got the iframe's own document and parent is potentially available, retry
+  if (doc === document) {
+    try {
+      if (window.parent && window.parent !== window) {
+        console.debug(`[EW] FAB: parent document not ready yet, retry ${fabRetryCount}/${FAB_MAX_RETRIES}`);
+        scheduleFabRetry();
+        return;
+      }
+    } catch { /* cross-origin — proceed with current doc */ }
+  }
+  createFab();
+}
+
 let fabVisibilityListener: (() => void) | null = null;
 
 export function mountUi() {
@@ -340,7 +376,8 @@ export function mountUi() {
   }
 
   try {
-    createFab();
+    fabRetryCount = 0;
+    tryCreateFab();
   } catch (error) {
     console.error('[Evolution World] FAB setup failed:', error);
   }
@@ -351,6 +388,7 @@ export function mountUi() {
 
 export function unmountUi() {
   uninstallMagicWandMenuItem();
+  clearFabRetryTimer();
   removeFab();
 
   if (fabVisibilityListener) {
@@ -365,3 +403,4 @@ export function unmountUi() {
   destroyStyle?.();
   destroyStyle = null;
 }
+
