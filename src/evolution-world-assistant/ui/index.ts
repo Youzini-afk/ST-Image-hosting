@@ -319,9 +319,6 @@ function syncFabVisibility(): void {
 }
 
 let fabRetryTimer: ReturnType<typeof setTimeout> | null = null;
-let fabRetryCount = 0;
-const FAB_RETRY_MS = 800;
-const FAB_MAX_RETRIES = 10;
 
 function clearFabRetryTimer() {
   if (fabRetryTimer) {
@@ -330,27 +327,18 @@ function clearFabRetryTimer() {
   }
 }
 
-function scheduleFabRetry() {
-  if (fabRetryTimer || fabRetryCount >= FAB_MAX_RETRIES) return;
-  fabRetryCount++;
-  fabRetryTimer = setTimeout(() => {
-    fabRetryTimer = null;
-    tryCreateFab();
-  }, FAB_RETRY_MS);
-}
-
-function tryCreateFab() {
+/**
+ * Ensure the FAB exists. If it doesn't, create it after a short delay.
+ * On first script load (dynamic injection by ST), the DOM might not be
+ * fully ready. A deferred creation + periodic re-check covers this.
+ */
+function ensureFabExists() {
   const doc = resolveParentDocument();
-  // If we got the iframe's own document and parent is potentially available, retry
-  if (doc === document) {
-    try {
-      if (window.parent && window.parent !== window) {
-        console.debug(`[EW] FAB: parent document not ready yet, retry ${fabRetryCount}/${FAB_MAX_RETRIES}`);
-        scheduleFabRetry();
-        return;
-      }
-    } catch { /* cross-origin — proceed with current doc */ }
-  }
+  if (doc.getElementById(FAB_ID)) return; // already exists
+
+  const settings = getSettings();
+  if (settings.show_fab === false) return;
+
   createFab();
 }
 
@@ -375,12 +363,23 @@ export function mountUi() {
     toastr.error(`魔法棒菜单挂载失败: ${error instanceof Error ? error.message : String(error)}`, 'Evolution World');
   }
 
+  // Create FAB immediately, then re-check after delays for first-load timing
   try {
-    fabRetryCount = 0;
-    tryCreateFab();
+    createFab();
   } catch (error) {
     console.error('[Evolution World] FAB setup failed:', error);
   }
+
+  // Deferred re-check: on first dynamic script load, the immediate create
+  // may fail silently (DOM not ready, parent doc not resolved, etc.).
+  // Schedule re-checks at 1s and 3s to cover various timing scenarios.
+  fabRetryTimer = setTimeout(() => {
+    ensureFabExists();
+    fabRetryTimer = setTimeout(() => {
+      ensureFabExists();
+      fabRetryTimer = null;
+    }, 2000);
+  }, 1000);
 
   fabVisibilityListener = () => syncFabVisibility();
   window.addEventListener('ew:fab-visibility-changed', fabVisibilityListener);
