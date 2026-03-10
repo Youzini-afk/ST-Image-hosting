@@ -29,13 +29,17 @@ interface RegexScript {
  * 从三个来源收集正则脚本：全局、预设绑定、角色卡局部。
  * 返回合并后的脚本数组（去重依据 id）。
  */
+declare const SillyTavern: { getContext(): Record<string, any> } | undefined;
+
 export function collectAllRegexScripts(): RegexScript[] {
   const scriptsById = new Map<string, RegexScript>();
   const win = globalThis as any;
 
+  // 获取 ST 上下文
+  const ctx = typeof SillyTavern !== 'undefined' ? SillyTavern?.getContext() : undefined;
+
   // 来源 1：全局正则（ST 正则扩展存储在 extension_settings.regex 中）
   try {
-    const ctx = typeof SillyTavern !== 'undefined' ? SillyTavern : undefined;
     const extSettings = ctx?.extensionSettings ?? win.extension_settings;
     const globalScripts: any[] = extSettings?.regex ?? [];
     for (const s of globalScripts) {
@@ -47,7 +51,6 @@ export function collectAllRegexScripts(): RegexScript[] {
 
   // 来源 2：预设绑定正则（当前预设 JSON 的 extensions.regex_scripts）
   try {
-    const ctx = typeof SillyTavern !== 'undefined' ? SillyTavern : undefined;
     const oaiSettings = ctx?.chatCompletionSettings ?? win.oai_settings;
     const presetScripts: any[] = oaiSettings?.regex_scripts ?? [];
     for (const s of presetScripts) {
@@ -59,7 +62,6 @@ export function collectAllRegexScripts(): RegexScript[] {
 
   // 来源 3：角色卡局部正则（character.data.extensions.regex_scripts）
   try {
-    const ctx = typeof SillyTavern !== 'undefined' ? SillyTavern : undefined;
     const charId = ctx?.characterId;
     const characters = ctx?.characters;
     if (charId !== undefined && characters) {

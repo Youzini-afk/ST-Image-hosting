@@ -488,21 +488,27 @@ interface RegexPreviewItem {
 const regexPreviewList = ref<RegexPreviewItem[]>([]);
 
 function openRegexPreview() {
-  const placementNames: Record<number, string> = { 0: '用户消息', 1: 'AI消息', 2: '斜杠命令', 3: '世界书' };
-  const scripts = collectAllRegexScripts();
-  regexPreviewList.value = scripts.map(s => {
-    const isBeau = isBeautificationReplace(s.replaceString);
-    return {
-      id: s.id,
-      scriptName: s.scriptName,
-      findRegex: s.findRegex,
-      effectiveReplace: isBeau ? '（美化正则，EW中替换为空）' : (s.replaceString || '（空 — 删除匹配内容）'),
-      isBeautification: isBeau,
-      markdownOnly: s.markdownOnly,
-      placementLabel: s.placement.map(p => placementNames[p] ?? `#${p}`).join(', ') || '无',
-    };
-  });
-  showRegexModal.value = true;
+  try {
+    const placementNames: Record<number, string> = { 0: '用户消息', 1: 'AI消息', 2: '斜杠命令', 3: '世界书' };
+    const scripts = collectAllRegexScripts();
+    console.log('[EW] openRegexPreview collected', scripts.length, 'scripts');
+    regexPreviewList.value = scripts.map(s => {
+      const isBeau = isBeautificationReplace(s.replaceString);
+      return {
+        id: s.id,
+        scriptName: s.scriptName,
+        findRegex: s.findRegex,
+        effectiveReplace: isBeau ? '（美化正则，EW中替换为空）' : (s.replaceString || '（空 — 删除匹配内容）'),
+        isBeautification: isBeau,
+        markdownOnly: s.markdownOnly,
+        placementLabel: s.placement.map(p => placementNames[p] ?? `#${p}`).join(', ') || '无',
+      };
+    });
+    showRegexModal.value = true;
+  } catch (e) {
+    console.error('[EW] openRegexPreview error:', e);
+    toastr.error(`正则预览失败: ${e instanceof Error ? e.message : String(e)}`, 'Evolution World');
+  }
 }
 </script>
 
