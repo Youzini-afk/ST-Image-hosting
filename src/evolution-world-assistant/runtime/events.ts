@@ -137,6 +137,16 @@ function stopGenerationNow() {
   }
 }
 
+function formatReasonForDisplay(reason: string | undefined, maxLen = 160): string {
+  const text = String(reason ?? 'unknown')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (text.length <= maxLen) {
+    return text;
+  }
+  return `${text.slice(0, maxLen)}...`;
+}
+
 function createProcessingReminder(onAbort: () => void) {
   return showManagedEwNotice({
     title: 'Evolution World',
@@ -224,14 +234,15 @@ async function executeWorkflowWithPolicy(settings: EwSettings, messageId: number
 
     if (policy === 'retry_once') {
       console.warn('[EW] retry_once: first attempt failed — retrying.');
+      const retryReason = formatReasonForDisplay(result.reason, 120);
       processingReminder.update({
         title: 'Evolution World',
-        message: `首次处理失败，正在重试… ${result.reason ?? ''}`,
+        message: `首次处理失败，正在重试… ${retryReason}`,
         level: 'warning',
         persist: true,
         busy: true,
       });
-      toastr.warning(`工作流首次失败，正在重试… (${result.reason ?? ''})`, 'Evolution World');
+      toastr.warning(`工作流首次失败，正在重试… (${retryReason})`, 'Evolution World');
       try {
         result = await runWorkflow({
           message_id: messageId,
@@ -255,36 +266,37 @@ async function executeWorkflowWithPolicy(settings: EwSettings, messageId: number
     }
 
     if (!result.ok) {
+      const displayReason = formatReasonForDisplay(result.reason);
       switch (policy) {
         case 'continue_generation':
           processingReminder.update({
             title: 'Evolution World',
-            message: `工作流失败，已回退为 AI 继续生成：${result.reason ?? 'unknown'}`,
+            message: `工作流失败，已回退为 AI 继续生成：${displayReason}`,
             level: 'warning',
             duration_ms: 3200,
           });
-          toastr.warning(`工作流失败，AI 继续生成: ${result.reason ?? 'unknown'}`, 'Evolution World');
+          toastr.warning(`工作流失败，AI 继续生成: ${displayReason}`, 'Evolution World');
           break;
         case 'notify_only':
           processingReminder.update({
             title: 'Evolution World',
-            message: `工作流失败：${result.reason ?? 'unknown'}`,
+            message: `工作流失败：${displayReason}`,
             level: 'warning',
             duration_ms: 3200,
           });
-          toastr.info(`工作流失败: ${result.reason ?? 'unknown'}`, 'Evolution World');
+          toastr.info(`工作流失败: ${displayReason}`, 'Evolution World');
           break;
         case 'stop_generation':
         case 'retry_once':
         default:
           processingReminder.update({
             title: 'Evolution World',
-            message: `动态世界流程失败，本轮已中止：${result.reason ?? 'unknown error'}`,
+            message: `动态世界流程失败，本轮已中止：${displayReason}`,
             level: 'error',
             duration_ms: 4200,
           });
           stopGenerationNow();
-          toastr.error(`动态世界流程失败，本轮已中止: ${result.reason ?? 'unknown error'}`, 'Evolution World');
+          toastr.error(`动态世界流程失败，本轮已中止: ${displayReason}`, 'Evolution World');
           return true;
       }
 

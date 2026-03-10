@@ -40,6 +40,43 @@ const LLM_WORKFLOW_SYSTEM_PROMPT = [
   'flow_id 必须与请求.flow.id 一致，priority 必须与请求.flow.priority 一致。',
 ].join('\n');
 
+function getHostRuntime(): Record<string, any> {
+  try {
+    if (window.parent && window.parent !== window) {
+      return window.parent as unknown as Record<string, any>;
+    }
+  } catch {
+    // ignore cross-frame access failures and fall back to current window
+  }
+
+  return globalThis as Record<string, any>;
+}
+
+function resolveGenerateRaw(): ((options: Record<string, any>) => Promise<string>) | null {
+  const hostRuntime = getHostRuntime();
+  if (typeof hostRuntime.generateRaw === 'function') {
+    return hostRuntime.generateRaw as (options: Record<string, any>) => Promise<string>;
+  }
+  if (typeof hostRuntime.TavernHelper?.generateRaw === 'function') {
+    return hostRuntime.TavernHelper.generateRaw as (options: Record<string, any>) => Promise<string>;
+  }
+  return null;
+}
+
+function getStRequestHeaders(): Record<string, string> {
+  const hostRuntime = getHostRuntime();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+
+  if (typeof hostRuntime.SillyTavern?.getRequestHeaders === 'function') {
+    Object.assign(headers, hostRuntime.SillyTavern.getRequestHeaders());
+  } else if (typeof SillyTavern !== 'undefined' && typeof SillyTavern.getRequestHeaders === 'function') {
+    Object.assign(headers, SillyTavern.getRequestHeaders());
+  }
+
+  headers['Content-Type'] = 'application/json';
+  return headers;
+}
+
 function isDispatchAborted(signal?: AbortSignal, isCancelled?: () => boolean): boolean {
   return Boolean(signal?.aborted || isCancelled?.());
 }
@@ -83,6 +120,154 @@ function toErrorMessage(error: unknown): string {
     return error.message;
   }
   return String(error);
+}
+
+function parseStBackendErrorPayload(errTxt: string): {
+  message: string;
+  code?: string;
+  type?: string;
+} | null {
+  try {
+    const parsed = JSON.parse(errTxt);
+    const payload = parsed?.error;
+    if (!payload || typeof payload !== 'object') {
+      return null;
+    }
+
+    return {
+      message: typeof payload.message === 'string' ? payload.message : String(payload.message ?? ''),
+      code: typeof payload.code === 'string' ? payload.code : undefined,
+      type: typeof payload.type === 'string' ? payload.type : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function getApiHostLabel(apiUrl: string): string {
+  try {
+    return new URL(apiUrl).host || apiUrl;
+  } catch {
+    return apiUrl;
+  }
+}
+
+function summarizeStBackendError(flowId: string, status: number, apiUrl: string, errTxt: string): string {
+  const payload = parseStBackendErrorPayload(errTxt);
+  const host = getApiHostLabel(apiUrl);
+  const rawMessage = payload?.message || errTxt;
+  const normalizedMessage = rawMessage.replace(/\s+/g, ' ').trim();
+  const code = payload?.code ?? (normalizedMessage.includes('ECONNRESET') ? 'ECONNRESET' : undefined);
+
+  if (
+    code === 'ECONNRESET' ||
+    /secure TLS connection was not established/i.test(normalizedMessage) ||
+    /Client network socket disconnected/i.test(normalizedMessage)
+  ) {
+    return `[${flowId}] 上游 API 连接失败：与 ${host} 建立安全连接时被重置（HTTP ${status}${code ? ` / ${code}` : ''}）`;
+  }
+
+  if (code === 'ETIMEDOUT' || /timed? out/i.test(normalizedMessage)) {
+    return `[${flowId}] 上游 API 连接超时：${host}（HTTP ${status}${code ? ` / ${code}` : ''}）`;
+  }
+
+  if (payload?.message) {
+    return `[${flowId}] 上游 API 请求失败：${payload.message}${code ? ` (${code})` : ''}`;
+  }
+
+  const compact = normalizedMessage.length > 180 ? `${normalizedMessage.slice(0, 180)}...` : normalizedMessage;
+  return `[${flowId}] ST backend error: ${status} ${compact}`;
+}
+
+function parseHeadersJson(headersJson: string): Record<string, string> {
+  const trimmed = headersJson.trim();
+  if (!trimmed) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('headers_json must be a JSON object');
+    }
+
+    return Object.fromEntries(Object.entries(parsed).map(([key, value]) => [String(key), String(value)]));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`headers_json invalid: ${message}`);
+  }
+}
+
+function buildCustomIncludeHeaders(apiPreset: EwApiPreset): string {
+  const headers = parseHeadersJson(apiPreset.headers_json);
+
+  if (apiPreset.api_key.trim()) {
+    headers.Authorization = `Bearer ${apiPreset.api_key.trim()}`;
+  }
+
+  return Object.entries(headers)
+    .map(([key, value]) => `${key}: ${value}`)
+    .join('\n');
+}
+
+function shouldUseGenerateRawCustomApi(apiPreset: EwApiPreset): boolean {
+  return !apiPreset.headers_json.trim();
+}
+
+async function buildOrderedPromptsForFlow(
+  flow: EwFlowConfig,
+  components: PromptComponents,
+  controllerEntryName: string,
+  body: Record<string, any>,
+): Promise<Array<{ role: 'system' | 'assistant' | 'user'; content: string }>> {
+  const orderedPrompts = await assembleOrderedPrompts(flow.prompt_order, components);
+  await injectEntryNames(orderedPrompts, controllerEntryName);
+  orderedPrompts.push({ role: 'system', content: LLM_WORKFLOW_SYSTEM_PROMPT });
+  orderedPrompts.push({ role: 'user', content: JSON.stringify(body, null, 2) });
+  return orderedPrompts;
+}
+
+function stopSpecificGeneration(generationId: string): void {
+  try {
+    if (typeof stopGenerationById === 'function' && stopGenerationById(generationId)) {
+      return;
+    }
+  } catch {
+    // ignore and fall through to stopAllGeneration
+  }
+
+  try {
+    stopAllGeneration();
+  } catch {
+    // ignore
+  }
+}
+
+function buildGenerateRawCustomApi(
+  apiPreset: EwApiPreset,
+  flow: EwFlowConfig,
+): {
+  apiurl: string;
+  key?: string;
+  model: string;
+  source?: string;
+  max_tokens?: 'same_as_preset' | 'unset' | number;
+  temperature?: 'same_as_preset' | 'unset' | number;
+  frequency_penalty?: 'same_as_preset' | 'unset' | number;
+  presence_penalty?: 'same_as_preset' | 'unset' | number;
+  top_p?: 'same_as_preset' | 'unset' | number;
+} {
+  return {
+    apiurl: apiPreset.api_url.trim(),
+    key: apiPreset.api_key.trim() || undefined,
+    model: apiPreset.model.trim().replace(/^models\//, ''),
+    source: apiPreset.api_source?.trim() || 'openai',
+    max_tokens: flow.generation_options.max_reply_tokens,
+    temperature: flow.generation_options.temperature,
+    frequency_penalty: flow.generation_options.frequency_penalty,
+    presence_penalty: flow.generation_options.presence_penalty,
+    top_p: flow.generation_options.top_p,
+  };
 }
 
 function parseJsonFromText(rawText: string, flowId: string): Record<string, any> {
@@ -166,20 +351,29 @@ async function executeFlowViaLlmConnector(
   body: Record<string, any>,
   components: PromptComponents,
   controllerEntryName: string,
+  generationId: string,
   abortSignal?: AbortSignal,
   isCancelled?: () => boolean,
 ): Promise<NonNullable<DispatchFlowAttempt['response']>> {
   throwIfDispatchAborted(abortSignal, isCancelled);
-  if (typeof generateRaw !== 'function') {
+  const generateRawFn = resolveGenerateRaw();
+  if (!generateRawFn) {
     throw new Error(`[${flow.id}] generateRaw is unavailable`);
   }
 
-  const orderedPrompts = await assembleOrderedPrompts(flow.prompt_order, components);
-  await injectEntryNames(orderedPrompts, controllerEntryName);
-  orderedPrompts.push({ role: 'system', content: LLM_WORKFLOW_SYSTEM_PROMPT });
-  orderedPrompts.push({ role: 'user', content: JSON.stringify(body, null, 2) });
+  const orderedPrompts = await buildOrderedPromptsForFlow(flow, components, controllerEntryName, body);
 
-  const rawText = await generateRaw({
+  const abortGeneration = () => stopSpecificGeneration(generationId);
+  if (abortSignal) {
+    if (abortSignal.aborted) {
+      abortGeneration();
+    } else {
+      abortSignal.addEventListener('abort', abortGeneration, { once: true });
+    }
+  }
+
+  const rawText = await generateRawFn({
+    generation_id: generationId,
     should_stream: false,
     should_silence: true,
     ordered_prompts: orderedPrompts,
@@ -196,7 +390,74 @@ async function executeFlowViaLlmConnector(
         .join('; ')}`,
     );
   }
+  if (abortSignal) {
+    abortSignal.removeEventListener('abort', abortGeneration);
+  }
   return parsed.data;
+}
+
+async function executeFlowViaGenerateRawCustomApi(
+  flow: EwFlowConfig,
+  apiPreset: EwApiPreset,
+  body: Record<string, any>,
+  components: PromptComponents,
+  controllerEntryName: string,
+  generationId: string,
+  abortSignal?: AbortSignal,
+  isCancelled?: () => boolean,
+): Promise<NonNullable<DispatchFlowAttempt['response']>> {
+  throwIfDispatchAborted(abortSignal, isCancelled);
+
+  if (!apiPreset.api_url.trim()) {
+    throw new Error(`[${flow.id}] custom api_url is empty`);
+  }
+  if (!apiPreset.model.trim()) {
+    throw new Error(`[${flow.id}] model is empty`);
+  }
+
+  const generateRawFn = resolveGenerateRaw();
+  if (!generateRawFn) {
+    throw new Error(`[${flow.id}] generateRaw is unavailable`);
+  }
+
+  const orderedPrompts = await buildOrderedPromptsForFlow(flow, components, controllerEntryName, body);
+  const customApi = buildGenerateRawCustomApi(apiPreset, flow);
+
+  const abortGeneration = () => stopSpecificGeneration(generationId);
+  if (abortSignal) {
+    if (abortSignal.aborted) {
+      abortGeneration();
+    } else {
+      abortSignal.addEventListener('abort', abortGeneration, { once: true });
+    }
+  }
+
+  try {
+    const rawText = await generateRawFn({
+      generation_id: generationId,
+      should_stream: false,
+      should_silence: true,
+      custom_api: customApi,
+      ordered_prompts: orderedPrompts,
+    });
+
+    throwIfDispatchAborted(abortSignal, isCancelled);
+
+    const parsedJson = parseJsonFromText(rawText, flow.id);
+    const parsed = FlowResponseSchema.safeParse(parsedJson);
+    if (!parsed.success) {
+      throw new Error(
+        `[${flow.id}] response schema invalid: ${parsed.error.issues
+          .map(issue => `${issue.path.join('.')}: ${issue.message}`)
+          .join('; ')}`,
+      );
+    }
+    return parsed.data;
+  } finally {
+    if (abortSignal) {
+      abortSignal.removeEventListener('abort', abortGeneration);
+    }
+  }
 }
 
 /**
@@ -221,12 +482,10 @@ async function executeFlowViaStBackend(
     throw new Error(`[${flow.id}] model is empty`);
   }
 
-  const orderedPrompts = await assembleOrderedPrompts(flow.prompt_order, components);
-  await injectEntryNames(orderedPrompts, controllerEntryName);
-  orderedPrompts.push({ role: 'system', content: LLM_WORKFLOW_SYSTEM_PROMPT });
-  orderedPrompts.push({ role: 'user', content: JSON.stringify(body, null, 2) });
+  const orderedPrompts = await buildOrderedPromptsForFlow(flow, components, controllerEntryName, body);
 
   const genOpts = flow.generation_options;
+  const customIncludeHeaders = buildCustomIncludeHeaders(apiPreset);
   const requestBody = {
     messages: orderedPrompts,
     model: apiPreset.model.trim().replace(/^models\//, ''),
@@ -237,17 +496,19 @@ async function executeFlowViaStBackend(
     presence_penalty: genOpts.presence_penalty,
     stream: false,
     chat_completion_source: 'custom',
+    group_names: [],
+    include_reasoning: flow.behavior_options.request_thinking,
+    reasoning_effort: flow.behavior_options.reasoning_effort,
+    enable_web_search: false,
+    request_images: flow.behavior_options.send_inline_media,
     reverse_proxy: apiPreset.api_url.trim(),
+    proxy_password: '',
     custom_url: apiPreset.api_url.trim(),
-    custom_include_headers: apiPreset.api_key.trim() ? `Authorization: Bearer ${apiPreset.api_key.trim()}` : '',
+    custom_include_headers: customIncludeHeaders,
     custom_prompt_post_processing: 'strict',
   };
 
-  const stHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (typeof SillyTavern !== 'undefined' && SillyTavern.getRequestHeaders) {
-    Object.assign(stHeaders, SillyTavern.getRequestHeaders());
-    stHeaders['Content-Type'] = 'application/json'; // ensure not overwritten
-  }
+  const stHeaders = getStRequestHeaders();
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), flow.timeout_ms);
@@ -271,7 +532,7 @@ async function executeFlowViaStBackend(
 
     if (!response.ok) {
       const errTxt = await response.text();
-      throw new Error(`[${flow.id}] ST backend error: ${response.status} ${errTxt}`);
+      throw new Error(summarizeStBackendError(flow.id, response.status, apiPreset.api_url.trim(), errTxt));
     }
 
     throwIfDispatchAborted(abortSignal, isCancelled);
@@ -324,8 +585,9 @@ async function executeFlow(
   const startedAt = Date.now();
   throwIfDispatchAborted(abortSignal, isCancelled);
   const apiPreset = resolveApiPreset(settings, flow);
-  const usesTavernMain = apiPreset.mode === 'llm_connector';
+  const usesTavernMain = apiPreset.mode === 'llm_connector' || apiPreset.use_main_api;
   const attemptApiUrl = usesTavernMain ? 'tavern://main_api' : apiPreset.api_url;
+  const generationId = `${requestId}:${flow.id}`;
 
   // Collect prompt components once — shared by buildFlowRequest (metadata) and assembler (messages)
   const promptComponents = collectPromptComponents(flow);
@@ -351,20 +613,49 @@ async function executeFlow(
         body,
         promptComponents,
         settings.controller_entry_name,
+        generationId,
         abortSignal,
         isCancelled,
       );
     } else {
-      // 自定义 API：通过 ST 后端代理，完全控制参数
-      response = await executeFlowViaStBackend(
-        flow,
-        apiPreset,
-        body,
-        promptComponents,
-        settings.controller_entry_name,
-        abortSignal,
-        isCancelled,
-      );
+      // 自定义 API：优先走官方 generateRaw.custom_api；若需要自定义 headers 再回退到 ST backend
+      if (shouldUseGenerateRawCustomApi(apiPreset)) {
+        try {
+          response = await executeFlowViaGenerateRawCustomApi(
+            flow,
+            apiPreset,
+            body,
+            promptComponents,
+            settings.controller_entry_name,
+            generationId,
+            abortSignal,
+            isCancelled,
+          );
+        } catch (error) {
+          console.warn(
+            `[EW] Flow "${flow.id}": generateRaw.custom_api failed, fallback to ST backend — ${toErrorMessage(error)}`,
+          );
+          response = await executeFlowViaStBackend(
+            flow,
+            apiPreset,
+            body,
+            promptComponents,
+            settings.controller_entry_name,
+            abortSignal,
+            isCancelled,
+          );
+        }
+      } else {
+        response = await executeFlowViaStBackend(
+          flow,
+          apiPreset,
+          body,
+          promptComponents,
+          settings.controller_entry_name,
+          abortSignal,
+          isCancelled,
+        );
+      }
     }
 
     throwIfDispatchAborted(abortSignal, isCancelled);
