@@ -1,4 +1,4 @@
-import { EwSettings } from './types';
+﻿import { EwSettings } from './types';
 
 export type TargetWorldbook = {
   worldbook_name: string;
@@ -42,11 +42,11 @@ export async function resolveTargetWorldbook(_settings: EwSettings): Promise<Tar
       const entries = await getWorldbook(charWb.primary);
       return { worldbook_name: charWb.primary, entries, created: false };
     } catch {
-      // Primary worldbook name is set but cannot be loaded — fallthrough to create.
+      // 主世界书名称已设置但无法加载 —— 回退到创建流程。
     }
   }
 
-  // Auto-create a worldbook for this character.
+  // 为该角色自动创建世界书。
   const charName = getCurrentCharacterName() ?? 'unknown';
   const autoName = `EW_${charName}`;
 
@@ -88,10 +88,10 @@ export async function getFullWorldbookContext(preloadedTarget?: TargetWorldbook)
     charDescription = character.description ?? '';
   } catch (e) {
     console.debug('[Evolution World] character data unavailable:', e);
-    // Proceed with empty description.
+    // 以空描述继续。
   }
 
-  // Reuse preloaded target if available, otherwise read from scratch.
+  // 如有预加载目标则复用，否则从头读取。
   let charEntries: Array<{ name: string; enabled: boolean; content: string }> = [];
   let charWbName = '';
 
@@ -106,7 +106,7 @@ export async function getFullWorldbookContext(preloadedTarget?: TargetWorldbook)
         charEntries = toEntrySnapshot(await getWorldbook(charWb.primary));
       } catch (e) {
         console.debug(`[Evolution World] cannot read char worldbook '${charWb.primary}':`, e);
-        // Cannot read — proceed with empty.
+        // 无法读取 —— 以空内容继续。
       }
     }
   }
@@ -123,7 +123,7 @@ export async function getFullWorldbookContext(preloadedTarget?: TargetWorldbook)
       });
     } catch (e) {
       console.debug(`[Evolution World] cannot read global worldbook '${wbName}':`, e);
-      // Skip unreadable worldbooks.
+      // 跳过不可读的世界书。
     }
   }
 

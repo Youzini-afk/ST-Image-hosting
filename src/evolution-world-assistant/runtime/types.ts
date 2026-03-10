@@ -1,4 +1,4 @@
-import { TextSliceRuleSchema } from './contracts';
+﻿import { TextSliceRuleSchema } from './contracts';
 
 export const EwApiPresetSchema = z.object({
   id: z.string().min(1),
@@ -126,7 +126,7 @@ export const EwFlowConfigSchema = z.object({
   behavior_options: EwFlowBehaviorOptionsSchema.default(() => EwFlowBehaviorOptionsSchema.parse({})),
   prompt_order: z.array(EwPromptOrderEntrySchema).default(DEFAULT_PROMPT_ORDER),
   prompt_items: z.array(EwFlowPromptItemSchema).default([]),
-  // Legacy fields kept for backward-compatible migration from old configs.
+  // 旧版字段，保留用于向后兼容旧配置的迁移。
   api_url: z.string().default(''),
   api_key: z.string().default(''),
   context_turns: z.coerce.number().int().min(1).default(8),
@@ -163,13 +163,13 @@ export const EwSettingsSchema = z.object({
   api_presets: z.array(EwApiPresetSchema).default([]),
   flows: z.array(EwFlowConfigSchema).default([]),
 
-  // Deprecated: kept for backward-compatible migration only.
+  // 已弃用：仅保留用于向后兼容迁移。
   meta_entry_name: z.string().default('EW/Meta'),
   meta_marker: z.string().default('EW_RUNTIME_META'),
   runtime_worldbook_prefix: z.string().default('EW_RUNTIME::'),
   max_scan_worldbooks: z.coerce.number().int().min(1).default(20),
 
-  // ── Hide settings (global) ──
+  // ── 隐藏设置（全局） ──
   hide_settings: z.object({
     enabled: z.boolean().default(false),
     hide_last_n: z.coerce.number().int().min(0).default(0),

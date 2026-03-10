@@ -1,8 +1,8 @@
-import type { EwFlowConfig, EwPromptOrderEntry } from './types';
+﻿import type { EwFlowConfig, EwPromptOrderEntry } from './types';
 import { renderEjsContent } from './ejs-bridge';
 import { collectLatestSnapshots } from './floor-binding';
 
-// SillyTavern globals available at runtime in extension context
+// SillyTavern 运行时全局变量，在扩展上下文中可用
 declare function getCharacterCardFields(): {
   description: string;
   personality: string;

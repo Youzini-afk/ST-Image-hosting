@@ -1,4 +1,4 @@
-import {
+﻿import {
   EwApiPreset,
   EwApiPresetSchema,
   EwFlowConfig,
@@ -36,7 +36,7 @@ let cachedSettings: EwSettings | null = null;
 let cachedLastRun: RunSummary | null = null;
 let cachedLastIo: LastIoSummary | null = null;
 
-// M-3: Use shared factory functions from factory.ts.
+// M-3: 使用 factory.ts 中的共享工厂函数。
 const makeDefaultApiPreset = createDefaultApiPreset;
 const makeDefaultFlow = createDefaultFlow;
 
@@ -152,21 +152,21 @@ function findPresetByLegacyFields(presets: EwApiPreset[], flow: EwFlowConfig): E
 }
 
 function migratePromptItems(flow: EwFlowConfig): EwFlowConfig {
-  // If prompt_order has been customized (length differs from default), skip migration
+  // 如果 prompt_order 已被自定义（长度与默认不同），跳过迁移
   if (flow.prompt_order.length !== DEFAULT_PROMPT_ORDER.length) return flow;
 
-  // Check if prompt_order is still the exact default (never configured by user)
+  // 检查 prompt_order 是否仍为默认值（从未被用户配置）
   const isDefault = flow.prompt_order.every(
     (entry, idx) => entry.identifier === DEFAULT_PROMPT_ORDER[idx].identifier,
   );
   if (!isDefault) return flow;
 
-  // If there are prompt_items, append them as custom entries to prompt_order
+  // 如果存在 prompt_items，将其作为自定义条目追加到 prompt_order
   if (flow.prompt_items.length === 0) return flow;
 
   const migratedOrder: EwPromptOrderEntry[] = [...flow.prompt_order];
   for (const item of flow.prompt_items) {
-    // Avoid duplicates — check if identifier already exists
+    // 避免重复 —— 检查 identifier 是否已存在
     if (migratedOrder.some(e => e.identifier === item.id)) continue;
     const oldItem = item as any; // may carry legacy depth field
     migratedOrder.push({
@@ -194,7 +194,7 @@ function normalizeSettings(raw: unknown): EwSettings {
 
   const normalizedFlows = flowSeed.map(flow => {
     let nextFlow = EwFlowConfigSchema.parse(flow);
-    // FEAT-2: Migrate old prompt_items into prompt_order
+    // FEAT-2: 将旧的 prompt_items 迁移到 prompt_order
     nextFlow = migratePromptItems(nextFlow);
     const boundPreset = apiPresets.find(preset => preset.id === nextFlow.api_preset_id);
     if (boundPreset) {
@@ -282,8 +282,8 @@ export function replaceSettings(nextSettings: EwSettings): EwSettings {
 }
 
 export function patchSettings(partial: Partial<EwSettings>): EwSettings {
-  // Use spread (shallow merge) instead of _.merge to avoid array-by-index corruption.
-  // _.merge would keep old array entries when the new array is shorter.
+  // 使用展开运算符（浅合并）替代 _.merge，避免按索引合并数组导致的数据损坏。
+  // _.merge 在新数组较短时会保留旧数组的条目。
   const current = getSettings();
   const merged: EwSettings = { ...current, ...partial };
   return replaceSettings(merged);
@@ -356,7 +356,7 @@ export function saveControllerBackup(chatId: string, worldbookName: string, cont
       controller_content: controllerContent,
     };
 
-    // CR-4: LRU eviction — keep only the most recent MAX_BACKUPS entries.
+    // CR-4: LRU 淘汰 —— 仅保留最近的 MAX_BACKUPS 条记录。
     const entries = Object.entries(backups);
     if (entries.length > MAX_BACKUPS) {
       entries.sort((a, b) => (b[1].at ?? 0) - (a[1].at ?? 0));

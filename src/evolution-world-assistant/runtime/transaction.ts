@@ -1,4 +1,4 @@
-import { MergedPlan, EwSettings } from './types';
+﻿import { MergedPlan, EwSettings } from './types';
 import { resolveTargetWorldbook, ensureDefaultEntry } from './worldbook-runtime';
 import { markFloorEntries } from './floor-binding';
 import { saveControllerBackup } from './settings';
@@ -32,17 +32,17 @@ function applyDeclarativeDiff(
   desiredEntries: Array<{ name: string; content: string; enabled: boolean }>,
   removeEntries: Array<{ name: string }>,
 ): WorldbookEntry[] {
-  // Step 1: Remove entries.
+  // 步骤 1：移除条目。
   const removeSet = new Set(removeEntries.map(e => e.name));
   const result = klona(currentEntries.filter(entry => !removeSet.has(entry.name)));
 
-  // Step 2: Build an index for O(1) lookups.
+  // 步骤 2：构建索引以实现 O(1) 查找。
   const indexByName = new Map<string, number>();
   for (let i = 0; i < result.length; i++) {
     indexByName.set(result[i].name, i);
   }
 
-  // Step 3: Apply desired state (in-place on the already-cloned array).
+  // 步骤 3：应用目标状态（在已克隆的数组上就地修改）。
   for (const desired of desiredEntries) {
     const existingIndex = indexByName.get(desired.name);
 
@@ -70,11 +70,11 @@ export async function commitMergedPlan(
   const beforeEntries = target.entries;
   const chatId = String(SillyTavern.getCurrentChatId?.() ?? SillyTavern.chatId ?? 'unknown');
 
-  // Backup the current controller content before overwriting.
+  // 覆写前备份当前 controller 内容。
   const previousController = findEntry(beforeEntries, settings.controller_entry_name)?.content ?? '';
   saveControllerBackup(chatId, target.worldbook_name, previousController);
 
-  // Validate that all operations target managed entry names.
+  // 校验所有操作目标都是受管理的条目名称。
   const allNames = [
     ...mergedPlan.worldbook.desired_entries.map(entry => entry.name),
     ...mergedPlan.worldbook.remove_entries.map(entry => entry.name),
@@ -84,27 +84,27 @@ export async function commitMergedPlan(
     throw new Error(`unmanaged entry name(s): ${unmanaged.join(', ')}`);
   }
 
-  // Apply declarative diff to worldbook entries.
+  // 将声明式 diff 应用到世界书条目。
   const nextEntries = applyDeclarativeDiff(
     beforeEntries,
     mergedPlan.worldbook.desired_entries,
     mergedPlan.worldbook.remove_entries,
   );
 
-  // Write the EJS controller entry into the character worldbook.
+  // 将 EJS controller 条目写入角色世界书。
   const ctrlExisting = nextEntries.find(e => e.name === settings.controller_entry_name);
   if (ctrlExisting) {
-    // CR-3: nextEntries is already a deep clone from applyDeclarativeDiff — modify in-place.
+    // CR-3: nextEntries 已经来自 applyDeclarativeDiff 的深拷贝 —— 直接就地修改。
     ctrlExisting.content = controllerTemplate;
     ctrlExisting.enabled = true;
   } else {
     nextEntries.push(ensureDefaultEntry(settings.controller_entry_name, controllerTemplate, true, nextEntries, true));
   }
 
-  // Commit all changes in one atomic operation.
+  // 在一次原子操作中提交所有变更。
   await replaceWorldbook(target.worldbook_name, nextEntries, { render: 'debounced' });
 
-  // Mark floor binding: record EW/Dyn entries, their content snapshots, and Controller snapshot.
+  // 标记楼层绑定：记录 EW/Dyn 条目、其内容快照和 Controller 快照。
   if (settings.floor_binding_enabled && messageId >= 0) {
     const dynDesired = mergedPlan.worldbook.desired_entries
       .filter(entry => entry.name.startsWith(settings.dynamic_entry_prefix));

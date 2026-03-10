@@ -1,4 +1,4 @@
-import { simpleHash, now } from './helpers';
+﻿import { simpleHash, now } from './helpers';
 import { EwSettings } from './types';
 
 type SendRecord = {
@@ -116,14 +116,14 @@ export function shouldHandleGenerationAfter(
   if (params?.automatic_trigger) {
     return { ok: false, reason: 'automatic_trigger' };
   }
-  // Allow the standard generation types that users can configure trigger_types for.
+  // 允许用户可配置 trigger_types 的标准生成类型。
   const allowedTypes = new Set(['normal', 'continue', 'regenerate', 'swipe']);
   if (!allowedTypes.has(type)) {
     return { ok: false, reason: `unsupported_type:${type}` };
   }
 
-  // CR-2: continue/regenerate/swipe don't create new send records, so the
-  // gate_ttl freshness check would almost always reject them. Skip it.
+  // CR-2: continue/regenerate/swipe 不会创建新的发送记录，因此
+  // gate_ttl 新鲜度检查几乎总会拒绝它们。跳过该检查。
   const noSendTypes = new Set(['continue', 'regenerate', 'swipe']);
   if (noSendTypes.has(type)) {
     return { ok: true, reason: 'ok' };

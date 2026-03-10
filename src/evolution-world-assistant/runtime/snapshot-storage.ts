@@ -1,4 +1,4 @@
-/**
+﻿/**
  * File-based snapshot storage via ST's /api/files endpoint.
  *
  * Stores per-message worldbook snapshots (Dyn entries + Controller)
@@ -13,10 +13,10 @@ export type SnapshotData = {
   dyn_entries: Array<{ name: string; content: string; enabled: boolean }>;
 };
 
-// ── Helpers ──────────────────────────────────────────────────
+// ── 辅助函数 ──────────────────────────────────────────────────
 
 function sanitizeSegment(s: string): string {
-  // Only allow alphanumeric, underscore, hyphen
+  // 仅允许字母数字、下划线、连字符
   return s.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 60);
 }
 
@@ -32,7 +32,7 @@ async function getHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
-  // ST may require CSRF token
+  // ST 可能需要 CSRF token
   if (typeof SillyTavern !== 'undefined' && SillyTavern.getRequestHeaders) {
     const stHeaders = SillyTavern.getRequestHeaders();
     if (stHeaders && typeof stHeaders === 'object') {
@@ -42,7 +42,7 @@ async function getHeaders(): Promise<Record<string, string>> {
   return headers;
 }
 
-// ── Write ────────────────────────────────────────────────────
+// ── 写入 ────────────────────────────────────────────────────
 
 export async function writeSnapshot(
   charName: string,
@@ -68,7 +68,7 @@ export async function writeSnapshot(
   return fileName;
 }
 
-// ── Read ─────────────────────────────────────────────────────
+// ── 读取 ─────────────────────────────────────────────────────
 
 export async function readSnapshot(fileName: string): Promise<SnapshotData | null> {
   try {
@@ -89,7 +89,7 @@ export async function readSnapshot(fileName: string): Promise<SnapshotData | nul
   }
 }
 
-// ── Delete ───────────────────────────────────────────────────
+// ── 删除 ───────────────────────────────────────────────────
 
 export async function deleteSnapshot(fileName: string): Promise<void> {
   try {
@@ -106,7 +106,7 @@ export async function deleteSnapshot(fileName: string): Promise<void> {
   }
 }
 
-// ── Batch Operations ─────────────────────────────────────────
+// ── 批量操作 ─────────────────────────────────────────
 
 /**
  * Find all snapshot files for a given chat.
@@ -163,6 +163,6 @@ export async function cleanupSnapshotFiles(
   return deleted;
 }
 
-// ── Migration ────────────────────────────────────────────────
+// ── 迁移 ────────────────────────────────────────────────
 
 export { buildFileName, buildFilePrefix };

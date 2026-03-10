@@ -1,4 +1,4 @@
-import { EwSettings } from './types';
+﻿import { EwSettings } from './types';
 import { resolveTargetWorldbook, ensureDefaultEntry } from './worldbook-runtime';
 import {
   writeSnapshot,
@@ -252,7 +252,7 @@ export async function purgeAndRestoreForChat(settings: EwSettings): Promise<void
   );
 }
 
-// ── Migration ────────────────────────────────────────────────
+// ── 迁移 ────────────────────────────────────────────────
 
 /**
  * Migrate snapshots between storage modes for the current chat.
