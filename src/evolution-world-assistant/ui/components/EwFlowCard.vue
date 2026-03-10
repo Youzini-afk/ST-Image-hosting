@@ -228,6 +228,7 @@
               <span class="ew-toggle-item__label">使用酒馆已启用的正则</span>
             </div>
             <p class="ew-flow-card__hint-text">开启后，聊天消息会先经过酒馆当前激活的正则脚本处理（全局 + 角色卡正则）。</p>
+            <button type="button" class="ew-mini-btn ew-mini-btn--info" @click="openRegexPreview">查看当前正则</button>
 
             <div class="ew-flow-card__custom-regex-head">
               <h6>自定义正则</h6>
@@ -287,6 +288,37 @@
         </EwFieldRow>
       </div>
     </transition>
+
+    <!-- 正则预览弹窗 -->
+    <Teleport to="body">
+      <transition name="ew-modal">
+        <div v-if="showRegexModal" class="ew-modal-overlay" @click.self="showRegexModal = false">
+          <div class="ew-modal ew-modal--regex">
+            <header class="ew-modal__header">
+              <h3>当前正则脚本一览</h3>
+              <button type="button" class="ew-modal__close" @click="showRegexModal = false">✕</button>
+            </header>
+            <div class="ew-modal__body">
+              <p v-if="regexPreviewList.length === 0" class="ew-empty">没有收集到任何已启用的正则脚本。</p>
+              <div v-for="(script, i) in regexPreviewList" :key="script.id" class="ew-regex-preview-item">
+                <div class="ew-regex-preview-item__head">
+                  <span class="ew-regex-preview-item__index">#{{ i + 1 }}</span>
+                  <span class="ew-regex-preview-item__name">{{ script.scriptName || '未命名' }}</span>
+                  <span v-if="script.isBeautification" class="ew-regex-preview-item__badge ew-regex-preview-item__badge--beauty">美化 → 清空</span>
+                  <span v-else class="ew-regex-preview-item__badge ew-regex-preview-item__badge--transform">转义</span>
+                  <span v-if="script.markdownOnly" class="ew-regex-preview-item__badge ew-regex-preview-item__badge--skip">跳过(MD)</span>
+                </div>
+                <div class="ew-regex-preview-item__details">
+                  <div class="ew-regex-preview-item__row"><span class="ew-regex-preview-item__label">查找</span><code>{{ script.findRegex }}</code></div>
+                  <div class="ew-regex-preview-item__row"><span class="ew-regex-preview-item__label">替换</span><code>{{ script.effectiveReplace }}</code></div>
+                  <div class="ew-regex-preview-item__row"><span class="ew-regex-preview-item__label">作用域</span><span>{{ script.placementLabel }}</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </transition>
+    </Teleport>
   </article>
 </template>
 
@@ -295,6 +327,7 @@ import type { EwApiPreset, EwFlowConfig, EwPromptOrderEntry } from '../../runtim
 import { EwFlowConfigSchema } from '../../runtime/types';
 import { isSillyTavernPreset, convertStPresetToFlow } from '../convertStPreset';
 import { simpleHash } from '../../runtime/helpers';
+import { collectAllRegexScripts, isBeautificationReplace } from '../../runtime/regex-engine';
 import { getFieldHelp } from '../help-meta';
 import EwFieldRow from './EwFieldRow.vue';
 
@@ -437,6 +470,39 @@ async function onImportFile(event: Event) {
   } finally {
     if (input) input.value = '';
   }
+}
+
+// ── 正则预览弹窗 ──
+const showRegexModal = ref(false);
+
+interface RegexPreviewItem {
+  id: string;
+  scriptName: string;
+  findRegex: string;
+  effectiveReplace: string;
+  isBeautification: boolean;
+  markdownOnly: boolean;
+  placementLabel: string;
+}
+
+const regexPreviewList = ref<RegexPreviewItem[]>([]);
+
+function openRegexPreview() {
+  const placementNames: Record<number, string> = { 0: '用户消息', 1: 'AI消息', 2: '斜杠命令', 3: '世界书' };
+  const scripts = collectAllRegexScripts();
+  regexPreviewList.value = scripts.map(s => {
+    const isBeau = isBeautificationReplace(s.replaceString);
+    return {
+      id: s.id,
+      scriptName: s.scriptName,
+      findRegex: s.findRegex,
+      effectiveReplace: isBeau ? '（美化正则，EW中替换为空）' : (s.replaceString || '（空 — 删除匹配内容）'),
+      isBeautification: isBeau,
+      markdownOnly: s.markdownOnly,
+      placementLabel: s.placement.map(p => placementNames[p] ?? `#${p}`).join(', ') || '无',
+    };
+  });
+  showRegexModal.value = true;
 }
 </script>
 
@@ -1037,4 +1103,192 @@ async function onImportFile(event: Event) {
     transition: none;
   }
 }
+
+.ew-mini-btn--info {
+  border-color: color-mix(in srgb, var(--ew-accent) 50%, transparent);
+  color: var(--ew-accent);
+  background: color-mix(in srgb, var(--ew-accent) 12%, transparent);
+}
+
+.ew-mini-btn--info:hover {
+  background: color-mix(in srgb, var(--ew-accent) 25%, transparent);
+  color: #fff;
+}
+
 </style>
+
+<!-- 弹窗样式需要 unscoped，因为 Teleport 渲染在 body 下 -->
+<style>
+.ew-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.ew-modal--regex {
+  width: min(640px, 90vw);
+  max-height: 80vh;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 30%, transparent);
+  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 8%, rgba(12, 16, 24, 0.95));
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ew-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 15%, transparent);
+}
+
+.ew-modal__header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 95%, transparent);
+}
+
+.ew-modal__close {
+  border: none;
+  background: none;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 60%, transparent);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  transition: background 0.2s, color 0.2s;
+}
+
+.ew-modal__close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.ew-modal__body {
+  padding: 0.85rem 1rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ew-regex-preview-item {
+  border-radius: 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 22%, transparent);
+  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 6%, rgba(0, 0, 0, 0.12));
+  padding: 0.55rem 0.7rem;
+}
+
+.ew-regex-preview-item__head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.35rem;
+}
+
+.ew-regex-preview-item__index {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 50%, transparent);
+  min-width: 1.6rem;
+}
+
+.ew-regex-preview-item__name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 92%, transparent);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ew-regex-preview-item__badge {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.ew-regex-preview-item__badge--transform {
+  background: color-mix(in srgb, var(--ew-success) 20%, transparent);
+  color: var(--ew-success);
+  border: 1px solid color-mix(in srgb, var(--ew-success) 35%, transparent);
+}
+
+.ew-regex-preview-item__badge--beauty {
+  background: color-mix(in srgb, #f59e0b 20%, transparent);
+  color: #f59e0b;
+  border: 1px solid color-mix(in srgb, #f59e0b 35%, transparent);
+}
+
+.ew-regex-preview-item__badge--skip {
+  background: color-mix(in srgb, #6b7280 20%, transparent);
+  color: #9ca3af;
+  border: 1px solid color-mix(in srgb, #6b7280 30%, transparent);
+}
+
+.ew-regex-preview-item__details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.ew-regex-preview-item__row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.ew-regex-preview-item__label {
+  font-weight: 600;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 55%, transparent);
+  min-width: 2.5rem;
+  flex-shrink: 0;
+}
+
+.ew-regex-preview-item__row code {
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 0.72rem;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  word-break: break-all;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 80%, transparent);
+}
+
+/* Modal transition */
+.ew-modal-enter-active,
+.ew-modal-leave-active {
+  transition: opacity 0.25s ease;
+}
+.ew-modal-enter-active .ew-modal--regex,
+.ew-modal-leave-active .ew-modal--regex {
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.ew-modal-enter-from,
+.ew-modal-leave-to {
+  opacity: 0;
+}
+.ew-modal-enter-from .ew-modal--regex {
+  transform: scale(0.92) translateY(10px);
+}
+.ew-modal-leave-to .ew-modal--regex {
+  transform: scale(0.96) translateY(5px);
+}
+</style>
+

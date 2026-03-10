@@ -29,7 +29,7 @@ interface RegexScript {
  * 从三个来源收集正则脚本：全局、预设绑定、角色卡局部。
  * 返回合并后的脚本数组（去重依据 id）。
  */
-function collectAllRegexScripts(): RegexScript[] {
+export function collectAllRegexScripts(): RegexScript[] {
   const scriptsById = new Map<string, RegexScript>();
   const win = globalThis as any;
 
@@ -104,7 +104,7 @@ function normalizeScript(raw: any): RegexScript {
 const HTML_TAG_PATTERN = /<\/?(?:div|span|p|br|hr|img|details|summary|section|article|aside|header|footer|nav|ul|ol|li|table|tr|td|th|h[1-6]|a|em|strong|blockquote|pre|code|svg|path)\b/i;
 const HTML_ATTR_PATTERN = /\b(?:style|class|id|href|src|data-)\s*=/i;
 
-function isBeautificationReplace(replaceString: string): boolean {
+export function isBeautificationReplace(replaceString: string): boolean {
   if (!replaceString) return false;
   return HTML_TAG_PATTERN.test(replaceString) || HTML_ATTR_PATTERN.test(replaceString);
 }
