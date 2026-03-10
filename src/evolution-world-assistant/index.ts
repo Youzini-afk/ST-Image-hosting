@@ -1,5 +1,5 @@
 import { initRuntime, disposeRuntime } from './runtime/main';
-import { mountUi, unmountUi } from './ui';
+import { mountUi, unmountUi, mountFabEarly } from './ui';
 import { showEwNotice } from './ui/notice';
 
 const BOOTSTRAP_TIMEOUT_MS = 12_000;
@@ -66,6 +66,15 @@ async function bootstrap() {
 }
 
 $(() => {
+  // Create FAB immediately (sync) — it's pure DOM and doesn't need runtime globals.
+  // This matches ST-Manager-STscript's pattern where init() is synchronous.
+  try {
+    mountFabEarly();
+  } catch (error) {
+    console.error('[Evolution World] early FAB setup failed:', error);
+  }
+
+  // The rest of bootstrap is async (waits for runtime globals)
   void bootstrap().catch(reportBootstrapError);
 });
 

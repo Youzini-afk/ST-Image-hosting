@@ -2,6 +2,17 @@ import { createScriptIdDiv, teleportStyle } from '@util/script';
 import App from './App.vue';
 import { patchSettings, getSettings } from '../runtime/settings';
 
+// Cache for early FAB visibility — if settings haven't loaded yet, default true
+function shouldShowFab(): boolean {
+  try {
+    const s = getSettings();
+    return s.show_fab !== false;
+  } catch {
+    // Settings not ready yet (runtime globals not loaded yet), default to true
+    return true;
+  }
+}
+
 let app: ReturnType<typeof createApp> | null = null;
 let destroyStyle: (() => void) | null = null;
 let $root: JQuery<HTMLDivElement> | null = null;
@@ -181,10 +192,7 @@ function createFab(): void {
   const doc = resolveParentDocument();
   if (doc.getElementById(FAB_ID)) return;
 
-  const settings = getSettings();
-  const showFab = settings.show_fab !== false; // default true even if missing
-  console.log('[EW] createFab: show_fab =', settings.show_fab, '→', showFab);
-  if (!showFab) return;
+  if (!shouldShowFab()) return;
 
   ensureFabStyle();
 
@@ -310,6 +318,24 @@ function syncFabVisibility(): void {
 
 let fabVisibilityListener: (() => void) | null = null;
 
+/**
+ * Create FAB early—called synchronously from $() before async bootstrap.
+ * Does NOT depend on runtime globals (getScriptId/getVariables etc.).
+ */
+export function mountFabEarly(): void {
+  try {
+    createFab();
+  } catch (error) {
+    console.error('[Evolution World] early FAB setup failed:', error);
+  }
+
+  // Listen for visibility changes
+  if (!fabVisibilityListener) {
+    fabVisibilityListener = () => syncFabVisibility();
+    window.addEventListener('ew:fab-visibility-changed', fabVisibilityListener);
+  }
+}
+
 export function mountUi() {
   if (app) {
     return;
@@ -329,15 +355,9 @@ export function mountUi() {
     toastr.error(`魔法棒菜单挂载失败: ${error instanceof Error ? error.message : String(error)}`, 'Evolution World');
   }
 
-  // Create FAB immediately
-  try {
-    createFab();
-  } catch (error) {
-    console.error('[Evolution World] FAB setup failed:', error);
-  }
-
-  fabVisibilityListener = () => syncFabVisibility();
-  window.addEventListener('ew:fab-visibility-changed', fabVisibilityListener);
+  // FAB should already exist from mountFabEarly(). Re-sync visibility
+  // with now-loaded settings in case show_fab was changed.
+  syncFabVisibility();
 }
 
 export function unmountUi() {
