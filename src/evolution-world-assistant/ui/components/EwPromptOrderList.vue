@@ -88,7 +88,7 @@
               内容
               <textarea
                 :value="entry.content"
-                rows="4"
+                rows="12"
                 placeholder="在此输入提示词内容..."
                 @input="patchEntry(entry.identifier, 'content', ($event.target as HTMLTextAreaElement).value)"
               ></textarea>
@@ -466,7 +466,7 @@ function onDragEnd() {
 
 .ew-prompt-order__editor-label textarea {
   resize: vertical;
-  min-height: 80px;
+  min-height: 240px;
   font-family: Consolas, Monaco, monospace;
 }
 
@@ -561,7 +561,7 @@ function onDragEnd() {
 }
 .ew-expand-enter-to,
 .ew-expand-leave-from {
-  max-height: 400px;
+  max-height: 1200px;
   opacity: 1;
 }
 
