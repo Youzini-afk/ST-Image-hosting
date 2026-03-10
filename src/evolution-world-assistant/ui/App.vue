@@ -391,10 +391,15 @@ const flowImportRef = ref<HTMLInputElement | null>(null);
 const migratingSnapshots = ref(false);
 
 function emitFabChanged() {
-  // Sync Vue store's show_fab value to runtime settings cache,
-  // so syncFabVisibility() → getSettings() sees the updated value.
-  patchSettings({ show_fab: store.settings.show_fab });
-  window.dispatchEvent(new Event('ew:fab-visibility-changed'));
+  // Direct DOM manipulation — matching ST-Manager's setFabVisibility() approach.
+  // No events, no runtime cache reads, just remove the FAB element directly.
+  const visible = store.settings.show_fab;
+  patchSettings({ show_fab: visible });
+  if (!visible) {
+    // FAB lives on the parent document's <html> element
+    const doc = window.parent?.document ?? document;
+    doc.getElementById('ew-assistant-fab')?.remove();
+  }
 }
 
 const enabledFlowCount = computed(() => store.settings.flows.filter(flow => flow.enabled).length);

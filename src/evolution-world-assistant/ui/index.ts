@@ -295,37 +295,23 @@ function createFab(): void {
 function removeFab(): void {
   const doc = resolveParentDocument();
   const fab = doc.getElementById(FAB_ID);
-  if (!fab) {
-    doc.getElementById(FAB_STYLE_ID)?.remove();
-    return;
-  }
-  fab.classList.add('leaving');
-  fab.addEventListener('animationend', () => {
-    fab.remove();
-    doc.getElementById(FAB_STYLE_ID)?.remove();
-  }, { once: true });
-  // Fallback if animationend doesn't fire
-  setTimeout(() => fab.remove(), 300);
+  if (fab) fab.remove();
+  doc.getElementById(FAB_STYLE_ID)?.remove();
 }
 
-function syncFabVisibility(): void {
-  const settings = getSettings();
+/**
+ * Directly set FAB visibility — matches ST-Manager's approach.
+ * No event dispatching, no runtime cache reads, just direct DOM manipulation.
+ */
+export function setFabVisibility(visible: boolean): void {
   const doc = resolveParentDocument();
   const fab = doc.getElementById(FAB_ID);
-  if (settings.show_fab) {
+  if (visible) {
     if (!fab) createFab();
   } else if (fab) {
-    // Clear any inline animation from pop-in, then apply leave animation
-    fab.style.animation = 'none';
-    void fab.offsetHeight; // force reflow
-    fab.classList.add('leaving');
-    fab.style.animation = '';  // let CSS .leaving rule take effect
-    fab.addEventListener('animationend', () => fab.remove(), { once: true });
-    setTimeout(() => fab.remove(), 400);
+    fab.remove();
   }
 }
-
-let fabVisibilityListener: (() => void) | null = null;
 
 /**
  * Create FAB early—called synchronously from $() before async bootstrap.
@@ -336,12 +322,6 @@ export function mountFabEarly(): void {
     createFab();
   } catch (error) {
     console.error('[Evolution World] early FAB setup failed:', error);
-  }
-
-  // Listen for visibility changes
-  if (!fabVisibilityListener) {
-    fabVisibilityListener = () => syncFabVisibility();
-    window.addEventListener('ew:fab-visibility-changed', fabVisibilityListener);
   }
 }
 
@@ -364,19 +344,16 @@ export function mountUi() {
     toastr.error(`魔法棒菜单挂载失败: ${error instanceof Error ? error.message : String(error)}`, 'Evolution World');
   }
 
-  // FAB should already exist from mountFabEarly(). Re-sync visibility
-  // with now-loaded settings in case show_fab was changed.
-  syncFabVisibility();
+  // FAB should already exist from mountFabEarly(). Re-sync with loaded settings.
+  const settings = getSettings();
+  if (settings.show_fab === false) {
+    removeFab();
+  }
 }
 
 export function unmountUi() {
   uninstallMagicWandMenuItem();
   removeFab();
-
-  if (fabVisibilityListener) {
-    window.removeEventListener('ew:fab-visibility-changed', fabVisibilityListener);
-    fabVisibilityListener = null;
-  }
 
   app?.unmount();
   app = null;
@@ -385,4 +362,3 @@ export function unmountUi() {
   destroyStyle?.();
   destroyStyle = null;
 }
-
