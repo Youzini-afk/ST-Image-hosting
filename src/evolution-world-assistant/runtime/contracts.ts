@@ -52,10 +52,6 @@ export const FlowRequestSchema = z.object({
   worldbook: z.object({
     worldbook_name: z.string().default(''),
   }),
-  mvu: z.object({
-    message_id: z.number().default(-1),
-    stat_data: z.record(z.string(), z.any()).default({}),
-  }),
   serial_results: z.array(z.record(z.string(), z.any())).default([]),
 });
 

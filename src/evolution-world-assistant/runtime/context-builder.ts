@@ -11,23 +11,6 @@ export type BuildRequestInput = {
   serial_results?: Record<string, any>[];
 };
 
-function getMvuSnapshot(messageId: number): { message_id: number; stat_data: Record<string, any> } {
-  const mvu = _.get(window, 'Mvu');
-  if (!mvu || !_.isFunction(mvu.getMvuData)) {
-    return { message_id: messageId, stat_data: {} };
-  }
-
-  try {
-    const data = mvu.getMvuData({ type: 'message', message_id: -1 });
-    return {
-      message_id: -1,
-      stat_data: _.get(data, 'stat_data', {}),
-    };
-  } catch {
-    return { message_id: messageId, stat_data: {} };
-  }
-}
-
 
 export async function buildFlowRequest(input: BuildRequestInput): Promise<FlowRequestV1> {
   const chatId = String(
@@ -65,7 +48,6 @@ export async function buildFlowRequest(input: BuildRequestInput): Promise<FlowRe
     worldbook: {
       worldbook_name: worldbookName,
     },
-    mvu: getMvuSnapshot(input.message_id),
     serial_results: input.serial_results ?? [],
   });
 
