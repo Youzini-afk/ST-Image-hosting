@@ -424,7 +424,7 @@
 
           <div class="ew-flow-card__subsection">
             <h5>文本切片</h5>
-            <div class="ew-grid ew-grid--two">
+            <div v-if="deferredEditorsReady" class="ew-grid ew-grid--two">
               <section>
                 <div class="ew-subhead"><h6>提取规则</h6></div>
                 <p class="ew-flow-card__hint-text">只保留 start～end 之间的文本发给 AI（如：只提取正文）。</p>
@@ -444,6 +444,7 @@
                 />
               </section>
             </div>
+            <div v-else class="ew-flow-card__deferred-placeholder">正在加载文本切片编辑器…</div>
           </div>
         </section>
 
@@ -451,7 +452,12 @@
           <div class="ew-flow-card__section-head">
             <h4>提示词编排</h4>
           </div>
-          <EwPromptOrderList :prompt-order="flow.prompt_order" @update:prompt-order="updatePromptOrder" />
+          <EwPromptOrderList
+            v-if="deferredEditorsReady"
+            :prompt-order="flow.prompt_order"
+            @update:prompt-order="updatePromptOrder"
+          />
+          <div v-else class="ew-flow-card__deferred-placeholder">正在加载提示词编排编辑器…</div>
         </section>
 
         <EwFieldRow label="请求模板(JSON merge)" :help="help('flow.request_template')">
@@ -551,12 +557,48 @@ const flow = computed(() => props.modelValue);
 // "已展开过"模式：首次展开后保持 DOM 存活（v-show）
 // 避免后续切换时重新挂载的开销。
 const hasBeenExpanded = ref(props.expanded);
+const deferredEditorsReady = ref(props.expanded);
+let deferredMountFrameA: number | null = null;
+let deferredMountFrameB: number | null = null;
+
+function clearDeferredMountFrames() {
+  if (deferredMountFrameA !== null) {
+    cancelAnimationFrame(deferredMountFrameA);
+    deferredMountFrameA = null;
+  }
+  if (deferredMountFrameB !== null) {
+    cancelAnimationFrame(deferredMountFrameB);
+    deferredMountFrameB = null;
+  }
+}
+
+function scheduleDeferredEditorsMount() {
+  if (deferredEditorsReady.value) return;
+
+  clearDeferredMountFrames();
+  deferredMountFrameA = requestAnimationFrame(() => {
+    deferredMountFrameA = null;
+    deferredMountFrameB = requestAnimationFrame(() => {
+      deferredMountFrameB = null;
+      if (props.expanded) {
+        deferredEditorsReady.value = true;
+      }
+    });
+  });
+}
+
 watch(
   () => props.expanded,
   val => {
-    if (val) hasBeenExpanded.value = true;
+    if (!val) return;
+    hasBeenExpanded.value = true;
+    scheduleDeferredEditorsMount();
   },
 );
+
+onBeforeUnmount(() => {
+  clearDeferredMountFrames();
+});
 
 const selectedPreset = computed(() => props.apiPresets.find(preset => preset.id === flow.value.api_preset_id) ?? null);
 const endpointSummary = computed(() => {
@@ -927,6 +969,15 @@ function openRegexPreview() {
   font-size: 0.76rem;
   line-height: 1.4;
   color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 65%, transparent);
+}
+
+.ew-flow-card__deferred-placeholder {
+  border-radius: 0.82rem;
+  border: 1px dashed color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 30%, transparent);
+  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 8%, rgba(8, 12, 18, 0.18));
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 62%, transparent);
+  font-size: 0.78rem;
+  padding: 0.8rem 0.9rem;
 }
 
 .ew-flow-card__subsection {
