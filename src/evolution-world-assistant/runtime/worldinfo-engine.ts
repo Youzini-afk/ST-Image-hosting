@@ -9,6 +9,8 @@
  *  - Probability filtering
  *  - Inclusion group handling (priority, scoring, weighted random)
  *  - Position classification (before/after char defs, at depth, etc.)
+ *  - substituteParams macro replacement in keywords
+ *  - Special entry name detection ([GENERATE:], [RENDER:], @INJECT, etc.)
  *
  * Used exclusively for workflow prompt assembly.
  */
@@ -39,6 +41,18 @@ const WI_LOGIC: Record<string, number> = {
   AND_ALL: 3,   // Primary + ALL secondary
 };
 
+/** Depth mapping for sorting (mirrors ST's DEPTH_MAPPING) */
+const DEPTH_MAPPING: Record<number, number> = {
+  [WI_POSITION.before]: 4,    // Before Char Defs
+  [WI_POSITION.after]: 3,     // After Char Defs
+  [WI_POSITION.EMTop]: 2,     // Before Example Messages
+  [WI_POSITION.EMBottom]: 1,  // After Example Messages
+  [WI_POSITION.ANTop]: 1,     // Top of Author's Note
+  [WI_POSITION.ANBottom]: -1,  // Bottom of Author's Note
+};
+
+const DEFAULT_DEPTH = 4;
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -49,6 +63,7 @@ interface RawWbEntry {
   name: string;
   content: string;
   enabled: boolean;
+  disable?: boolean;
   position: {
     type: string;
     role: string;
@@ -73,6 +88,12 @@ interface RawWbEntry {
     delay: number | null;
   };
   extra: Record<string, any>;
+  // Legacy ST format fields (extensions-based)
+  extensions?: {
+    position?: number;
+    useProbability?: boolean;
+    [key: string]: any;
+  };
 }
 
 /** Normalized entry used internally */
@@ -123,9 +144,46 @@ export interface ResolvedWorldInfo {
 declare function getWorldbook(name: string): Promise<RawWbEntry[]>;
 declare function getCharWorldbookNames(target: 'current'): { primary: string | null; additional: string[] };
 declare function getGlobalWorldbookNames(): string[];
+declare const SillyTavern: { getContext(): Record<string, any> } | undefined;
+
+function getStContext(): Record<string, any> {
+  try {
+    return SillyTavern?.getContext?.() ?? {};
+  } catch {
+    return {};
+  }
+}
 
 // ---------------------------------------------------------------------------
-// Decorator Parsing
+// substituteParams – macro replacement for keywords (Fix #1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Replace common ST macros in keyword strings before matching.
+ * Mirrors SillyTavern's `substituteParams()` for the most common macros.
+ */
+function substituteParams(text: string): string {
+  if (!text || !text.includes('{{')) return text;
+
+  const ctx = getStContext();
+  const userName = ctx.name1 ?? '';
+  const charName = ctx.name2 ?? '';
+  const personaDescription = ctx.persona ?? '';
+
+  return text
+    .replace(/\{\{user\}\}/gi, userName)
+    .replace(/\{\{char\}\}/gi, charName)
+    .replace(/\{\{persona\}\}/gi, personaDescription)
+    .replace(/\{\{original\}\}/gi, '')
+    .replace(/\{\{input\}\}/gi, '')
+    .replace(/\{\{lastMessage\}\}/gi, '')
+    .replace(/\{\{lastMessageId\}\}/gi, '')
+    .replace(/\{\{newline\}\}/gi, '\n')
+    .replace(/\{\{trim\}\}/gi, '');
+}
+
+// ---------------------------------------------------------------------------
+// Decorator Parsing (Fix #5: separate name from arguments)
 // ---------------------------------------------------------------------------
 
 const KNOWN_DECORATORS = [
@@ -144,7 +202,9 @@ function parseDecorators(content: string): { decorators: string[]; cleanContent:
     const trimmed = line.trim();
     const match = KNOWN_DECORATORS.find(d => trimmed.startsWith(d));
     if (match) {
-      decorators.push(trimmed);
+      // ST separates decorator name from arguments — store only the name
+      const firstSpace = trimmed.indexOf(' ');
+      decorators.push(firstSpace > 0 ? trimmed.substring(0, firstSpace) : trimmed);
     } else {
       cleanLines.push(line);
     }
@@ -157,7 +217,17 @@ function parseDecorators(content: string): { decorators: string[]; cleanContent:
 }
 
 // ---------------------------------------------------------------------------
-// Entry Normalization
+// Special Entry Name Detection (Fix #6)
+// ---------------------------------------------------------------------------
+
+const SPECIAL_NAME_MARKERS = ['[GENERATE:', '[RENDER:', '@INJECT', '[InitialVariables]'];
+
+function isSpecialEntryByName(name: string): boolean {
+  return SPECIAL_NAME_MARKERS.some(marker => name.includes(marker));
+}
+
+// ---------------------------------------------------------------------------
+// Entry Normalization (Fix #4: handle both `disable` and `enabled`)
 // ---------------------------------------------------------------------------
 
 function normalizeEntry(raw: RawWbEntry, worldbookName: string): NormalizedEntry {
@@ -174,8 +244,8 @@ function normalizeEntry(raw: RawWbEntry, worldbookName: string): NormalizedEntry
   else if (posType === 'an_bottom') position = WI_POSITION.ANBottom;
   else if (posType === 'at_depth') position = WI_POSITION.atDepth;
   // numeric position from extensions (legacy support)
-  else if (typeof (raw as any).extensions?.position === 'number') {
-    position = (raw as any).extensions.position;
+  else if (typeof raw.extensions?.position === 'number') {
+    position = raw.extensions.position;
   }
 
   // Map strategy.type to boolean flags
@@ -189,13 +259,23 @@ function normalizeEntry(raw: RawWbEntry, worldbookName: string): NormalizedEntry
   else if (logicStr === 'not_any') selectiveLogic = WI_LOGIC.NOT_ANY;
   else if (logicStr === 'and_all') selectiveLogic = WI_LOGIC.AND_ALL;
 
+  // Fix #4: handle both `disable` (ST native) and `enabled` (getWorldbook API)
+  let isEnabled: boolean;
+  if (typeof raw.disable === 'boolean') {
+    isEnabled = !raw.disable;
+  } else if (typeof raw.enabled === 'boolean') {
+    isEnabled = raw.enabled;
+  } else {
+    isEnabled = true; // default: enabled
+  }
+
   return {
     uid: raw.uid,
     name: raw.name,
     content: raw.content,
     cleanContent,
     decorators,
-    enabled: raw.enabled,
+    enabled: isEnabled,
     worldbook: worldbookName,
 
     constant: isConstant,
@@ -291,6 +371,7 @@ function getScore(trigger: string, entry: NormalizedEntry): number {
 
 // ---------------------------------------------------------------------------
 // Entry Activation (replicates ST selectActivatedEntries)
+// Fixes applied: #1 substituteParams, #5 exact decorator match, #6 special names
 // ---------------------------------------------------------------------------
 
 function selectActivatedEntries(entries: NormalizedEntry[], trigger: string): NormalizedEntry[] {
@@ -308,21 +389,28 @@ function selectActivatedEntries(entries: NormalizedEntry[], trigger: string): No
       continue;
     }
 
-    // Decorator-based activation
-    if (entry.decorators.some(d => d.startsWith('@@activate'))) {
+    // Decorator-based activation (Fix #5: exact match, not startsWith)
+    if (entry.decorators.includes('@@activate')) {
       activated.add(entry);
       continue;
     }
-    if (entry.decorators.some(d => d.startsWith('@@dont_activate'))) continue;
-    if (entry.decorators.some(d => d.startsWith('@@only_preload'))) continue;
+    if (entry.decorators.includes('@@dont_activate')) continue;
+    if (entry.decorators.includes('@@only_preload')) continue;
 
     // Special decorator entries (@@generate, @@render, @@initial_variables, @@preprocessing, @@iframe)
-    const specialDecorators = ['@@generate', '@@render', '@@initial_variables', '@@preprocessing', '@@iframe'];
-    if (entry.decorators.some(d => specialDecorators.some(sd => d.startsWith(sd)))) continue;
+    const specialDecorators = ['@@generate', '@@generate_before', '@@generate_after',
+      '@@render', '@@render_before', '@@render_after',
+      '@@initial_variables', '@@preprocessing', '@@iframe'];
+    if (entry.decorators.some(d => specialDecorators.includes(d))) continue;
 
-    // Primary keyword matching
+    // Fix #6: Special entry name markers
+    if (isSpecialEntryByName(entry.name)) continue;
+
+    // Primary keyword matching (Fix #1: substituteParams before match)
     if (entry.keys.length === 0) continue;
-    const matchedKey = entry.keys.find(k => matchKeys(trigger, k, entry));
+    const matchedKey = entry.keys
+      .map(k => substituteParams(k))
+      .find(k => matchKeys(trigger, k, entry));
     if (!matchedKey) continue;
 
     // Secondary keyword (blue lamp) logic
@@ -336,7 +424,9 @@ function selectActivatedEntries(entries: NormalizedEntry[], trigger: string): No
     let hasAllMatch = true;
 
     for (const secondary of entry.keysSecondary) {
-      const hasMatch = secondary.trim() !== '' && matchKeys(trigger, secondary.trim(), entry);
+      // Fix #1: substituteParams on secondary keys too
+      const substituted = substituteParams(secondary);
+      const hasMatch = substituted.trim() !== '' && matchKeys(trigger, substituted.trim(), entry);
       if (hasMatch) hasAnyMatch = true;
       if (!hasMatch) hasAllMatch = false;
 
@@ -391,8 +481,10 @@ function selectActivatedEntries(entries: NormalizedEntry[], trigger: string): No
     if (usePrioritize.length > 0) {
       const orders = members.map(e => e.order);
       const top = Math.min(...orders);
-      matched.push(members[Math.max(orders.findIndex(o => o <= top), 0)]);
-      continue;
+      if (top) {
+        matched.push(members[Math.max(orders.findIndex(o => o <= top), 0)]);
+        continue;
+      }
     }
 
     // Group scoring
@@ -406,69 +498,116 @@ function selectActivatedEntries(entries: NormalizedEntry[], trigger: string): No
       }
     }
 
-    // Weighted random
-    const weights = members.map(e => e.groupWeight);
-    const totalWeight = _.sum(weights);
-    let rollValue = _.random(1, totalWeight);
-    const winner = weights.findIndex(w => (rollValue -= w) <= 0);
-    if (winner >= 0) matched.push(members[winner]);
+    // Fix #7: Weighted random — only for members without groupOverride or useGroupScoring
+    const useWeights = members.filter(e => !e.groupOverride && !e.useGroupScoring);
+    if (useWeights.length > 0) {
+      const weights = useWeights.map(e => e.groupWeight);
+      const totalWeight = _.sum(weights);
+      let rollValue = _.random(1, totalWeight);
+      const winner = weights.findIndex(w => (rollValue -= w) <= 0);
+      if (winner >= 0) matched.push(useWeights[winner]);
+    }
   }
 
   return ungrouped.concat(matched).sort(sortEntries);
 }
 
+// Fix #3: Sort with depth dimension, matching ST's worldInfoSorter
+function calcDepth(entry: NormalizedEntry, maxDepth: number): number {
+  const offset = DEPTH_MAPPING[entry.position];
+
+  // atDepth: absolute depth
+  if (offset == null) {
+    return entry.depth ?? DEFAULT_DEPTH;
+  }
+
+  // relative to chat history with preset offset
+  return offset + maxDepth;
+}
+
 function sortEntries(a: NormalizedEntry, b: NormalizedEntry): number {
-  // Sort by order (asc), then uid (desc)
-  return a.order - b.order || b.uid - a.uid;
+  // Compute max depth among all atDepth entries for relative sorting
+  const maxDepth = Math.max(a.depth, b.depth, DEFAULT_DEPTH);
+
+  // Sort by depth (desc), then order (asc), then uid (desc) — matches ST
+  return calcDepth(b, maxDepth) - calcDepth(a, maxDepth) ||
+    a.order - b.order ||
+    b.uid - a.uid;
 }
 
 // ---------------------------------------------------------------------------
-// Worldbook Collection
+// Worldbook Collection (Fix #2: add persona + chat-bound lorebooks)
 // ---------------------------------------------------------------------------
 
 async function collectAllWorldbookEntries(): Promise<NormalizedEntry[]> {
   const allEntries: NormalizedEntry[] = [];
 
+  // Helper to load and normalize entries from a worldbook
+  async function loadWb(wbName: string): Promise<void> {
+    try {
+      const entries = await getWorldbook(wbName);
+      for (const entry of entries) {
+        allEntries.push(normalizeEntry(entry, wbName));
+      }
+    } catch (e) {
+      console.debug(`[EW WI Engine] Cannot read worldbook '${wbName}':`, e);
+    }
+  }
+
+  const loadedNames = new Set<string>();
+  async function loadWbOnce(wbName: string): Promise<void> {
+    if (!wbName || loadedNames.has(wbName)) return;
+    loadedNames.add(wbName);
+    await loadWb(wbName);
+  }
+
   // 1. Character primary worldbook
   try {
     const charWb = getCharWorldbookNames('current');
     if (charWb.primary) {
-      const entries = await getWorldbook(charWb.primary);
-      for (const entry of entries) {
-        allEntries.push(normalizeEntry(entry, charWb.primary));
-      }
+      await loadWbOnce(charWb.primary);
     }
 
     // Character additional worldbooks
     for (const additionalWb of charWb.additional ?? []) {
-      try {
-        const entries = await getWorldbook(additionalWb);
-        for (const entry of entries) {
-          allEntries.push(normalizeEntry(entry, additionalWb));
-        }
-      } catch (e) {
-        console.debug(`[EW WI Engine] Cannot read additional worldbook '${additionalWb}':`, e);
-      }
+      await loadWbOnce(additionalWb);
     }
   } catch (e) {
     console.debug('[EW WI Engine] Cannot read character worldbooks:', e);
   }
 
-  // 2. Global worldbooks
+  // 2. Global worldbooks (selected_world_info)
   try {
     const globalNames = getGlobalWorldbookNames();
     for (const wbName of globalNames) {
-      try {
-        const entries = await getWorldbook(wbName);
-        for (const entry of entries) {
-          allEntries.push(normalizeEntry(entry, wbName));
-        }
-      } catch (e) {
-        console.debug(`[EW WI Engine] Cannot read global worldbook '${wbName}':`, e);
-      }
+      await loadWbOnce(wbName);
     }
   } catch (e) {
     console.debug('[EW WI Engine] Cannot read global worldbooks:', e);
+  }
+
+  // 3. Fix #2: Persona lorebook
+  try {
+    const ctx = getStContext();
+    const personaLorebook: string | undefined =
+      ctx.extensionSettings?.persona_description_lorebook ??
+      (ctx as any).power_user?.persona_description_lorebook;
+    if (personaLorebook) {
+      await loadWbOnce(personaLorebook);
+    }
+  } catch (e) {
+    console.debug('[EW WI Engine] Cannot read persona lorebook:', e);
+  }
+
+  // 4. Fix #2: Chat-bound lorebook (chat_metadata['world'])
+  try {
+    const ctx = getStContext();
+    const chatWorld: string | undefined = ctx.chatMetadata?.world;
+    if (chatWorld) {
+      await loadWbOnce(chatWorld);
+    }
+  } catch (e) {
+    console.debug('[EW WI Engine] Cannot read chat-bound lorebook:', e);
   }
 
   return allEntries;
@@ -500,7 +639,7 @@ function classifyPosition(entry: NormalizedEntry): 'before' | 'after' {
 /**
  * Resolve all active worldbook entries for the current context.
  *
- * 1. Collects entries from all relevant worldbooks
+ * 1. Collects entries from all relevant worldbooks (char, global, persona, chat-bound)
  * 2. Runs ST-compatible activation logic (keywords, constants, decorators, groups)
  * 3. Executes EJS rendering on activated entries
  * 4. Returns structured before/after lists with entry names
