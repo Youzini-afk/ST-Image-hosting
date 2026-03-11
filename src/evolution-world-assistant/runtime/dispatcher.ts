@@ -35,10 +35,10 @@ export class DispatchFlowsError extends Error {
 
 const LLM_WORKFLOW_SYSTEM_PROMPT = [
   '你是 Evolution World 的工作流执行器。',
-  '你会收到一个 FlowRequestV1 JSON，请返回一个严格符合 ew-flow/v1 的 FlowResponseV1 JSON。',
+  '你会收到一个 FlowRequestV1 JSON，请返回一个 JSON 对象。',
   '必须只输出 JSON 对象，不允许 markdown、不允许代码块、不允许额外解释。',
-  'status 必须为 ok，operations.worldbook 字段必须存在（允许为空数组）。',
-  'flow_id 必须与请求.flow.id 一致，priority 必须与请求.flow.priority 一致。',
+  'operations.worldbook 字段必须存在（允许为空数组）。',
+  'version/flow_id/status/priority 等固定字段可省略，插件会自动补全。',
 ].join('\n');
 
 function getHostRuntime(): Record<string, any> {
@@ -312,6 +312,24 @@ function parseJsonFromText(rawText: string, flowId: string): Record<string, any>
   }
 }
 
+/**
+ * 自动补全 AI 回复中的固定字段。
+ * AI 可以省略 version / flow_id / status / priority / diagnostics，
+ * 脚本在 Schema 校验前注入默认值。若 AI 已输出则不覆盖（向后兼容）。
+ */
+function normalizeAiResponse(
+  raw: Record<string, any>,
+  flowId: string,
+  flowPriority: number,
+): Record<string, any> {
+  if (!raw.version) raw.version = 'ew-flow/v1';
+  if (!raw.flow_id) raw.flow_id = flowId;
+  if (!raw.status) raw.status = 'ok';
+  if (raw.priority === undefined) raw.priority = flowPriority;
+  if (!raw.diagnostics) raw.diagnostics = {};
+  return raw;
+}
+
 function resolveApiPreset(settings: EwSettings, flow: EwFlowConfig): EwApiPreset {
   const matchedPreset = settings.api_presets.find(preset => preset.id === flow.api_preset_id);
   if (matchedPreset) {
@@ -379,6 +397,7 @@ async function executeFlowViaLlmConnector(
   throwIfDispatchAborted(abortSignal, isCancelled);
 
   const parsedJson = parseJsonFromText(rawText, flow.id);
+  normalizeAiResponse(parsedJson, flow.id, flow.priority);
   const parsed = FlowResponseSchema.safeParse(parsedJson);
   if (!parsed.success) {
     throw new Error(
@@ -437,6 +456,7 @@ async function executeFlowViaGenerateRawCustomApi(
     throwIfDispatchAborted(abortSignal, isCancelled);
 
     const parsedJson = parseJsonFromText(rawText, flow.id);
+    normalizeAiResponse(parsedJson, flow.id, flow.priority);
     const parsed = FlowResponseSchema.safeParse(parsedJson);
     if (!parsed.success) {
       throw new Error(
@@ -534,6 +554,7 @@ async function executeFlowViaStBackend(
     }
 
     const parsedJson = parseJsonFromText(rawText, flow.id);
+    normalizeAiResponse(parsedJson, flow.id, flow.priority);
     const parsed = FlowResponseSchema.safeParse(parsedJson);
     if (!parsed.success) {
       throw new Error(
