@@ -1,21 +1,75 @@
-﻿import type { EwFlowConfig, EwPromptOrderEntry } from './types';
-import { renderEjsContent } from './ejs-bridge';
+﻿import { renderEjsContent } from './ejs-bridge';
 import { collectLatestSnapshotFast } from './floor-binding';
 import { applyTavernRegex } from './regex-engine';
+import type { EwFlowConfig, EwPromptOrderEntry } from './types';
 
 // SillyTavern 运行时全局变量，在扩展上下文中可用
-declare function getCharacterCardFields(): {
-  description: string;
-  personality: string;
-  persona: string;
-  scenario: string;
-  mesExamples: string;
-  system: string;
-  jailbreak: string;
-} | undefined;
+declare function getCharacterCardFields():
+  | {
+      description: string;
+      personality: string;
+      persona: string;
+      scenario: string;
+      mesExamples: string;
+      system: string;
+      jailbreak: string;
+    }
+  | undefined;
 declare function getLastMessageId(): number;
 declare function getChatMessages(range: string, opts?: Record<string, any>): any[];
 declare const SillyTavern: { getContext(): Record<string, any> } | undefined;
+
+function getHostRuntime(): Record<string, any> {
+  try {
+    if (window.parent && window.parent !== window) {
+      return window.parent as unknown as Record<string, any>;
+    }
+  } catch {
+    // ignore cross-frame access failures and fall back to current window
+  }
+
+  return globalThis as Record<string, any>;
+}
+
+function getRuntimeContext(): Record<string, any> | undefined {
+  const hostRuntime = getHostRuntime();
+
+  if (typeof hostRuntime.SillyTavern?.getContext === 'function') {
+    return hostRuntime.SillyTavern.getContext();
+  }
+  if (typeof SillyTavern?.getContext === 'function') {
+    return SillyTavern.getContext();
+  }
+
+  return undefined;
+}
+
+function getRuntimeCharacterCardFields(): ReturnType<typeof getCharacterCardFields> {
+  const hostRuntime = getHostRuntime();
+  if (typeof hostRuntime.getCharacterCardFields === 'function') {
+    return hostRuntime.getCharacterCardFields();
+  }
+
+  return getCharacterCardFields?.();
+}
+
+function getRuntimeLastMessageId(): number {
+  const hostRuntime = getHostRuntime();
+  if (typeof hostRuntime.getLastMessageId === 'function') {
+    return Number(hostRuntime.getLastMessageId());
+  }
+
+  return getLastMessageId();
+}
+
+function getRuntimeChatMessages(range: string, opts?: Record<string, any>): any[] {
+  const hostRuntime = getHostRuntime();
+  if (typeof hostRuntime.getChatMessages === 'function') {
+    return hostRuntime.getChatMessages(range, opts);
+  }
+
+  return getChatMessages(range, opts);
+}
 
 /**
  * Raw prompt components collected from SillyTavern's runtime environment.
@@ -62,7 +116,7 @@ export function collectPromptComponents(flow: EwFlowConfig): PromptComponents {
 
   // ── 1. Character card fields ──────────────────────────────────────────
   try {
-    const fields = getCharacterCardFields?.();
+    const fields = getRuntimeCharacterCardFields();
     if (fields) {
       components.charDescription = fields.description ?? '';
       components.charPersonality = fields.personality ?? '';
@@ -80,7 +134,7 @@ export function collectPromptComponents(flow: EwFlowConfig): PromptComponents {
   // ST computes worldInfoBefore/After via getWorldInfoPrompt() and may expose
   // them on the context object. These are the non-depth WI entries.
   try {
-    const ctx = typeof SillyTavern !== 'undefined' ? SillyTavern?.getContext() : undefined;
+    const ctx = getRuntimeContext();
     if (ctx) {
       // Try to read pre-computed WI strings from context
       if (typeof ctx.worldInfoBefore === 'string' && ctx.worldInfoBefore.trim()) {
@@ -101,11 +155,14 @@ export function collectPromptComponents(flow: EwFlowConfig): PromptComponents {
   //             BEFORE_PROMPT(2) = before all prompts, NONE(-1) = skip
   //   role:     SYSTEM(0), USER(1), ASSISTANT(2)
   try {
-    const ctx2 = typeof SillyTavern !== 'undefined' ? SillyTavern?.getContext() : undefined;
-    const extPrompts = ctx2?.extensionPrompts ?? (globalThis as any).extension_prompts;
+    const ctx2 = getRuntimeContext();
+    const extPrompts =
+      ctx2?.extensionPrompts ?? getHostRuntime().extension_prompts ?? (globalThis as any).extension_prompts;
     if (extPrompts && typeof extPrompts === 'object') {
       const roleMap: Record<number, 'system' | 'user' | 'assistant'> = {
-        0: 'system', 1: 'user', 2: 'assistant',
+        0: 'system',
+        1: 'user',
+        2: 'assistant',
       };
       const inPromptEntries: string[] = [];
 
@@ -136,8 +193,7 @@ export function collectPromptComponents(flow: EwFlowConfig): PromptComponents {
       // IN_PROMPT entries: append to worldInfoBefore as fallback
       // (only if we didn't already get WI from context)
       if (inPromptEntries.length) {
-        components.worldInfoBefore = [components.worldInfoBefore, ...inPromptEntries]
-          .filter(s => s).join('\n');
+        components.worldInfoBefore = [components.worldInfoBefore, ...inPromptEntries].filter(s => s).join('\n');
       }
     }
   } catch (e) {
@@ -146,9 +202,9 @@ export function collectPromptComponents(flow: EwFlowConfig): PromptComponents {
 
   // ── 3. Chat messages ──────────────────────────────────────────────────
   try {
-    const lastId = getLastMessageId();
+    const lastId = getRuntimeLastMessageId();
     if (lastId >= 0) {
-      const msgs = getChatMessages(`0-${lastId}`, { hide_state: 'unhidden' });
+      const msgs = getRuntimeChatMessages(`0-${lastId}`, { hide_state: 'unhidden' });
       components.chatMessages = msgs
         .slice(-flow.context_turns)
         .map((msg: any) => ({
@@ -230,8 +286,7 @@ export async function assembleOrderedPrompts(
       }
     } else {
       // User-editable prompt — use entry.content, fallback to marker for 'main'
-      const raw = entry.content.trim()
-        || (entry.identifier === 'main' ? components.main : '');
+      const raw = entry.content.trim() || (entry.identifier === 'main' ? components.main : '');
       if (raw.trim()) {
         const content = await renderEjsContent(raw);
         result.push({ role: entry.role, content });
@@ -258,10 +313,7 @@ export async function assembleOrderedPrompts(
     // 从后往前插入：每次插入不影响之前已计算的位置
     for (let i = deferredInjections.length - 1; i >= 0; i--) {
       const { role, content, depth } = deferredInjections[i];
-      const insertIdx = Math.max(
-        chatHistoryStartIdx,
-        chatHistoryEndIdx - Math.min(depth, chatLen),
-      );
+      const insertIdx = Math.max(chatHistoryStartIdx, chatHistoryEndIdx - Math.min(depth, chatLen));
       result.splice(insertIdx, 0, { role, content });
     }
   } else if (deferredInjections.length > 0) {
@@ -284,17 +336,28 @@ export async function assembleOrderedPrompts(
  */
 function resolveMarkerContent(identifier: string, components: PromptComponents): string {
   switch (identifier) {
-    case 'main':               return components.main;
-    case 'enhanceDefinitions': return components.main; // CR-1: ST treats this as an extension of main
-    case 'charDescription':    return components.charDescription;
-    case 'charPersonality':    return components.charPersonality;
-    case 'scenario':           return components.scenario;
-    case 'personaDescription': return components.personaDescription;
-    case 'worldInfoBefore':    return components.worldInfoBefore;
-    case 'worldInfoAfter':     return components.worldInfoAfter;
-    case 'dialogueExamples':   return components.dialogueExamples;
-    case 'postHistoryInstructions': return components.jailbreak;
-    default:                   return '';
+    case 'main':
+      return components.main;
+    case 'enhanceDefinitions':
+      return components.main; // CR-1: ST treats this as an extension of main
+    case 'charDescription':
+      return components.charDescription;
+    case 'charPersonality':
+      return components.charPersonality;
+    case 'scenario':
+      return components.scenario;
+    case 'personaDescription':
+      return components.personaDescription;
+    case 'worldInfoBefore':
+      return components.worldInfoBefore;
+    case 'worldInfoAfter':
+      return components.worldInfoAfter;
+    case 'dialogueExamples':
+      return components.dialogueExamples;
+    case 'postHistoryInstructions':
+      return components.jailbreak;
+    default:
+      return '';
   }
 }
 
@@ -311,10 +374,7 @@ function resolveMarkerContent(identifier: string, components: PromptComponents):
  * @param messages  The assembled prompt messages (mutated in place)
  * @param controllerEntryName  The name of the Controller entry (from settings)
  */
-export async function injectEntryNames(
-  messages: AssembledMessage[],
-  controllerEntryName: string,
-): Promise<void> {
+export async function injectEntryNames(messages: AssembledMessage[], controllerEntryName: string): Promise<void> {
   const { controller, dyn } = await collectLatestSnapshotFast();
 
   // Build a list of { name, content } to match, sorted by content length descending
@@ -340,10 +400,7 @@ export async function injectEntryNames(
   for (const msg of messages) {
     for (const target of matchTargets) {
       if (msg.content.includes(target.content)) {
-        msg.content = msg.content.replace(
-          target.content,
-          `[${target.name}]\n${target.content}`,
-        );
+        msg.content = msg.content.replace(target.content, `[${target.name}]\n${target.content}`);
       }
     }
   }
@@ -358,10 +415,7 @@ export async function injectEntryNames(
  * assemble ordered prompts → inject entry names) but does NOT send
  * anything to the AI. Returns the messages array for UI display.
  */
-export async function previewPrompt(
-  flow: EwFlowConfig,
-  controllerEntryName: string,
-): Promise<AssembledMessage[]> {
+export async function previewPrompt(flow: EwFlowConfig, controllerEntryName: string): Promise<AssembledMessage[]> {
   const components = collectPromptComponents(flow);
   const messages = await assembleOrderedPrompts(flow.prompt_order, components);
   await injectEntryNames(messages, controllerEntryName);
