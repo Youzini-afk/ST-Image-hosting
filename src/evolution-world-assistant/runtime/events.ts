@@ -310,6 +310,19 @@ async function executeWorkflowWithPolicy(
   const workflowAbortController = new AbortController();
   let abortedByUser = false;
 
+  const buildAbortableReminder = (message: string, level: 'info' | 'warning' = 'info') => ({
+    title: 'Evolution World',
+    message,
+    level,
+    persist: true,
+    busy: true,
+    action: {
+      label: '终止处理',
+      kind: 'danger' as const,
+      onClick: cancelWorkflow,
+    },
+  });
+
   const cancelWorkflow = () => {
     if (abortedByUser) {
       return;
@@ -327,13 +340,7 @@ async function executeWorkflowWithPolicy(
   };
 
   const processingReminder = createProcessingReminder(cancelWorkflow);
-  processingReminder.update({
-    title: 'Evolution World',
-    message: options.reminderMessage,
-    level: 'info',
-    persist: true,
-    busy: true,
-  });
+  processingReminder.update(buildAbortableReminder(options.reminderMessage));
 
   const finalizeUserAbort = () => {
     processingReminder.update({
@@ -378,13 +385,7 @@ async function executeWorkflowWithPolicy(
     if (policy === 'retry_once') {
       console.warn('[EW] retry_once: first attempt failed — retrying.');
       const retryReason = formatReasonForDisplay(result.reason, 120);
-      processingReminder.update({
-        title: 'Evolution World',
-        message: `首次处理失败，正在重试… ${retryReason}`,
-        level: 'warning',
-        persist: true,
-        busy: true,
-      });
+      processingReminder.update(buildAbortableReminder(`首次处理失败，正在重试… ${retryReason}`, 'warning'));
       toastr.warning(`工作流首次失败，正在重试… (${retryReason})`, 'Evolution World');
       try {
         result = await runWorkflow({
