@@ -53,6 +53,34 @@ function getChatMetadataVariables(): Record<string, any> {
 }
 
 // ---------------------------------------------------------------------------
+// substituteParams – macro replacement (Fix #1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Replace common ST macros in text before rendering.
+ * Mirrors SillyTavern's `substituteParams()` for the most common macros.
+ */
+function substituteParams(text: string): string {
+  if (!text || !text.includes('{{')) return text;
+
+  const ctx = getStContext();
+  const userName = ctx.name1 ?? '';
+  const charName = ctx.name2 ?? '';
+  const personaDescription = ctx.persona ?? '';
+
+  return text
+    .replace(/\{\{user\}\}/gi, userName)
+    .replace(/\{\{char\}\}/gi, charName)
+    .replace(/\{\{persona\}\}/gi, personaDescription)
+    .replace(/\{\{original\}\}/gi, '')
+    .replace(/\{\{input\}\}/gi, '')
+    .replace(/\{\{lastMessage\}\}/gi, '')
+    .replace(/\{\{lastMessageId\}\}/gi, '')
+    .replace(/\{\{newline\}\}/gi, '\n')
+    .replace(/\{\{trim\}\}/gi, '');
+}
+
+// ---------------------------------------------------------------------------
 // Variable Access (simplified ST-compatible implementation)
 // ---------------------------------------------------------------------------
 
@@ -85,7 +113,50 @@ function setVariable(path: string, _value: unknown, _opts: Record<string, any> =
 }
 
 // ---------------------------------------------------------------------------
-// getwi implementation
+// Chat Message Access (Fix #4)
+// ---------------------------------------------------------------------------
+
+declare function getChatMessages(range: string, opts?: Record<string, any>): any[];
+declare function getLastMessageId(): number;
+
+function getStChat(): any[] {
+  try {
+    const ctx = getStContext();
+    return ctx.chat ?? [];
+  } catch {
+    return [];
+  }
+}
+
+function stGetChatMessage(id: number): any {
+  const chat = getStChat();
+  if (id >= 0 && id < chat.length) return chat[id];
+  return null;
+}
+
+function stGetChatMessages(range: string, _opts?: Record<string, any>): any[] {
+  try {
+    if (typeof getChatMessages === 'function') {
+      return getChatMessages(range, _opts);
+    }
+  } catch { /* fallback below */ }
+
+  // Simple fallback: parse range "start-end" and slice chat
+  const chat = getStChat();
+  const [startStr, endStr] = range.split('-');
+  const start = parseInt(startStr, 10) || 0;
+  const end = endStr !== undefined ? parseInt(endStr, 10) : chat.length - 1;
+  return chat.slice(start, end + 1);
+}
+
+function stMatchChatMessages(pattern: string | RegExp): any[] {
+  const chat = getStChat();
+  const regex = typeof pattern === 'string' ? new RegExp(pattern, 'i') : pattern;
+  return chat.filter((msg: any) => regex.test(msg.mes ?? ''));
+}
+
+// ---------------------------------------------------------------------------
+// getwi implementation (Fix #1: substituteParams on entry content)
 // ---------------------------------------------------------------------------
 
 async function getwi(
@@ -114,26 +185,31 @@ async function getwi(
   // Recursion guard
   if (ctx.renderStack.has(entryName)) {
     console.warn(`[EW EJS Internal] getwi: circular reference detected for '${entryName}'`);
-    return entry.content;
+    return substituteParams(entry.content);
   }
 
   if (ctx.renderStack.size >= ctx.maxRecursion) {
     console.warn(`[EW EJS Internal] getwi: max recursion depth (${ctx.maxRecursion}) reached`);
-    return entry.content;
+    return substituteParams(entry.content);
   }
 
+  // Fix #1: Apply substituteParams before rendering
+  const processed = substituteParams(entry.content);
+
   // If content contains EJS, render it recursively
-  if (entry.content.includes('<%')) {
+  if (processed.includes('<%')) {
     ctx.renderStack.add(entryName);
     try {
-      const rendered = await evalEjsTemplate(entry.content, ctx);
+      const rendered = await evalEjsTemplate(processed, ctx, {
+        world_info: { comment: entryName, world: entry.worldbook },
+      });
       return rendered;
     } finally {
       ctx.renderStack.delete(entryName);
     }
   }
 
-  return entry.content;
+  return processed;
 }
 
 // ---------------------------------------------------------------------------
@@ -143,16 +219,18 @@ async function getwi(
 /**
  * Evaluate an EJS template with the workflow-specific context.
  *
- * Provides a subset of ST-Prompt-Template's context functions sufficient
- * for rendering worldbook entries including Controller EJS.
+ * Provides a comprehensive subset of ST-Prompt-Template's context functions
+ * sufficient for rendering worldbook entries including Controller EJS.
  */
 export async function evalEjsTemplate(
   content: string,
   renderCtx: EjsRenderContext,
+  extraEnv: Record<string, any> = {},
 ): Promise<string> {
   if (!content.includes('<%')) return content;
 
   const stCtx = getStContext();
+  const chat = getStChat();
 
   // Build the evaluation context
   const context: Record<string, any> = {
@@ -162,27 +240,96 @@ export async function evalEjsTemplate(
     // Console
     console,
 
-    // Character info
+    // ── Character info ──
     userName: stCtx.name1 ?? '',
     charName: stCtx.name2 ?? '',
     assistantName: stCtx.name2 ?? '',
     characterId: stCtx.characterId,
 
     get chatId() {
-      return stCtx.chatId ?? '';
+      return stCtx.chatId ?? (typeof getCurrentChatId === 'function' ? getCurrentChatId() : '');
     },
 
     get variables() {
       return getChatMetadataVariables();
     },
 
-    // World info functions
+    // ── Fix #2: Message variables ──
+    get lastUserMessageId() {
+      return chat.findLastIndex((msg: any) => msg.is_user);
+    },
+
+    get lastUserMessage() {
+      return chat.findLast((msg: any) => msg.is_user)?.mes ?? '';
+    },
+
+    get lastCharMessageId() {
+      return chat.findLastIndex((msg: any) => !msg.is_user && !msg.is_system);
+    },
+
+    get lastCharMessage() {
+      return chat.findLast((msg: any) => !msg.is_user && !msg.is_system)?.mes ?? '';
+    },
+
+    get lastMessageId() {
+      return chat.length - 1;
+    },
+
+    // ── Fix #3: Lorebook variables ──
+    get charLoreBook() {
+      try {
+        const chars = stCtx.characters;
+        const chid = stCtx.characterId;
+        return chars?.[chid]?.data?.extensions?.world ?? '';
+      } catch { return ''; }
+    },
+
+    get userLoreBook() {
+      try {
+        return stCtx.extensionSettings?.persona_description_lorebook ?? '';
+      } catch { return ''; }
+    },
+
+    get chatLoreBook() {
+      try {
+        return stCtx.chatMetadata?.world ?? '';
+      } catch { return ''; }
+    },
+
+    // Avatar URLs
+    get charAvatar() {
+      try {
+        const chars = stCtx.characters;
+        const chid = stCtx.characterId;
+        return chars?.[chid]?.avatar ? `/characters/${chars[chid].avatar}` : '';
+      } catch { return ''; }
+    },
+
+    userAvatar: '',
+
+    // Groups
+    groups: stCtx.groups ?? [],
+    groupId: stCtx.selectedGroupId ?? null,
+
+    // Model
+    get model() {
+      try {
+        return stCtx.onlineStatus ?? '';
+      } catch { return ''; }
+    },
+
+    // SillyTavern context proxy
+    get SillyTavern() {
+      return getStContext();
+    },
+
+    // ── World info functions ──
     getwi: (worldbookOrEntry: string | null, entryNameOrData?: string | Record<string, unknown>) =>
       getwi(renderCtx, worldbookOrEntry, entryNameOrData),
     getWorldInfo: (worldbookOrEntry: string | null, entryNameOrData?: string | Record<string, unknown>) =>
       getwi(renderCtx, worldbookOrEntry, entryNameOrData),
 
-    // Variable functions (read-only for workflow assembly)
+    // ── Variable functions (read-only for workflow assembly) ──
     getvar: (path: string, opts?: Record<string, any>) => getVariable(path, opts),
     getLocalVar: (path: string, opts: Record<string, any> = {}) => getVariable(path, { ...opts, scope: 'local' }),
     getGlobalVar: (path: string, opts: Record<string, any> = {}) => getVariable(path, { ...opts, scope: 'global' }),
@@ -205,12 +352,89 @@ export async function evalEjsTemplate(
     decMessageVar: () => undefined,
     patchVariables: () => undefined,
 
+    // ── Fix #4: Chat message functions ──
+    getChatMessage: (id: number) => stGetChatMessage(id),
+    getChatMessages: (range: string, opts?: Record<string, any>) => stGetChatMessages(range, opts),
+    matchChatMessages: (pattern: string | RegExp) => stMatchChatMessages(pattern),
+
+    // ── Fix #5: High-level functions (safe stubs for workflow context) ──
+
+    // getchr / getchar / getChara — return character data
+    getchr: (_name?: string | RegExp) => {
+      try {
+        const chars = stCtx.characters;
+        const chid = stCtx.characterId;
+        const char = chars?.[chid];
+        if (!char) return '';
+        return char.data?.description ?? '';
+      } catch { return ''; }
+    },
+    getchar: undefined as any, // aliased below
+    getChara: undefined as any,
+
+    // getprp / getpreset / getPresetPrompt — stub (workflow doesn't use preset prompts)
+    getprp: async () => '',
+    getpreset: async () => '',
+    getPresetPrompt: async () => '',
+
+    // execute (slash command) — no-op in workflow context
+    execute: async (_cmd: string) => '',
+
+    // define — no-op (SharedDefines not needed in workflow)
+    define: (_name: string, _value: unknown) => undefined,
+
+    // evalTemplate — recursive EJS within workflow context
+    evalTemplate: async (content: string, data: Record<string, any> = {}) => {
+      return await evalEjsTemplate(content, renderCtx, data);
+    },
+
+    // getqr / getQuickReply — stub
+    getqr: async () => '',
+    getQuickReply: async () => '',
+
+    // findVariables — stub
+    findVariables: () => ({}),
+
+    // World info data access
+    getWorldInfoData: async () => {
+      const entries: any[] = [];
+      for (const [name, entry] of renderCtx.allEntries) {
+        entries.push({ comment: name, content: entry.content, world: entry.worldbook });
+      }
+      return entries;
+    },
+    getWorldInfoActivatedData: async () => [],
+    getEnabledWorldInfoEntries: async () => [],
+    selectActivatedEntries: () => [],
+    activateWorldInfoByKeywords: async () => [],
+    getEnabledLoreBooks: () => [],
+
     // World info activation (no-op in this context)
     activewi: async () => null,
+    activateWorldInfo: async () => null,
+
+    // Regex
+    activateRegex: () => undefined,
+
+    // Prompt injection
+    injectPrompt: () => undefined,
+    getPromptsInjected: () => [],
+    hasPromptsInjected: () => false,
+
+    // JSON utils
+    jsonPatch: () => undefined,
+    parseJSON: (str: string) => { try { return JSON.parse(str); } catch { return null; } },
 
     // Print function for EJS
     print: (...args: any[]) => args.filter(x => x !== undefined && x !== null).join(''),
+
+    // Merge any extra environment (e.g., world_info metadata from getwi)
+    ...extraEnv,
   };
+
+  // Alias getchr variants
+  context.getchar = context.getchr;
+  context.getChara = context.getchr;
 
   try {
     const compiled = ejs.compile(content, {
@@ -220,7 +444,14 @@ export async function evalEjsTemplate(
       localsName: 'locals',
       client: true,
     });
-    const result = await compiled.call(context, context, (s: string) => s, () => ({ filename: '', template: '' }), rethrow);
+    // Fix #6: rethrow signature matches EJS lib (5 params: err, str, flnm, lineno, esc)
+    const result = await compiled.call(
+      context,
+      context,
+      (s: string) => s,                                    // escapeFn (identity, no HTML escaping)
+      () => ({ filename: '', template: '' }),               // includer (stub)
+      rethrow,
+    );
     return result ?? '';
   } catch (e) {
     console.warn('[EW EJS Internal] Template render failed:', e);
@@ -229,17 +460,22 @@ export async function evalEjsTemplate(
   }
 }
 
-function rethrow(err: Error, str: string, _flnm: string, lineno: number) {
+// Fix #6: rethrow signature matches EJS internal (5 params)
+function rethrow(err: Error, str: string, flnm: string, lineno: number, _esc?: (s: string) => string) {
   const lines = str.split('\n');
   const start = Math.max(lineno - 3, 0);
   const end = Math.min(lines.length, lineno + 3);
+  const filename = typeof _esc === 'function' ? _esc(flnm) : (flnm || 'ejs');
   const context = lines.slice(start, end).map((line, i) => {
     const curr = i + start + 1;
     return (curr === lineno ? ' >> ' : '    ') + curr + '| ' + line;
   }).join('\n');
-  err.message = 'ejs:' + lineno + '\n' + context + '\n\n' + err.message;
+  err.message = filename + ':' + lineno + '\n' + context + '\n\n' + err.message;
   throw err;
 }
+
+// Declare getCurrentChatId for optional use
+declare function getCurrentChatId(): string;
 
 /**
  * Create a render context from a flat list of worldbook entries.
