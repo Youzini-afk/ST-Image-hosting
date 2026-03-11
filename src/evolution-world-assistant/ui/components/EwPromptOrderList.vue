@@ -10,13 +10,21 @@
           'ew-prompt-order__item--marker': entry.type === 'marker',
           'ew-prompt-order__item--editing': editingId === entry.identifier,
         }"
-        :draggable="true"
+        :draggable="dragArmedId === entry.identifier"
+        :data-allow-native-drag="dragArmedId === entry.identifier ? 'true' : null"
         @dragstart="onDragStart(idx, $event)"
         @dragover.prevent="onDragOver(idx)"
         @dragend="onDragEnd"
       >
         <div class="ew-prompt-order__row">
-          <span class="ew-prompt-order__handle" title="拖拽排序">☰</span>
+          <span
+            class="ew-prompt-order__handle"
+            title="拖拽排序"
+            @pointerdown.stop="armDrag(entry.identifier)"
+            @pointerup.stop="releaseDragArm"
+            @pointercancel.stop="releaseDragArm"
+            >☰</span
+          >
           <span class="ew-prompt-order__icon" :title="entry.type === 'marker' ? '系统标记' : '可编辑提示词'">
             {{ entry.type === 'marker' ? '📌' : '📄' }}
           </span>
@@ -189,6 +197,7 @@ const emit = defineEmits<{
 }>();
 
 const editingId = ref<string | null>(null);
+const dragArmedId = ref<string | null>(null);
 let dragFromIdx = -1;
 const dragPreview = ref<EwPromptOrderEntry[] | null>(null);
 const entryDrafts = ref<Record<string, Partial<Pick<EwPromptOrderEntry, 'name' | 'content'>>>>({});
@@ -271,6 +280,15 @@ onBeforeUnmount(() => {
 
 function toggleEdit(identifier: string) {
   editingId.value = editingId.value === identifier ? null : identifier;
+  dragArmedId.value = null;
+}
+
+function armDrag(identifier: string) {
+  dragArmedId.value = identifier;
+}
+
+function releaseDragArm() {
+  dragArmedId.value = null;
 }
 
 function canDelete(entry: EwPromptOrderEntry): boolean {
@@ -337,6 +355,11 @@ function addCustomEntry() {
 
 // ── 拖拽排序（PERF-1: 仅在 dragend 时发射 emit） ──────────────
 function onDragStart(idx: number, e: DragEvent) {
+  if (dragArmedId.value !== displayOrder.value[idx]?.identifier) {
+    e.preventDefault();
+    return;
+  }
+
   dragFromIdx = idx;
   dragPreview.value = clone();
   if (e.dataTransfer) {
@@ -362,6 +385,7 @@ function onDragEnd() {
     });
   }
   dragFromIdx = -1;
+  dragArmedId.value = null;
 }
 </script>
 

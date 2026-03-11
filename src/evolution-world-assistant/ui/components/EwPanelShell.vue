@@ -58,8 +58,8 @@ function onPanelDragStart(event: DragEvent) {
     return;
   }
 
-  // 允许显式声明 draggable 的组件继续工作，例如提示词排序列表。
-  if (target.closest('[draggable="true"]')) {
+  // 仅允许显式授权的拖拽源继续工作，例如提示词排序的拖拽手柄。
+  if (target.closest('[data-allow-native-drag="true"]')) {
     return;
   }
 
