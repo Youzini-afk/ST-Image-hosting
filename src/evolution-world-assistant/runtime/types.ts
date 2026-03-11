@@ -1,4 +1,4 @@
-﻿import { TextSliceRuleSchema } from './contracts';
+import { TextSliceRuleSchema } from './contracts';
 
 export const EwApiPresetSchema = z.object({
   id: z.string().min(1),
@@ -256,6 +256,7 @@ export const EwFlowConfigSchema = z.object({
     )
     .default([]),
   request_template: z.string().default(''),
+  system_prompt: z.string().default(''),
   headers_json: z.string().default(''),
 });
 

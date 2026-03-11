@@ -33,7 +33,7 @@ export class DispatchFlowsError extends Error {
   }
 }
 
-const LLM_WORKFLOW_SYSTEM_PROMPT = [
+export const DEFAULT_WORKFLOW_SYSTEM_PROMPT = [
   '你是 Evolution World 的工作流执行器。',
   '你会收到一个 FlowRequestV1 JSON，请返回一个 JSON 对象。',
   '必须只输出 JSON 对象，不允许 markdown、不允许代码块、不允许额外解释。',
@@ -223,7 +223,10 @@ async function buildOrderedPromptsForFlow(
 ): Promise<Array<{ role: 'system' | 'assistant' | 'user'; content: string }>> {
   const orderedPrompts = await assembleOrderedPrompts(flow.prompt_order, components);
   await injectEntryNames(orderedPrompts, controllerEntryName);
-  orderedPrompts.push({ role: 'system', content: LLM_WORKFLOW_SYSTEM_PROMPT });
+  const systemPrompt = flow.system_prompt?.trim() || '';
+  if (systemPrompt) {
+    orderedPrompts.push({ role: 'system', content: systemPrompt });
+  }
   orderedPrompts.push({ role: 'user', content: JSON.stringify(body, null, 2) });
   return orderedPrompts;
 }

@@ -460,6 +460,25 @@
 
         <section class="ew-flow-card__section">
           <div class="ew-flow-card__section-head">
+            <h4>系统提示词</h4>
+            <div class="ew-flow-card__action-group">
+              <button
+                type="button"
+                class="ew-mini-btn ew-mini-btn--info"
+                @click="patch({ system_prompt: DEFAULT_WORKFLOW_SYSTEM_PROMPT })"
+              >恢复默认</button>
+            </div>
+          </div>
+          <textarea
+            :value="flow.system_prompt"
+            rows="5"
+            :placeholder="'留空则不追加系统提示词\n\n默认值：\n' + DEFAULT_WORKFLOW_SYSTEM_PROMPT"
+            @input="(e: Event) => patch({ system_prompt: (e.target as HTMLTextAreaElement).value })"
+          />
+        </section>
+
+        <section class="ew-flow-card__section">
+          <div class="ew-flow-card__section-head">
             <h4>提示词编排</h4>
           </div>
           <EwPromptOrderList
@@ -528,6 +547,7 @@
 <script setup lang="ts">
 import { simpleHash } from '../../runtime/helpers';
 import { collectAllRegexScripts, isBeautificationReplace } from '../../runtime/regex-engine';
+import { DEFAULT_WORKFLOW_SYSTEM_PROMPT } from '../../runtime/dispatcher';
 import type { EwApiPreset, EwFlowConfig, EwPromptOrderEntry } from '../../runtime/types';
 import { EwFlowConfigSchema } from '../../runtime/types';
 import { convertStPresetToFlow, isSillyTavernPreset } from '../convertStPreset';
