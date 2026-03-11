@@ -19,6 +19,9 @@ declare function getLastMessageId(): number;
 declare function getChatMessages(range: string, opts?: Record<string, any>): any[];
 declare function getCharData(name: 'current' | string): SillyTavern.v1CharData | null;
 declare const SillyTavern: { getContext(): Record<string, any> } | undefined;
+declare const characters: SillyTavern.v1CharData[] | undefined;
+declare const this_chid: number | string | undefined;
+declare const power_user: Record<string, any> | undefined;
 
 function getHostRuntime(): Record<string, any> {
   try {
@@ -48,8 +51,7 @@ function getRuntimeContext(): Record<string, any> | undefined {
 function getRuntimeCharacterCardFields(): ReturnType<typeof getCharacterCardFields> {
   const hostRuntime = getHostRuntime();
   if (typeof hostRuntime.getCharacterCardFields === 'function') {
-    const ctx = getRuntimeContext();
-    const chid = Number(ctx?.characterId);
+    const chid = getRuntimeCharacterId();
     if (Number.isFinite(chid) && chid >= 0) {
       return hostRuntime.getCharacterCardFields({ chid });
     }
@@ -60,19 +62,61 @@ function getRuntimeCharacterCardFields(): ReturnType<typeof getCharacterCardFiel
   return getCharacterCardFields?.();
 }
 
+function getRuntimeCharacterId(): number {
+  const hostRuntime = getHostRuntime();
+  const ctx = getRuntimeContext();
+
+  const candidates = [
+    ctx?.characterId,
+    hostRuntime.SillyTavern?.characterId,
+    hostRuntime.this_chid,
+    (globalThis as any).this_chid,
+    this_chid,
+  ];
+
+  for (const value of candidates) {
+    const numberValue = Number(value);
+    if (Number.isFinite(numberValue) && numberValue >= 0) {
+      return numberValue;
+    }
+  }
+
+  return -1;
+}
+
+function getRuntimeCharacters(): SillyTavern.v1CharData[] {
+  const hostRuntime = getHostRuntime();
+  const ctx = getRuntimeContext();
+  const candidates = [
+    hostRuntime.SillyTavern?.characters,
+    (SillyTavern as any)?.characters,
+    ctx?.characters,
+    hostRuntime.characters,
+    (globalThis as any).characters,
+    characters,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate) && candidate.length > 0) {
+      return candidate as SillyTavern.v1CharData[];
+    }
+  }
+
+  return [];
+}
+
 function getRuntimeCharData(): SillyTavern.v1CharData | null {
   const hostRuntime = getHostRuntime();
   const ctx = getRuntimeContext();
-  const characterId = Number(ctx?.characterId);
-
-  const runtimeCharacters = Array.isArray(hostRuntime.SillyTavern?.characters)
-    ? hostRuntime.SillyTavern.characters
-    : Array.isArray((SillyTavern as any)?.characters)
-      ? (SillyTavern as any).characters
-      : [];
+  const characterId = getRuntimeCharacterId();
+  const runtimeCharacters = getRuntimeCharacters();
 
   if (Number.isFinite(characterId) && characterId >= 0 && runtimeCharacters[characterId]) {
     return runtimeCharacters[characterId] as SillyTavern.v1CharData;
+  }
+
+  if (Number.isFinite(Number(ctx?.characterId)) && Number(ctx?.characterId) >= 0 && Array.isArray(ctx?.characters)) {
+    return (ctx.characters[Number(ctx.characterId)] as SillyTavern.v1CharData) ?? null;
   }
 
   if (typeof hostRuntime.getCharData === 'function') {
@@ -116,8 +160,11 @@ function getRuntimePersonaDescription(): string {
 
   return getPreferredText(
     ctx?.powerUserSettings?.persona_description,
+    ctx?.persona_description,
     hostRuntime.power_user?.persona_description,
     hostRuntime.SillyTavern?.powerUserSettings?.persona_description,
+    (globalThis as any).power_user?.persona_description,
+    power_user?.persona_description,
     getRuntimeCharacterCardFields()?.persona,
   );
 }
