@@ -36,6 +36,15 @@ function toPreview(value: unknown, maxLen = 3000): string {
   }
 }
 
+function buildAttemptRequestPreview(attempt: DispatchFlowAttempt): string {
+  return toPreview(
+    attempt.request_debug ?? {
+      flow_request: attempt.request,
+    },
+    20000,
+  );
+}
+
 function saveIoSummary(requestId: string, chatId: string, mode: 'auto' | 'manual', attempts: DispatchFlowAttempt[]) {
   setLastIo({
     at: Date.now(),
@@ -51,7 +60,7 @@ function saveIoSummary(requestId: string, chatId: string, mode: 'auto' | 'manual
       ok: attempt.ok,
       elapsed_ms: attempt.elapsed_ms,
       error: attempt.error ?? '',
-      request_preview: toPreview(attempt.request),
+      request_preview: buildAttemptRequestPreview(attempt),
       response_preview: attempt.response ? toPreview(attempt.response) : '',
     })),
   });

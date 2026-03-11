@@ -349,9 +349,7 @@ function resolveApiPreset(settings: EwSettings, flow: EwFlowConfig): EwApiPreset
  */
 async function executeFlowViaLlmConnector(
   flow: EwFlowConfig,
-  body: Record<string, any>,
-  components: PromptComponents,
-  controllerEntryName: string,
+  orderedPrompts: Array<{ role: 'system' | 'assistant' | 'user'; content: string }>,
   generationId: string,
   abortSignal?: AbortSignal,
   isCancelled?: () => boolean,
@@ -361,8 +359,6 @@ async function executeFlowViaLlmConnector(
   if (!generateRawFn) {
     throw new Error(`[${flow.id}] generateRaw is unavailable`);
   }
-
-  const orderedPrompts = await buildOrderedPromptsForFlow(flow, components, controllerEntryName, body);
 
   const abortGeneration = () => stopSpecificGeneration(generationId);
   if (abortSignal) {
@@ -400,9 +396,7 @@ async function executeFlowViaLlmConnector(
 async function executeFlowViaGenerateRawCustomApi(
   flow: EwFlowConfig,
   apiPreset: EwApiPreset,
-  body: Record<string, any>,
-  components: PromptComponents,
-  controllerEntryName: string,
+  orderedPrompts: Array<{ role: 'system' | 'assistant' | 'user'; content: string }>,
   generationId: string,
   abortSignal?: AbortSignal,
   isCancelled?: () => boolean,
@@ -420,8 +414,6 @@ async function executeFlowViaGenerateRawCustomApi(
   if (!generateRawFn) {
     throw new Error(`[${flow.id}] generateRaw is unavailable`);
   }
-
-  const orderedPrompts = await buildOrderedPromptsForFlow(flow, components, controllerEntryName, body);
   const customApi = buildGenerateRawCustomApi(apiPreset, flow);
 
   const abortGeneration = () => stopSpecificGeneration(generationId);
@@ -468,9 +460,7 @@ async function executeFlowViaGenerateRawCustomApi(
 async function executeFlowViaStBackend(
   flow: EwFlowConfig,
   apiPreset: EwApiPreset,
-  body: Record<string, any>,
-  components: PromptComponents,
-  controllerEntryName: string,
+  orderedPrompts: Array<{ role: 'system' | 'assistant' | 'user'; content: string }>,
   abortSignal?: AbortSignal,
   isCancelled?: () => boolean,
 ): Promise<NonNullable<DispatchFlowAttempt['response']>> {
@@ -481,9 +471,6 @@ async function executeFlowViaStBackend(
   if (!apiPreset.model.trim()) {
     throw new Error(`[${flow.id}] model is empty`);
   }
-
-  const orderedPrompts = await buildOrderedPromptsForFlow(flow, components, controllerEntryName, body);
-
   const genOpts = flow.generation_options;
   const customIncludeHeaders = buildCustomIncludeHeaders(apiPreset);
   const requestBody = {
@@ -606,29 +593,54 @@ async function executeFlow(
     throwIfDispatchAborted(abortSignal, isCancelled);
     const body = applyTemplate(request as unknown as Record<string, any>, flow.request_template);
     const promptComponents = await promptComponentsPromise;
+    const orderedPrompts = await buildOrderedPromptsForFlow(
+      flow,
+      promptComponents,
+      settings.controller_entry_name,
+      body,
+    );
+    const requestDebugBase = {
+      route: usesTavernMain
+        ? 'generateRaw(main_api)'
+        : shouldUseGenerateRawCustomApi(apiPreset)
+          ? 'generateRaw(custom_api)'
+          : '/api/backends/chat-completions/generate',
+      flow_request: request,
+      assembled_messages: orderedPrompts,
+    };
 
     let response: NonNullable<DispatchFlowAttempt['response']>;
+    let requestDebug = requestDebugBase as Record<string, any>;
 
     if (usesTavernMain) {
       // 主 API：通过 TavernHelper.generateRaw，使用酒馆当前配置
-      response = await executeFlowViaLlmConnector(
-        flow,
-        body,
-        promptComponents,
-        settings.controller_entry_name,
-        generationId,
-        abortSignal,
-        isCancelled,
-      );
+      requestDebug = {
+        ...requestDebugBase,
+        transport_request: {
+          generation_id: generationId,
+          should_stream: false,
+          should_silence: true,
+          ordered_prompts: orderedPrompts,
+        },
+      };
+      response = await executeFlowViaLlmConnector(flow, orderedPrompts, generationId, abortSignal, isCancelled);
     } else if (shouldUseGenerateRawCustomApi(apiPreset)) {
       // 自定义 API：优先走官方 generateRaw.custom_api；若需要自定义 headers 再回退到 ST backend
       try {
+        requestDebug = {
+          ...requestDebugBase,
+          transport_request: {
+            generation_id: generationId,
+            should_stream: false,
+            should_silence: true,
+            custom_api: buildGenerateRawCustomApi(apiPreset, flow),
+            ordered_prompts: orderedPrompts,
+          },
+        };
         response = await executeFlowViaGenerateRawCustomApi(
           flow,
           apiPreset,
-          body,
-          promptComponents,
-          settings.controller_entry_name,
+          orderedPrompts,
           generationId,
           abortSignal,
           isCancelled,
@@ -637,26 +649,60 @@ async function executeFlow(
         console.warn(
           `[EW] Flow "${flow.id}": generateRaw.custom_api failed, fallback to ST backend — ${toErrorMessage(error)}`,
         );
-        response = await executeFlowViaStBackend(
-          flow,
-          apiPreset,
-          body,
-          promptComponents,
-          settings.controller_entry_name,
-          abortSignal,
-          isCancelled,
-        );
+        const fallbackRequestBody = {
+          messages: orderedPrompts,
+          model: apiPreset.model.trim().replace(/^models\//, ''),
+          max_tokens: flow.generation_options.max_reply_tokens,
+          temperature: flow.generation_options.temperature,
+          top_p: flow.generation_options.top_p,
+          frequency_penalty: flow.generation_options.frequency_penalty,
+          presence_penalty: flow.generation_options.presence_penalty,
+          stream: false,
+          chat_completion_source: 'custom',
+          group_names: [],
+          include_reasoning: flow.behavior_options.request_thinking,
+          reasoning_effort: flow.behavior_options.reasoning_effort,
+          enable_web_search: false,
+          request_images: flow.behavior_options.send_inline_media,
+          reverse_proxy: apiPreset.api_url.trim(),
+          proxy_password: '',
+          custom_url: apiPreset.api_url.trim(),
+          custom_include_headers: buildCustomIncludeHeaders(apiPreset),
+          custom_prompt_post_processing: 'strict',
+        };
+        requestDebug = {
+          ...requestDebugBase,
+          route: '/api/backends/chat-completions/generate (fallback)',
+          transport_request: fallbackRequestBody,
+        };
+        response = await executeFlowViaStBackend(flow, apiPreset, orderedPrompts, abortSignal, isCancelled);
       }
     } else {
-      response = await executeFlowViaStBackend(
-        flow,
-        apiPreset,
-        body,
-        promptComponents,
-        settings.controller_entry_name,
-        abortSignal,
-        isCancelled,
-      );
+      requestDebug = {
+        ...requestDebugBase,
+        transport_request: {
+          messages: orderedPrompts,
+          model: apiPreset.model.trim().replace(/^models\//, ''),
+          max_tokens: flow.generation_options.max_reply_tokens,
+          temperature: flow.generation_options.temperature,
+          top_p: flow.generation_options.top_p,
+          frequency_penalty: flow.generation_options.frequency_penalty,
+          presence_penalty: flow.generation_options.presence_penalty,
+          stream: false,
+          chat_completion_source: 'custom',
+          group_names: [],
+          include_reasoning: flow.behavior_options.request_thinking,
+          reasoning_effort: flow.behavior_options.reasoning_effort,
+          enable_web_search: false,
+          request_images: flow.behavior_options.send_inline_media,
+          reverse_proxy: apiPreset.api_url.trim(),
+          proxy_password: '',
+          custom_url: apiPreset.api_url.trim(),
+          custom_include_headers: buildCustomIncludeHeaders(apiPreset),
+          custom_prompt_post_processing: 'strict',
+        },
+      };
+      response = await executeFlowViaStBackend(flow, apiPreset, orderedPrompts, abortSignal, isCancelled);
     }
 
     throwIfDispatchAborted(abortSignal, isCancelled);
@@ -668,6 +714,7 @@ async function executeFlow(
       api_preset_name: apiPreset.name,
       api_url: attemptApiUrl,
       request,
+      request_debug: requestDebug,
       response,
       ok: true,
       elapsed_ms: Date.now() - startedAt,
@@ -680,6 +727,9 @@ async function executeFlow(
       api_preset_name: apiPreset.name,
       api_url: attemptApiUrl,
       request,
+      request_debug: {
+        flow_request: request,
+      },
       ok: false,
       error: toErrorMessage(error),
       elapsed_ms: Date.now() - startedAt,

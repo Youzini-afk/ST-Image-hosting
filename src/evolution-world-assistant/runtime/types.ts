@@ -50,29 +50,140 @@ export const EwPromptOrderEntrySchema = z.object({
 export type EwPromptOrderEntry = z.infer<typeof EwPromptOrderEntrySchema>;
 
 export const DEFAULT_PROMPT_ORDER: EwPromptOrderEntry[] = [
-  { identifier: 'main',                    name: 'Main Prompt',               type: 'prompt', enabled: true,  role: 'system', content: '', injection_position: 'relative', injection_depth: 0 },
-  { identifier: 'worldInfoBefore',         name: 'World Info (before)',       type: 'marker', enabled: true,  role: 'system', content: '', injection_position: 'relative', injection_depth: 0 },
-  { identifier: 'personaDescription',      name: 'Persona Description',      type: 'marker', enabled: true,  role: 'system', content: '', injection_position: 'relative', injection_depth: 0 },
-  { identifier: 'charDescription',         name: 'Char Description',         type: 'marker', enabled: true,  role: 'system', content: '', injection_position: 'relative', injection_depth: 0 },
-  { identifier: 'charPersonality',         name: 'Char Personality',         type: 'marker', enabled: true,  role: 'system', content: '', injection_position: 'relative', injection_depth: 0 },
-  { identifier: 'scenario',                name: 'Scenario',                 type: 'marker', enabled: true,  role: 'system', content: '', injection_position: 'relative', injection_depth: 0 },
-  { identifier: 'enhanceDefinitions',      name: 'Enhance Definitions',      type: 'prompt', enabled: false, role: 'system', content: '', injection_position: 'relative', injection_depth: 0 },
-  { identifier: 'auxiliaryPrompt',         name: 'Auxiliary Prompt',         type: 'prompt', enabled: true,  role: 'system', content: '', injection_position: 'relative', injection_depth: 0 },
-  { identifier: 'worldInfoAfter',          name: 'World Info (after)',       type: 'marker', enabled: true,  role: 'system', content: '', injection_position: 'relative', injection_depth: 0 },
-  { identifier: 'dialogueExamples',        name: 'Chat Examples',            type: 'marker', enabled: true,  role: 'system', content: '', injection_position: 'relative', injection_depth: 0 },
-  { identifier: 'chatHistory',             name: 'Chat History',             type: 'marker', enabled: true,  role: 'system', content: '', injection_position: 'relative', injection_depth: 0 },
-  { identifier: 'postHistoryInstructions', name: 'Post-History Instructions', type: 'prompt', enabled: true,  role: 'system', content: '', injection_position: 'relative', injection_depth: 0 },
+  {
+    identifier: 'main',
+    name: 'Main Prompt',
+    type: 'prompt',
+    enabled: true,
+    role: 'system',
+    content: '',
+    injection_position: 'relative',
+    injection_depth: 0,
+  },
+  {
+    identifier: 'worldInfoBefore',
+    name: 'World Info (before)',
+    type: 'marker',
+    enabled: true,
+    role: 'system',
+    content: '',
+    injection_position: 'relative',
+    injection_depth: 0,
+  },
+  {
+    identifier: 'personaDescription',
+    name: 'Persona Description',
+    type: 'marker',
+    enabled: true,
+    role: 'system',
+    content: '',
+    injection_position: 'relative',
+    injection_depth: 0,
+  },
+  {
+    identifier: 'charDescription',
+    name: 'Char Description',
+    type: 'marker',
+    enabled: true,
+    role: 'system',
+    content: '',
+    injection_position: 'relative',
+    injection_depth: 0,
+  },
+  {
+    identifier: 'charPersonality',
+    name: 'Char Personality',
+    type: 'marker',
+    enabled: true,
+    role: 'system',
+    content: '',
+    injection_position: 'relative',
+    injection_depth: 0,
+  },
+  {
+    identifier: 'scenario',
+    name: 'Scenario',
+    type: 'marker',
+    enabled: true,
+    role: 'system',
+    content: '',
+    injection_position: 'relative',
+    injection_depth: 0,
+  },
+  {
+    identifier: 'enhanceDefinitions',
+    name: 'Enhance Definitions',
+    type: 'prompt',
+    enabled: false,
+    role: 'system',
+    content: '',
+    injection_position: 'relative',
+    injection_depth: 0,
+  },
+  {
+    identifier: 'auxiliaryPrompt',
+    name: 'Auxiliary Prompt',
+    type: 'prompt',
+    enabled: true,
+    role: 'system',
+    content: '',
+    injection_position: 'relative',
+    injection_depth: 0,
+  },
+  {
+    identifier: 'worldInfoAfter',
+    name: 'World Info (after)',
+    type: 'marker',
+    enabled: true,
+    role: 'system',
+    content: '',
+    injection_position: 'relative',
+    injection_depth: 0,
+  },
+  {
+    identifier: 'dialogueExamples',
+    name: 'Chat Examples',
+    type: 'marker',
+    enabled: true,
+    role: 'system',
+    content: '',
+    injection_position: 'relative',
+    injection_depth: 0,
+  },
+  {
+    identifier: 'chatHistory',
+    name: 'Chat History',
+    type: 'marker',
+    enabled: true,
+    role: 'system',
+    content: '',
+    injection_position: 'relative',
+    injection_depth: 0,
+  },
+  {
+    identifier: 'postHistoryInstructions',
+    name: 'Post-History Instructions',
+    type: 'prompt',
+    enabled: true,
+    role: 'system',
+    content: '',
+    injection_position: 'relative',
+    injection_depth: 0,
+  },
 ];
 
 export const BUILTIN_MARKERS = new Set([
-  'worldInfoBefore', 'personaDescription', 'charDescription',
-  'charPersonality', 'scenario', 'worldInfoAfter',
-  'dialogueExamples', 'chatHistory',
+  'worldInfoBefore',
+  'personaDescription',
+  'charDescription',
+  'charPersonality',
+  'scenario',
+  'worldInfoAfter',
+  'dialogueExamples',
+  'chatHistory',
 ]);
 
-export const BUILTIN_PROMPTS = new Set([
-  'main', 'enhanceDefinitions', 'auxiliaryPrompt', 'postHistoryInstructions',
-]);
+export const BUILTIN_PROMPTS = new Set(['main', 'enhanceDefinitions', 'auxiliaryPrompt', 'postHistoryInstructions']);
 
 export const EwFlowPromptTriggerTypeSchema = z.enum(['all', 'send', 'continue', 'regenerate', 'quiet', 'manual']);
 
@@ -133,13 +244,17 @@ export const EwFlowConfigSchema = z.object({
   extract_rules: z.array(TextSliceRuleSchema).default([]),
   exclude_rules: z.array(TextSliceRuleSchema).default([]),
   use_tavern_regex: z.boolean().default(false),
-  custom_regex_rules: z.array(z.object({
-    id: z.string().min(1),
-    name: z.string().default(''),
-    enabled: z.boolean().default(true),
-    find_regex: z.string().default(''),
-    replace_string: z.string().default(''),
-  })).default([]),
+  custom_regex_rules: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        name: z.string().default(''),
+        enabled: z.boolean().default(true),
+        find_regex: z.string().default(''),
+        replace_string: z.string().default(''),
+      }),
+    )
+    .default([]),
   request_template: z.string().default(''),
   headers_json: z.string().default(''),
 });
@@ -148,7 +263,9 @@ export const EwSettingsSchema = z.object({
   enabled: z.boolean().default(false),
   total_timeout_ms: z.coerce.number().int().positive().default(15000),
   dispatch_mode: z.enum(['parallel', 'serial']).default('parallel'),
-  failure_policy: z.enum(['stop_generation', 'continue_generation', 'retry_once', 'notify_only', 'allow_partial_success']).default('stop_generation'),
+  failure_policy: z
+    .enum(['stop_generation', 'continue_generation', 'retry_once', 'notify_only', 'allow_partial_success'])
+    .default('stop_generation'),
   controller_entry_name: z.string().default('EW/Controller'),
   dynamic_entry_prefix: z.string().default('EW/Dyn/'),
   gate_ttl_ms: z.coerce.number().int().positive().default(12000),
@@ -170,12 +287,14 @@ export const EwSettingsSchema = z.object({
   max_scan_worldbooks: z.coerce.number().int().min(1).default(20),
 
   // ── 隐藏设置（全局） ──
-  hide_settings: z.object({
-    enabled: z.boolean().default(false),
-    hide_last_n: z.coerce.number().int().min(0).default(0),
-    limiter_enabled: z.boolean().default(false),
-    limiter_count: z.coerce.number().int().min(1).default(20),
-  }).default({ enabled: false, hide_last_n: 0, limiter_enabled: false, limiter_count: 20 }),
+  hide_settings: z
+    .object({
+      enabled: z.boolean().default(false),
+      hide_last_n: z.coerce.number().int().min(0).default(0),
+      limiter_enabled: z.boolean().default(false),
+      limiter_count: z.coerce.number().int().min(1).default(20),
+    })
+    .default({ enabled: false, hide_last_n: 0, limiter_enabled: false, limiter_count: 20 }),
 });
 
 export const WorldbookOperationSchema = z.object({
@@ -246,6 +365,7 @@ export type DispatchFlowAttempt = {
   api_preset_name: string;
   api_url: string;
   request: import('./contracts').FlowRequestV1;
+  request_debug?: Record<string, any>;
   response?: import('./contracts').FlowResponseV1;
   ok: boolean;
   elapsed_ms: number;
