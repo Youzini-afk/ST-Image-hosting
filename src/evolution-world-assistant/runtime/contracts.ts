@@ -17,7 +17,7 @@ export const FlowRequestSchema = z.object({
     id: z.string().min(1),
     name: z.string().default(''),
     priority: z.number().default(100),
-    timeout_ms: z.number().int().positive().default(8000),
+    timeout_ms: z.number().int().positive().default(300000),
     generation_options: z
       .object({
         unlock_context_length: z.boolean().default(false),

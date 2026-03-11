@@ -231,7 +231,7 @@ export const EwFlowConfigSchema = z.object({
   name: z.string().default('Flow'),
   enabled: z.boolean().default(true),
   priority: z.coerce.number().int().default(100),
-  timeout_ms: z.coerce.number().int().positive().default(8000),
+  timeout_ms: z.coerce.number().int().positive().default(300000),
   api_preset_id: z.string().default(''),
   generation_options: EwFlowGenerationOptionsSchema.default(() => EwFlowGenerationOptionsSchema.parse({})),
   behavior_options: EwFlowBehaviorOptionsSchema.default(() => EwFlowBehaviorOptionsSchema.parse({})),
@@ -264,7 +264,7 @@ export const EwFlowConfigSchema = z.object({
 
 export const EwSettingsSchema = z.object({
   enabled: z.boolean().default(false),
-  total_timeout_ms: z.coerce.number().int().positive().default(15000),
+  total_timeout_ms: z.coerce.number().int().positive().default(300000),
   dispatch_mode: z.enum(['parallel', 'serial']).default('parallel'),
   failure_policy: z
     .enum(['stop_generation', 'continue_generation', 'retry_once', 'notify_only', 'allow_partial_success'])

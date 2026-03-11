@@ -25,7 +25,7 @@ export function createDefaultFlow(index: number, apiPresetId: string): EwFlowCon
     name: `工作流 ${index}`,
     enabled: true,
     priority: 100,
-    timeout_ms: 8000,
+    timeout_ms: 300000,
     api_preset_id: apiPresetId,
     generation_options: {
       unlock_context_length: false,

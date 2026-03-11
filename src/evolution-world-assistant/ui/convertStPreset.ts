@@ -192,7 +192,7 @@ export function convertStPresetToFlow(
     name: name || 'ST Preset',
     enabled: true,
     priority: 100,
-    timeout_ms: 8000,
+    timeout_ms: 300000,
     api_preset_id: '',
     generation_options: genOpts,
     behavior_options: {},
