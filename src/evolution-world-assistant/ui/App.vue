@@ -43,18 +43,29 @@
             <EwSectionCard title="高频设置">
               <div class="ew-grid two">
                 <EwFieldRow label="总开关" :help="help('enabled')">
-                  <button
-                    type="button"
-                    class="ew-switch"
-                    role="switch"
-                    :aria-checked="store.settings.enabled ? 'true' : 'false'"
-                    @click="store.settings.enabled = !store.settings.enabled"
-                  >
-                    <span class="ew-switch__track" :data-enabled="store.settings.enabled ? '1' : '0'">
-                      <span class="ew-switch__thumb" />
-                    </span>
-                    <span class="ew-switch__text">{{ store.settings.enabled ? '已开启' : '已关闭' }}</span>
-                  </button>
+                  <div class="ew-inline-actions">
+                    <button
+                      type="button"
+                      class="ew-switch"
+                      role="switch"
+                      :aria-checked="store.settings.enabled ? 'true' : 'false'"
+                      @click="store.settings.enabled = !store.settings.enabled"
+                    >
+                      <span class="ew-switch__track" :data-enabled="store.settings.enabled ? '1' : '0'">
+                        <span class="ew-switch__thumb" />
+                      </span>
+                      <span class="ew-switch__text">{{ store.settings.enabled ? '已开启' : '已关闭' }}</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="ew-btn ew-btn--sm"
+                      :disabled="!canRerollCurrentFloor"
+                      :title="rerollButtonTitle"
+                      @click="onRerollCurrentFloor"
+                    >
+                      重roll当前楼
+                    </button>
+                  </div>
                 </EwFieldRow>
 
                 <EwFieldRow label="调度模式" :help="help('dispatch_mode')">
@@ -88,6 +99,19 @@
                   <h4>API预设</h4>
                   <strong>{{ store.settings.api_presets.length }}</strong>
                   <small>接口配置</small>
+                </article>
+                <article class="ew-summary-card ew-summary-card--env">
+                  <h4>环境检查</h4>
+                  <strong>{{ environmentStatus.overallLabel }}</strong>
+                  <div class="ew-summary-badges">
+                    <span class="ew-status-pill" :data-tone="environmentStatus.promptTemplateTone">
+                      模板 {{ environmentStatus.promptTemplateLabel }}
+                    </span>
+                    <span class="ew-status-pill" :data-tone="environmentStatus.ewEjsTone">
+                      EW EJS {{ environmentStatus.ewEjsLabel }}
+                    </span>
+                  </div>
+                  <small>{{ environmentStatus.overallDetail }}</small>
                 </article>
               </div>
             </EwSectionCard>
@@ -386,6 +410,7 @@
 </template>
 
 <script setup lang="ts">
+import { checkEjsSyntax, renderEjsContent } from '../runtime/ejs-internal';
 import { migrateSnapshots } from '../runtime/floor-binding';
 import { applyFloorLimit, runFullHideCheck, unhideAll } from '../runtime/hide-engine';
 import { patchSettings } from '../runtime/settings';
@@ -406,6 +431,125 @@ const importFileInputRef = ref<HTMLInputElement | null>(null);
 const flowImportRef = ref<HTMLInputElement | null>(null);
 const migratingSnapshots = ref(false);
 
+type StatusTone = 'good' | 'warn' | 'bad' | 'muted';
+
+interface EnvironmentStatus {
+  overallLabel: string;
+  overallDetail: string;
+  promptTemplateLabel: string;
+  promptTemplateTone: StatusTone;
+  ewEjsLabel: string;
+  ewEjsTone: StatusTone;
+}
+
+const environmentStatus = ref<EnvironmentStatus>({
+  overallLabel: '检查中',
+  overallDetail: '正在读取宿主提示词模板和 EW 内置 EJS 状态。',
+  promptTemplateLabel: '检查中',
+  promptTemplateTone: 'muted',
+  ewEjsLabel: '检查中',
+  ewEjsTone: 'muted',
+});
+
+function getHostWindowForEnv(): Record<string, any> {
+  try {
+    if (window.parent && window.parent !== window) {
+      return window.parent as unknown as Record<string, any>;
+    }
+  } catch {
+    // Fall back to current window if parent access is blocked.
+  }
+
+  return window as unknown as Record<string, any>;
+}
+
+async function refreshEnvironmentStatus() {
+  environmentStatus.value = {
+    overallLabel: '检查中',
+    overallDetail: '正在读取宿主提示词模板和 EW 内置 EJS 状态。',
+    promptTemplateLabel: '检查中',
+    promptTemplateTone: 'muted',
+    ewEjsLabel: '检查中',
+    ewEjsTone: 'muted',
+  };
+
+  const host = getHostWindowForEnv();
+  const extensionSettings =
+    host.extension_settings ??
+    host.SillyTavern?.getContext?.()?.extensionSettings ??
+    host.SillyTavern?.extensionSettings;
+  const promptTemplateSettings = extensionSettings?.EjsTemplate;
+  const promptTemplateApi = host.EjsTemplate;
+
+  const hasPromptTemplate = Boolean(promptTemplateSettings || promptTemplateApi);
+  const promptTemplateEnabled =
+    typeof promptTemplateSettings?.enabled === 'boolean' ? promptTemplateSettings.enabled : hasPromptTemplate;
+  const promptTemplateReady =
+    typeof promptTemplateApi?.evalTemplate === 'function' && typeof promptTemplateApi?.prepareContext === 'function';
+
+  let promptTemplateLabel = '未检测到';
+  let promptTemplateTone: StatusTone = 'bad';
+  let promptTemplateDetail = '未发现 ST-Prompt-Template 的宿主设置或运行时接口。';
+
+  if (hasPromptTemplate && !promptTemplateEnabled) {
+    promptTemplateLabel = '已关闭';
+    promptTemplateTone = 'warn';
+    promptTemplateDetail = '已检测到提示词模板扩展，但当前总开关处于关闭状态。';
+  } else if (hasPromptTemplate && !promptTemplateReady) {
+    promptTemplateLabel = '未就绪';
+    promptTemplateTone = 'warn';
+    promptTemplateDetail = '已检测到提示词模板扩展，但 EjsTemplate 接口尚未完全挂载。';
+  } else if (hasPromptTemplate) {
+    promptTemplateLabel = '已开启';
+    promptTemplateTone = 'good';
+    promptTemplateDetail = '宿主提示词模板扩展已启用，EjsTemplate 接口可调用。';
+  }
+
+  let ewEjsLabel = '异常';
+  let ewEjsTone: StatusTone = 'bad';
+  let ewEjsDetail = 'EW 内置 EJS 自检失败。';
+
+  try {
+    const syntaxError = checkEjsSyntax('EW::<%= 1 + 1 %>');
+    if (syntaxError) {
+      throw new Error(syntaxError);
+    }
+
+    const rendered = await renderEjsContent('EW::<%= 1 + 1 %>');
+    if (rendered.trim() !== 'EW::2') {
+      throw new Error(`unexpected render result: ${rendered}`);
+    }
+
+    ewEjsLabel = '正常';
+    ewEjsTone = 'good';
+    ewEjsDetail = 'EW 内置 EJS 引擎可正常编译并执行最小模板。';
+  } catch (error) {
+    ewEjsLabel = '异常';
+    ewEjsTone = 'bad';
+    ewEjsDetail = error instanceof Error ? error.message : String(error);
+  }
+
+  let overallLabel = '需检查';
+  let overallDetail = `${promptTemplateDetail} ${ewEjsDetail}`;
+
+  if (promptTemplateTone === 'good' && ewEjsTone === 'good') {
+    overallLabel = '环境正常';
+    overallDetail = '宿主提示词模板已开启，EW 内置 EJS 也可正常使用。';
+  } else if (ewEjsTone === 'good') {
+    overallLabel = '可降级运行';
+    overallDetail = `${promptTemplateDetail} 但 EW 内置 EJS 自检正常，当前扩展仍可继续运行。`;
+  }
+
+  environmentStatus.value = {
+    overallLabel,
+    overallDetail,
+    promptTemplateLabel,
+    promptTemplateTone,
+    ewEjsLabel,
+    ewEjsTone,
+  };
+}
+
 function emitFabChanged() {
   // Direct DOM manipulation — matching ST-Manager's setFabVisibility() approach.
   // No events, no runtime cache reads, just remove the FAB element directly.
@@ -419,6 +563,21 @@ function emitFabChanged() {
 }
 
 const enabledFlowCount = computed(() => store.settings.flows.filter(flow => flow.enabled).length);
+const canRerollCurrentFloor = computed(() => {
+  return store.settings.enabled && store.settings.workflow_timing === 'after_reply' && !store.busy;
+});
+const rerollButtonTitle = computed(() => {
+  if (store.busy) {
+    return '当前有任务正在执行';
+  }
+  if (!store.settings.enabled) {
+    return '请先开启 Evolution World';
+  }
+  if (store.settings.workflow_timing !== 'after_reply') {
+    return '仅在“回复后更新”模式下可用';
+  }
+  return '重跑当前楼的回复后工作流';
+});
 const bindCountByPresetId = computed<Record<string, number>>(() => {
   const counts: Record<string, number> = {};
   for (const flow of store.settings.flows) {
@@ -440,6 +599,43 @@ async function onMigrateSnapshots() {
   } finally {
     migratingSnapshots.value = false;
   }
+}
+
+async function onRerollCurrentFloor() {
+  if (!canRerollCurrentFloor.value) {
+    showEwNotice({
+      title: 'Evolution World',
+      message: rerollButtonTitle.value,
+      level: 'warning',
+    });
+    return;
+  }
+
+  const api = window.EvolutionWorldAPI;
+  if (!api?.rerollCurrentAfterReply) {
+    showEwNotice({
+      title: 'Evolution World',
+      message: '运行时尚未就绪，暂时无法重跑当前楼。',
+      level: 'warning',
+    });
+    return;
+  }
+
+  const result = await api.rerollCurrentAfterReply();
+  if (result.ok) {
+    showEwNotice({
+      title: 'Evolution World',
+      message: '当前楼的回复后工作流已重跑完成。',
+      level: 'success',
+    });
+    return;
+  }
+
+  showEwNotice({
+    title: 'Evolution World',
+    message: `重跑当前楼失败: ${result.reason ?? 'unknown error'}`,
+    level: 'warning',
+  });
 }
 
 function help(key: string) {
@@ -544,7 +740,18 @@ async function onFlowImportChange(event: Event) {
 
 onMounted(() => {
   window.addEventListener('keydown', onEsc);
+  void refreshEnvironmentStatus();
 });
+
+watch(
+  () => [store.settings.ui_open, store.activeTab] as const,
+  ([uiOpen, activeTab]) => {
+    if (uiOpen && activeTab === 'overview') {
+      void refreshEnvironmentStatus();
+    }
+  },
+  { immediate: true },
+);
 
 onUnmounted(() => {
   window.removeEventListener('keydown', onEsc);
@@ -645,6 +852,52 @@ onUnmounted(() => {
   color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 55%, transparent);
 }
 
+.ew-summary-card--env {
+  gap: 0.5rem;
+}
+
+.ew-summary-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.ew-status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.45rem;
+  border-radius: 999px;
+  padding: 0.1rem 0.55rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  border: 1px solid transparent;
+}
+
+.ew-status-pill[data-tone='good'] {
+  color: #d1fae5;
+  background: rgba(16, 185, 129, 0.18);
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+.ew-status-pill[data-tone='warn'] {
+  color: #fef3c7;
+  background: rgba(245, 158, 11, 0.18);
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+.ew-status-pill[data-tone='bad'] {
+  color: #fee2e2;
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.ew-status-pill[data-tone='muted'] {
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 70%, transparent);
+  background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 14%, transparent);
+  border-color: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 26%, transparent);
+}
+
 .ew-flow-list,
 .ew-api-list {
   display: flex;
@@ -657,6 +910,13 @@ onUnmounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 0.55rem;
+}
+
+.ew-inline-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.65rem;
 }
 
 .ew-btn {

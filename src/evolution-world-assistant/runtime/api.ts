@@ -1,7 +1,8 @@
-import { runWorkflow } from './pipeline';
-import { EwSettingsSchema } from './types';
-import { getSettings, getLastIo, getLastRun, patchSettings, readControllerBackup } from './settings';
 import { validateEjsTemplate } from './controller-renderer';
+import { rerollCurrentAfterReplyWorkflow } from './events';
+import { runWorkflow } from './pipeline';
+import { getLastIo, getLastRun, getSettings, patchSettings, readControllerBackup } from './settings';
+import { EwSettingsSchema } from './types';
 import { resolveTargetWorldbook } from './worldbook-runtime';
 
 declare global {
@@ -15,6 +16,7 @@ declare global {
       getLastIo: () => ReturnType<typeof getLastIo>;
       validateControllerSyntax: () => Promise<{ ok: boolean; reason?: string }>;
       rollbackController: () => Promise<{ ok: boolean; reason?: string }>;
+      rerollCurrentAfterReply: () => Promise<{ ok: boolean; reason?: string }>;
     };
   }
 }
@@ -114,6 +116,7 @@ export function initGlobalApi() {
     getLastIo: () => getLastIo(),
     validateControllerSyntax,
     rollbackController,
+    rerollCurrentAfterReply: () => rerollCurrentAfterReplyWorkflow(),
   };
 }
 

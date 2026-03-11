@@ -718,6 +718,67 @@ async function onAfterReplyMessage(messageId: number, type: string, source: 'mes
   }
 }
 
+export async function rerollCurrentAfterReplyWorkflow(): Promise<{ ok: boolean; reason?: string }> {
+  const settings = getSettings();
+  if (settings.workflow_timing !== 'after_reply') {
+    return { ok: false, reason: 'workflow timing is not after_reply' };
+  }
+  if (!settings.enabled) {
+    return { ok: false, reason: 'workflow disabled' };
+  }
+  if (getRuntimeState().is_processing) {
+    return { ok: false, reason: 'workflow already processing' };
+  }
+
+  const messageId = getLastMessageId();
+  if (!Number.isFinite(messageId) || messageId < 0) {
+    return { ok: false, reason: 'no current floor found' };
+  }
+  if (!isAssistantMessage(messageId)) {
+    return { ok: false, reason: 'current floor is not an assistant reply' };
+  }
+
+  const messageText = getMessageText(messageId);
+  if (!messageText.trim()) {
+    return { ok: false, reason: 'current assistant reply is empty' };
+  }
+
+  const runtimeState = getRuntimeState();
+  const generationType = runtimeState.last_generation?.type || 'manual';
+
+  setProcessing(true);
+  try {
+    const outcome = await executeWorkflowWithPolicy(settings, {
+      messageId,
+      injectReply: false,
+      trigger: {
+        timing: 'after_reply',
+        source: 'fab_double_click',
+        generation_type: generationType,
+        user_message_id: runtimeState.after_reply.pending_user_message_id ?? runtimeState.last_send?.message_id,
+        assistant_message_id: messageId,
+      },
+      reminderMessage: '正在重跑当前楼的回复后工作流，请稍后…',
+      successMessage: '当前楼的动态世界工作流已重跑完成。',
+    });
+
+    if (outcome.workflowSucceeded) {
+      markAfterReplyHandled(messageId, messageText);
+      return { ok: true };
+    }
+
+    if (outcome.abortedByUser) {
+      return { ok: false, reason: 'workflow cancelled by user' };
+    }
+
+    return { ok: false, reason: 'workflow failed' };
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : String(error) };
+  } finally {
+    setProcessing(false);
+  }
+}
+
 export function initRuntimeEvents() {
   // Primary path: TavernHelper.generate hook
   installTavernHelperHook();

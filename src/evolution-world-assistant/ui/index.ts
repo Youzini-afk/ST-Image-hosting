@@ -1,6 +1,7 @@
 import { createScriptIdDiv, teleportStyle } from '@util/script';
+import { getSettings, patchSettings } from '../runtime/settings';
 import App from './App.vue';
-import { patchSettings, getSettings } from '../runtime/settings';
+import { showEwNotice } from './notice';
 
 // 提前判断悬浮球是否可见 —— 如果设置尚未加载，默认为 true
 function shouldShowFab(): boolean {
@@ -28,6 +29,7 @@ const FAB_ID = 'ew-assistant-fab';
 const FAB_STYLE_ID = 'ew-assistant-fab-style';
 const FAB_POS_KEY = '__EW_FAB_POS__';
 const FAB_SIZE = 48;
+const FAB_CLICK_DELAY_MS = 220;
 
 function resolveParentDocument(): Document {
   return getHostWindow().document;
@@ -81,9 +83,7 @@ function installMagicWandMenuItem() {
 
   let $menuContainer = $(`#${MENU_CONTAINER_ID}`, $extensionsMenu);
   if (!$menuContainer.length) {
-    $menuContainer = $(
-      `<div class="extension_container interactable" id="${MENU_CONTAINER_ID}" tabindex="0"></div>`,
-    );
+    $menuContainer = $(`<div class="extension_container interactable" id="${MENU_CONTAINER_ID}" tabindex="0"></div>`);
     $extensionsMenu.append($menuContainer);
   }
 
@@ -95,12 +95,10 @@ function installMagicWandMenuItem() {
     $menuContainer.append($menuItem);
   }
 
-  $menuItem
-    .off(`click${MENU_EVENT_NS}`)
-    .on(`click${MENU_EVENT_NS}`, event => {
-      event.stopPropagation();
-      void onMenuItemClick(parentDoc, $extensionsMenu);
-    });
+  $menuItem.off(`click${MENU_EVENT_NS}`).on(`click${MENU_EVENT_NS}`, event => {
+    event.stopPropagation();
+    void onMenuItemClick(parentDoc, $extensionsMenu);
+  });
 }
 
 function uninstallMagicWandMenuItem() {
@@ -214,7 +212,9 @@ function createFab(): void {
       vpX = Math.min(saved.x, hostWin.innerWidth - FAB_SIZE);
       vpY = Math.min(saved.y, hostWin.innerHeight - FAB_SIZE);
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   if (vpX !== null && vpY !== null) {
     fab.style.left = vpX + 'px';
@@ -231,6 +231,14 @@ function createFab(): void {
   let startY = 0;
   let fabStartX = 0;
   let fabStartY = 0;
+  let clickTimer: number | null = null;
+
+  function clearFabClickTimer() {
+    if (clickTimer !== null) {
+      window.clearTimeout(clickTimer);
+      clickTimer = null;
+    }
+  }
 
   fab.addEventListener('pointerdown', (e: PointerEvent) => {
     if (e.button !== 0) return;
@@ -272,14 +280,60 @@ function createFab(): void {
       if (vpX !== null && vpY !== null) {
         localStorage.setItem(FAB_POS_KEY, JSON.stringify({ x: vpX, y: vpY }));
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   });
 
   fab.addEventListener('click', (event: MouseEvent) => {
     event.stopPropagation();
     event.preventDefault();
-    if (dragMoved) { dragMoved = false; return; }
-    patchSettings({ ui_open: true });
+    if (dragMoved) {
+      dragMoved = false;
+      return;
+    }
+
+    clearFabClickTimer();
+    clickTimer = window.setTimeout(() => {
+      clickTimer = null;
+      patchSettings({ ui_open: true });
+    }, FAB_CLICK_DELAY_MS);
+  });
+
+  fab.addEventListener('dblclick', async (event: MouseEvent) => {
+    event.stopPropagation();
+    event.preventDefault();
+    if (dragMoved) {
+      dragMoved = false;
+      return;
+    }
+
+    clearFabClickTimer();
+
+    const settings = getSettings();
+    if (settings.workflow_timing !== 'after_reply') {
+      patchSettings({ ui_open: true });
+      return;
+    }
+
+    const api = window.EvolutionWorldAPI;
+    if (!api?.rerollCurrentAfterReply) {
+      showEwNotice({
+        title: 'Evolution World',
+        message: '运行时尚未就绪，暂时无法重跑当前楼。',
+        level: 'warning',
+      });
+      return;
+    }
+
+    const result = await api.rerollCurrentAfterReply();
+    if (!result.ok) {
+      showEwNotice({
+        title: 'Evolution World',
+        message: `重跑当前楼失败: ${result.reason ?? 'unknown error'}`,
+        level: 'warning',
+      });
+    }
   });
 
   // 追加到 <html> 以覆盖所有带 transform 的容器

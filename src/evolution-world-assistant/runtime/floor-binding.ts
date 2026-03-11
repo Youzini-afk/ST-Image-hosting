@@ -1,12 +1,12 @@
-import { EwSettings } from './types';
-import { resolveTargetWorldbook, ensureDefaultEntry } from './worldbook-runtime';
 import {
-  writeSnapshot,
-  readSnapshot,
-  deleteSnapshot,
   cleanupSnapshotFiles,
+  deleteSnapshot,
+  readSnapshot,
+  writeSnapshot,
   type SnapshotData,
 } from './snapshot-storage';
+import { EwSettings } from './types';
+import { ensureDefaultEntry, resolveTargetWorldbook } from './worldbook-runtime';
 
 const EW_FLOOR_DATA_KEY = 'ew_entries';
 const EW_CONTROLLER_DATA_KEY = 'ew_controller';
@@ -16,6 +16,17 @@ const EW_SNAPSHOT_FILE_KEY = 'ew_snapshot_file';
 export type DynSnapshot = { name: string; content: string; enabled: boolean };
 
 const floorBindingListenerStops: EventOnReturn[] = [];
+
+function clearInlineSnapshotFields(data: Record<string, unknown>) {
+  delete data[EW_CONTROLLER_DATA_KEY];
+  delete data[EW_DYN_SNAPSHOTS_KEY];
+}
+
+function clearFloorSnapshotFields(data: Record<string, unknown>) {
+  delete data[EW_FLOOR_DATA_KEY];
+  clearInlineSnapshotFields(data);
+  delete data[EW_SNAPSHOT_FILE_KEY];
+}
 
 // ── Context Helpers ──────────────────────────────────────────
 
@@ -42,59 +53,70 @@ export async function markFloorEntries(
   controllerSnapshot?: string,
   dynSnapshots?: DynSnapshot[],
 ): Promise<void> {
-  if (entryNames.length === 0 && !controllerSnapshot && (!dynSnapshots || dynSnapshots.length === 0)) {
-    return;
-  }
-
   const messages = getChatMessages(messageId);
   if (messages.length === 0) {
     return;
   }
 
   const msg = messages[0];
-  const existingEntries: string[] = _.get(msg.data, EW_FLOOR_DATA_KEY, []);
-  const mergedEntries = _.uniq([...existingEntries, ...entryNames]);
+  const previousSnapshotFile = _.get(msg.data, EW_SNAPSHOT_FILE_KEY);
+  const normalizedEntryNames = _.uniq(entryNames.filter(name => typeof name === 'string' && name.trim()));
+  const normalizedDynSnapshots = (dynSnapshots ?? []).filter(snap => snap.name && typeof snap.content === 'string');
+  const hasSnapshotPayload = Boolean(
+    controllerSnapshot !== undefined || normalizedDynSnapshots.length > 0 || normalizedEntryNames.length > 0,
+  );
 
   const nextData: Record<string, unknown> = {
     ...msg.data,
-    [EW_FLOOR_DATA_KEY]: mergedEntries,
   };
+  clearFloorSnapshotFields(nextData);
+
+  if (!hasSnapshotPayload) {
+    if (typeof previousSnapshotFile === 'string' && previousSnapshotFile) {
+      await deleteSnapshot(previousSnapshotFile);
+    }
+    await setChatMessages([{ message_id: messageId, data: nextData }], { refresh: 'none' });
+    return;
+  }
+
+  if (normalizedEntryNames.length > 0) {
+    nextData[EW_FLOOR_DATA_KEY] = normalizedEntryNames;
+  }
 
   if (settings.snapshot_storage === 'file') {
-    // File mode: write snapshot to file, store filename in message data.
-    if (controllerSnapshot || (dynSnapshots && dynSnapshots.length > 0)) {
-      const snapshotData: SnapshotData = {
-        controller: controllerSnapshot ?? '',
-        dyn_entries: dynSnapshots ?? [],
-      };
-      try {
-        const fileName = await writeSnapshot(getCharName(), getChatId(), messageId, snapshotData);
-        nextData[EW_SNAPSHOT_FILE_KEY] = fileName;
-      } catch (e) {
-        console.warn('[Evolution World] File snapshot write failed, falling back to message data:', e);
-        // Fallback: store in message data
-        if (controllerSnapshot !== undefined) {
-          nextData[EW_CONTROLLER_DATA_KEY] = controllerSnapshot;
-        }
-        if (dynSnapshots && dynSnapshots.length > 0) {
-          nextData[EW_DYN_SNAPSHOTS_KEY] = dynSnapshots;
-        }
+    // File mode: rewrite the entire snapshot file for this floor.
+    const snapshotData: SnapshotData = {
+      controller: controllerSnapshot ?? '',
+      dyn_entries: normalizedDynSnapshots,
+    };
+    try {
+      const fileName = await writeSnapshot(getCharName(), getChatId(), messageId, snapshotData);
+      nextData[EW_SNAPSHOT_FILE_KEY] = fileName;
+      if (typeof previousSnapshotFile === 'string' && previousSnapshotFile && previousSnapshotFile !== fileName) {
+        await deleteSnapshot(previousSnapshotFile);
+      }
+    } catch (e) {
+      console.warn('[Evolution World] File snapshot write failed, falling back to message data:', e);
+      if (controllerSnapshot !== undefined) {
+        nextData[EW_CONTROLLER_DATA_KEY] = controllerSnapshot;
+      }
+      nextData[EW_DYN_SNAPSHOTS_KEY] = normalizedDynSnapshots;
+      if (typeof previousSnapshotFile === 'string' && previousSnapshotFile) {
+        await deleteSnapshot(previousSnapshotFile);
       }
     }
   } else {
-    // Message data mode (default).
+    // Message data mode (default): rewrite inline snapshot fields exactly.
     if (controllerSnapshot !== undefined) {
       nextData[EW_CONTROLLER_DATA_KEY] = controllerSnapshot;
     }
-    if (dynSnapshots && dynSnapshots.length > 0) {
-      nextData[EW_DYN_SNAPSHOTS_KEY] = dynSnapshots;
+    nextData[EW_DYN_SNAPSHOTS_KEY] = normalizedDynSnapshots;
+    if (typeof previousSnapshotFile === 'string' && previousSnapshotFile) {
+      await deleteSnapshot(previousSnapshotFile);
     }
   }
 
-  await setChatMessages(
-    [{ message_id: messageId, data: nextData }],
-    { refresh: 'none' },
-  );
+  await setChatMessages([{ message_id: messageId, data: nextData }], { refresh: 'none' });
 }
 
 // ── Floor Query ──────────────────────────────────────────────
@@ -171,7 +193,6 @@ export async function collectLatestSnapshots(): Promise<{
   return { controller: latestController, dyn: dynMerged };
 }
 
-
 // ── Unified Purge + Restore ─────────────────────────────────
 
 /**
@@ -187,9 +208,7 @@ export async function purgeAndRestoreForChat(settings: EwSettings): Promise<void
   const target = await resolveTargetWorldbook(settings);
 
   // Step 1: Remove all EW/Dyn/* entries and clear EW/Controller.
-  const nextEntries = klona(target.entries).filter(
-    entry => !entry.name.startsWith(settings.dynamic_entry_prefix),
-  );
+  const nextEntries = klona(target.entries).filter(entry => !entry.name.startsWith(settings.dynamic_entry_prefix));
   const ctrlEntry = nextEntries.find(e => e.name === settings.controller_entry_name);
   if (ctrlEntry) {
     ctrlEntry.content = '';
@@ -205,9 +224,7 @@ export async function purgeAndRestoreForChat(settings: EwSettings): Promise<void
       existing.content = snap.content;
       existing.enabled = snap.enabled;
     } else {
-      nextEntries.push(
-        ensureDefaultEntry(snap.name, snap.content, snap.enabled, nextEntries),
-      );
+      nextEntries.push(ensureDefaultEntry(snap.name, snap.content, snap.enabled, nextEntries));
     }
   }
 
@@ -215,9 +232,7 @@ export async function purgeAndRestoreForChat(settings: EwSettings): Promise<void
     ctrlEntry.content = controllerSnapshot;
     ctrlEntry.enabled = true;
   } else if (controllerSnapshot) {
-    nextEntries.push(
-      ensureDefaultEntry(settings.controller_entry_name, controllerSnapshot, true, nextEntries, true),
-    );
+    nextEntries.push(ensureDefaultEntry(settings.controller_entry_name, controllerSnapshot, true, nextEntries, true));
   }
 
   // Step 3: Commit the cleaned + restored worldbook.
@@ -248,9 +263,7 @@ export async function purgeAndRestoreForChat(settings: EwSettings): Promise<void
 
   const restoredDyn = dynSnapshots.size;
   const restoredCtrl = controllerSnapshot ? 1 : 0;
-  console.info(
-    `[Evolution World] purgeAndRestore: ${restoredDyn} Dyn + ${restoredCtrl} Controller restored`,
-  );
+  console.info(`[Evolution World] purgeAndRestore: ${restoredDyn} Dyn + ${restoredCtrl} Controller restored`);
 }
 
 // ── 迁移 ────────────────────────────────────────────────
@@ -258,9 +271,7 @@ export async function purgeAndRestoreForChat(settings: EwSettings): Promise<void
 /**
  * Migrate snapshots between storage modes for the current chat.
  */
-export async function migrateSnapshots(
-  direction: 'to_file' | 'to_message_data',
-): Promise<{ migrated: number }> {
+export async function migrateSnapshots(direction: 'to_file' | 'to_message_data'): Promise<{ migrated: number }> {
   const lastId = getLastMessageId();
   if (lastId < 0) return { migrated: 0 };
 
@@ -290,10 +301,7 @@ export async function migrateSnapshots(
       delete nextData[EW_DYN_SNAPSHOTS_KEY];
       delete nextData[EW_CONTROLLER_DATA_KEY];
 
-      await setChatMessages(
-        [{ message_id: msg.message_id, data: nextData }],
-        { refresh: 'none' },
-      );
+      await setChatMessages([{ message_id: msg.message_id, data: nextData }], { refresh: 'none' });
       migrated++;
     }
   } else {
@@ -316,10 +324,7 @@ export async function migrateSnapshots(
         }
       }
 
-      await setChatMessages(
-        [{ message_id: msg.message_id, data: nextData }],
-        { refresh: 'none' },
-      );
+      await setChatMessages([{ message_id: msg.message_id, data: nextData }], { refresh: 'none' });
 
       await deleteSnapshot(snapshotFile);
       migrated++;
@@ -387,10 +392,7 @@ export async function collectAllFloorSnapshots(): Promise<FloorSnapshot[]> {
  * Compute the diff between two snapshots (prev → curr).
  * If prev is null, all entries in curr are "created".
  */
-export function diffSnapshots(
-  prev: SnapshotData | null,
-  curr: SnapshotData | null,
-): SnapshotDiff {
+export function diffSnapshots(prev: SnapshotData | null, curr: SnapshotData | null): SnapshotDiff {
   const diff: SnapshotDiff = { created: [], modified: [], deleted: [], toggled: [], controllerChanged: false };
   if (!curr) return diff;
 
@@ -436,10 +438,7 @@ export function diffSnapshots(
  * This means: merge all snapshots from floor 0 up to and including
  * the target messageId, then apply that state to the worldbook.
  */
-export async function rollbackToFloor(
-  settings: EwSettings,
-  targetMessageId: number,
-): Promise<void> {
+export async function rollbackToFloor(settings: EwSettings, targetMessageId: number): Promise<void> {
   const allFloors = await collectAllFloorSnapshots();
   const dynMerged = new Map<string, DynSnapshot>();
   let controller: string | null = null;
@@ -461,9 +460,7 @@ export async function rollbackToFloor(
 
   // Apply to worldbook (same pattern as purgeAndRestoreForChat)
   const target = await resolveTargetWorldbook(settings);
-  const nextEntries = klona(target.entries).filter(
-    entry => !entry.name.startsWith(settings.dynamic_entry_prefix),
-  );
+  const nextEntries = klona(target.entries).filter(entry => !entry.name.startsWith(settings.dynamic_entry_prefix));
   const ctrlEntry = nextEntries.find(e => e.name === settings.controller_entry_name);
   if (ctrlEntry) {
     ctrlEntry.content = '';
@@ -476,9 +473,7 @@ export async function rollbackToFloor(
       existing.content = snap.content;
       existing.enabled = snap.enabled;
     } else {
-      nextEntries.push(
-        ensureDefaultEntry(snap.name, snap.content, snap.enabled, nextEntries),
-      );
+      nextEntries.push(ensureDefaultEntry(snap.name, snap.content, snap.enabled, nextEntries));
     }
   }
 
@@ -486,13 +481,13 @@ export async function rollbackToFloor(
     ctrlEntry.content = controller;
     ctrlEntry.enabled = true;
   } else if (controller) {
-    nextEntries.push(
-      ensureDefaultEntry(settings.controller_entry_name, controller, true, nextEntries, true),
-    );
+    nextEntries.push(ensureDefaultEntry(settings.controller_entry_name, controller, true, nextEntries, true));
   }
 
   await replaceWorldbook(target.worldbook_name, nextEntries, { render: 'debounced' });
-  console.info(`[Evolution World] Rolled back to floor #${targetMessageId}: ${dynMerged.size} Dyn + ${controller ? 1 : 0} Controller`);
+  console.info(
+    `[Evolution World] Rolled back to floor #${targetMessageId}: ${dynMerged.size} Dyn + ${controller ? 1 : 0} Controller`,
+  );
 }
 
 // ── Event Handlers ──────────────────────────────────────────
