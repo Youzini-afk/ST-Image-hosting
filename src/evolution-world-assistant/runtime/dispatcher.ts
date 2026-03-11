@@ -3,7 +3,6 @@ import { FlowResponseSchema } from './contracts';
 import {
   assembleOrderedPrompts,
   collectPromptComponents,
-  injectEntryNames,
   PromptComponents,
 } from './prompt-assembler';
 import { DispatchFlowAttempt, DispatchFlowResult, EwApiPreset, EwFlowConfig, EwSettings } from './types';
@@ -218,11 +217,9 @@ function shouldUseGenerateRawCustomApi(apiPreset: EwApiPreset): boolean {
 async function buildOrderedPromptsForFlow(
   flow: EwFlowConfig,
   components: PromptComponents,
-  controllerEntryName: string,
   body: Record<string, any>,
 ): Promise<Array<{ role: 'system' | 'assistant' | 'user'; content: string }>> {
   const orderedPrompts = await assembleOrderedPrompts(flow.prompt_order, components);
-  await injectEntryNames(orderedPrompts, controllerEntryName);
   const systemPrompt = flow.system_prompt?.trim() || '';
   if (systemPrompt) {
     orderedPrompts.push({ role: 'system', content: systemPrompt });
@@ -620,7 +617,6 @@ async function executeFlow(
     const orderedPrompts = await buildOrderedPromptsForFlow(
       flow,
       promptComponents,
-      settings.controller_entry_name,
       body,
     );
     const requestDebugBase = {

@@ -1,5 +1,4 @@
 import { renderEjsContent } from './ejs-bridge';
-import { collectLatestSnapshotFast } from './floor-binding';
 import { applyTavernRegex } from './regex-engine';
 import type { EwFlowConfig, EwPromptOrderEntry, EwSettings } from './types';
 import { resolveWorldInfo } from './worldinfo-engine';
@@ -116,28 +115,6 @@ function resolveCharacterCardFieldsGetter(): {
   return {};
 }
 
-function resolveWorldInfoPromptGetter(): {
-  getter?: (chat: string[], maxContext: number, isDryRun: boolean) => Promise<any>;
-  source?: string;
-} {
-  const hostRuntime = getHostRuntime();
-  const ctx = getRuntimeContext();
-
-  if (typeof ctx?.getWorldInfoPrompt === 'function') {
-    return { getter: ctx.getWorldInfoPrompt, source: 'ctx.getWorldInfoPrompt' };
-  }
-  if (typeof hostRuntime.getWorldInfoPrompt === 'function') {
-    return { getter: hostRuntime.getWorldInfoPrompt, source: 'hostRuntime.getWorldInfoPrompt' };
-  }
-  if (typeof hostRuntime.SillyTavern?.getWorldInfoPrompt === 'function') {
-    return { getter: hostRuntime.SillyTavern.getWorldInfoPrompt, source: 'hostRuntime.SillyTavern.getWorldInfoPrompt' };
-  }
-  if (typeof getWorldInfoPrompt === 'function') {
-    return { getter: getWorldInfoPrompt, source: 'global getWorldInfoPrompt' };
-  }
-
-  return {};
-}
 
 function hasCharacterCardFieldValue(fields: ReturnType<typeof getCharacterCardFields> | undefined): boolean {
   if (!fields) {
@@ -301,15 +278,6 @@ function getRuntimeChatMessages(range: string, opts?: Record<string, any>): any[
   return getChatMessages(range, opts);
 }
 
-function getPreferredText(...values: unknown[]): string {
-  for (const value of values) {
-    if (typeof value === 'string' && value.trim()) {
-      return value;
-    }
-  }
-
-  return '';
-}
 
 function describeAttempt(label: string, value: unknown, detail?: string): PromptDiagnosticAttempt {
   if (typeof value === 'string') {
@@ -961,50 +929,6 @@ function resolveMarkerContent(identifier: string, components: PromptComponents):
   }
 }
 
-// ── Entry Name Injection ─────────────────────────────────────
-
-/**
- * Inject EW entry names into assembled prompt messages via content matching.
- *
- * Uses the latest snapshot data (Controller + Dyn entries) to find their
- * content in the assembled messages and prepend `[entry_name]` labels.
- * This lets the AI identify which EW worldbook entry each content block
- * belongs to.
- *
- * @param messages  The assembled prompt messages (mutated in place)
- * @param controllerEntryName  The name of the Controller entry (from settings)
- */
-export async function injectEntryNames(messages: AssembledMessage[], controllerEntryName: string): Promise<void> {
-  const { controller, dyn } = await collectLatestSnapshotFast();
-
-  // Build a list of { name, content } to match, sorted by content length descending
-  // (longer content first to avoid partial substring matches).
-  const matchTargets: Array<{ name: string; content: string }> = [];
-
-  if (controller && controller.trim()) {
-    matchTargets.push({ name: controllerEntryName, content: controller });
-  }
-
-  for (const snap of dyn.values()) {
-    if (snap.content && snap.content.trim()) {
-      matchTargets.push({ name: snap.name, content: snap.content });
-    }
-  }
-
-  // Sort longest first for greedy matching.
-  matchTargets.sort((a, b) => b.content.length - a.content.length);
-
-  if (matchTargets.length === 0) return;
-
-  // Scan each message and prepend entry names where content matches.
-  for (const msg of messages) {
-    for (const target of matchTargets) {
-      if (msg.content.includes(target.content)) {
-        msg.content = msg.content.replace(target.content, `[${target.name}]\n${target.content}`);
-      }
-    }
-  }
-}
 
 // ── Prompt Preview (Debug) ───────────────────────────────────
 
@@ -1015,9 +939,8 @@ export async function injectEntryNames(messages: AssembledMessage[], controllerE
  * assemble ordered prompts → inject entry names) but does NOT send
  * anything to the AI. Returns the messages array for UI display.
  */
-export async function previewPrompt(flow: EwFlowConfig, controllerEntryName: string): Promise<PromptPreviewMessage[]> {
+export async function previewPrompt(flow: EwFlowConfig): Promise<PromptPreviewMessage[]> {
   const components = await collectPromptComponents(flow);
   const messages = await assembleOrderedPrompts(flow.prompt_order, components, { includeMarkerPlaceholders: true });
-  await injectEntryNames(messages, controllerEntryName);
   return messages;
 }
