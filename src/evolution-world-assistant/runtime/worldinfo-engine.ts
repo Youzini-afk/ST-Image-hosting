@@ -16,7 +16,7 @@
  */
 
 import { createRenderContext, evalEjsTemplate } from './ejs-internal';
-import { isMvuTaggedWorldInfoComment } from './mvu-compat';
+import { isLikelyMvuWorldInfoContent, isMvuTaggedWorldInfoNameOrComment } from './mvu-compat';
 import { EwSettings } from './types';
 
 // ---------------------------------------------------------------------------
@@ -339,7 +339,10 @@ function normalizeEntry(raw: RawWbEntry, worldbookName: string): NormalizedEntry
 }
 
 function shouldIgnoreForWorkflow(entry: NormalizedEntry): boolean {
-  return isMvuTaggedWorldInfoComment(entry.comment);
+  return (
+    isMvuTaggedWorldInfoNameOrComment(entry.name, entry.comment) ||
+    isLikelyMvuWorldInfoContent(entry.cleanContent || entry.content)
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -688,6 +691,96 @@ async function collectAllWorldbookEntries(): Promise<NormalizedEntry[]> {
   }
 
   return allEntries;
+}
+
+export async function collectIgnoredWorldInfoContents(): Promise<string[]> {
+  const ignoredContents: string[] = [];
+
+  async function loadWb(wbName: string): Promise<void> {
+    try {
+      const entries = await getWorldbook(wbName);
+      let commentByUid = new Map<number, string>();
+
+      try {
+        const lorebookEntries = await getLorebookEntries(wbName);
+        commentByUid = new Map(lorebookEntries.map(entry => [entry.uid, String(entry.comment ?? '')]));
+      } catch (commentError) {
+        console.debug(`[EW WI Engine] Cannot read lorebook comments for '${wbName}':`, commentError);
+      }
+
+      for (const entry of entries) {
+        const normalized = normalizeEntry(
+          {
+            ...entry,
+            comment: commentByUid.get(entry.uid) ?? entry.comment ?? '',
+          },
+          wbName,
+        );
+
+        if (!shouldIgnoreForWorkflow(normalized)) {
+          continue;
+        }
+
+        const normalizedContent = (normalized.cleanContent || normalized.content).trim();
+        if (normalizedContent) {
+          ignoredContents.push(normalizedContent);
+        }
+      }
+    } catch (e) {
+      console.debug(`[EW WI Engine] Cannot read worldbook '${wbName}' for ignore list:`, e);
+    }
+  }
+
+  const loadedNames = new Set<string>();
+  async function loadWbOnce(wbName: string): Promise<void> {
+    if (!wbName || loadedNames.has(wbName)) return;
+    loadedNames.add(wbName);
+    await loadWb(wbName);
+  }
+
+  try {
+    const charWb = getCharWorldbookNames('current');
+    if (charWb.primary) {
+      await loadWbOnce(charWb.primary);
+    }
+    for (const additionalWb of charWb.additional ?? []) {
+      await loadWbOnce(additionalWb);
+    }
+  } catch (e) {
+    console.debug('[EW WI Engine] Cannot read character worldbooks for ignore list:', e);
+  }
+
+  try {
+    const globalNames = getGlobalWorldbookNames();
+    for (const wbName of globalNames) {
+      await loadWbOnce(wbName);
+    }
+  } catch (e) {
+    console.debug('[EW WI Engine] Cannot read global worldbooks for ignore list:', e);
+  }
+
+  try {
+    const ctx = getStContext();
+    const personaLorebook: string | undefined =
+      ctx.extensionSettings?.persona_description_lorebook ?? (ctx as any).power_user?.persona_description_lorebook;
+    if (personaLorebook) {
+      await loadWbOnce(personaLorebook);
+    }
+  } catch (e) {
+    console.debug('[EW WI Engine] Cannot read persona lorebook for ignore list:', e);
+  }
+
+  try {
+    const ctx = getStContext();
+    const chatWorld: string | undefined = ctx.chatMetadata?.world;
+    if (chatWorld) {
+      await loadWbOnce(chatWorld);
+    }
+  } catch (e) {
+    console.debug('[EW WI Engine] Cannot read chat-bound lorebook for ignore list:', e);
+  }
+
+  return _.uniq(ignoredContents.map(content => content.trim()).filter(Boolean));
 }
 
 // ---------------------------------------------------------------------------

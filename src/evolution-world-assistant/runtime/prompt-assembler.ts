@@ -1,8 +1,8 @@
 ﻿import { renderEjsContent } from './ejs-internal';
-import { stripMvuPromptArtifacts } from './mvu-compat';
+import { isLikelyMvuWorldInfoContent, stripBlockedPromptContents, stripMvuPromptArtifacts } from './mvu-compat';
 import { applyTavernRegex } from './regex-engine';
 import type { EwFlowConfig, EwPromptOrderEntry, EwSettings } from './types';
-import { resolveWorldInfo, type ResolvedWiEntry } from './worldinfo-engine';
+import { collectIgnoredWorldInfoContents, resolveWorldInfo, type ResolvedWiEntry } from './worldinfo-engine';
 
 // SillyTavern 运行时全局变量，在扩展上下文中可用
 declare function getCharacterCardFields():
@@ -347,8 +347,12 @@ function appendDiagnosticNote(
   };
 }
 
-function sanitizeWorkflowExtensionPrompt(content: string): string {
-  return stripMvuPromptArtifacts(content);
+function sanitizeWorkflowExtensionPrompt(content: string, blockedContents: string[] = []): string {
+  const sanitized = stripBlockedPromptContents(stripMvuPromptArtifacts(content), blockedContents);
+  if (isLikelyMvuWorldInfoContent(content) || isLikelyMvuWorldInfoContent(sanitized)) {
+    return '';
+  }
+  return sanitized;
 }
 
 function formatAttempt(attempt: PromptDiagnosticAttempt): string {
@@ -518,6 +522,8 @@ function getRuntimeCharacterFields(): {
 }
 
 async function populateWorldInfoComponents(components: PromptComponents, settings: EwSettings): Promise<void> {
+  components.blockedWorldInfoContents = await collectIgnoredWorldInfoContents();
+
   try {
     const chatTexts = components.chatMessages.map(msg => msg.content).filter(Boolean);
     const resolved = await resolveWorldInfo(settings, chatTexts);
@@ -590,6 +596,8 @@ export type PromptComponents = {
   depthInjections: Array<{ content: string; depth: number; role: 'system' | 'user' | 'assistant' }>;
   /** Extension prompts that go before all other prompts (ST position=BEFORE_PROMPT) */
   beforePromptInjections: string[];
+  /** Exact prompt bodies cloned from ignored world info entries. */
+  blockedWorldInfoContents?: string[];
   diagnostics: PromptDiagnosticMap;
 };
 
@@ -622,6 +630,7 @@ export async function collectPromptComponents(flow: EwFlowConfig, settings?: EwS
     chatMessages: [],
     depthInjections: [],
     beforePromptInjections: [],
+    blockedWorldInfoContents: [],
     diagnostics: {},
   };
 
@@ -708,7 +717,7 @@ export async function collectPromptComponents(flow: EwFlowConfig, settings?: EwS
         const p = prompt as any;
         if (!p || typeof p.value !== 'string' || !p.value.trim()) continue;
 
-        const sanitizedPromptValue = sanitizeWorkflowExtensionPrompt(p.value);
+        const sanitizedPromptValue = sanitizeWorkflowExtensionPrompt(p.value, components.blockedWorldInfoContents);
         if (!sanitizedPromptValue) continue;
 
         const role = roleMap[p.role] ?? 'system';

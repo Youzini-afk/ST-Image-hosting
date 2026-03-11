@@ -5,9 +5,33 @@ export const MVU_ENTRY_COMMENT_REGEX = /\[(mvu_update|mvu_plot|initvar)\]/i;
 
 const MVU_UPDATE_BLOCK_REGEX = /\n?<(update(?:variable)?|variableupdate)>(?:(?!<\1>).)*<\/\1?>/gis;
 const MVU_STATUS_PLACEHOLDER_REGEX = /\n?<StatusPlaceHolderImpl\/>/gi;
+const MVU_STATUS_CURRENT_VARIABLE_REGEX = /\n?<status_current_variable>[\s\S]*?<\/status_current_variable>/gi;
+const MVU_VARIABLE_OUTPUT_ENTRY_REGEX = /^\s*---\s*[\r\n]+变量输出格式:\s*[\s\S]*?<UpdateVariable>/i;
+const MVU_VARIABLE_RULES_ENTRY_REGEX = /^\s*---\s*[\r\n]+变量更新规则:\s*[\s\S]*?(?:当前时间:|近期事务:)/i;
 
 export function isMvuTaggedWorldInfoComment(comment: string): boolean {
   return MVU_ENTRY_COMMENT_REGEX.test(comment);
+}
+
+export function isMvuTaggedWorldInfoNameOrComment(name: string, comment: string): boolean {
+  return MVU_ENTRY_COMMENT_REGEX.test(name) || MVU_ENTRY_COMMENT_REGEX.test(comment);
+}
+
+export function isLikelyMvuWorldInfoContent(content: string): boolean {
+  if (!content) {
+    return false;
+  }
+
+  const normalized = content.trim();
+  if (!normalized) {
+    return false;
+  }
+
+  return (
+    MVU_STATUS_CURRENT_VARIABLE_REGEX.test(normalized) ||
+    MVU_VARIABLE_OUTPUT_ENTRY_REGEX.test(normalized) ||
+    MVU_VARIABLE_RULES_ENTRY_REGEX.test(normalized)
+  );
 }
 
 export function stripMvuPromptArtifacts(content: string): string {
@@ -15,5 +39,32 @@ export function stripMvuPromptArtifacts(content: string): string {
     return '';
   }
 
-  return content.replace(MVU_UPDATE_BLOCK_REGEX, '').replace(MVU_STATUS_PLACEHOLDER_REGEX, '').trim();
+  return content
+    .replace(MVU_UPDATE_BLOCK_REGEX, '')
+    .replace(MVU_STATUS_PLACEHOLDER_REGEX, '')
+    .replace(MVU_STATUS_CURRENT_VARIABLE_REGEX, '')
+    .trim();
+}
+
+export function stripBlockedPromptContents(content: string, blockedContents: string[]): string {
+  if (!content || blockedContents.length === 0) {
+    return content;
+  }
+
+  const normalizedBlocked = _.uniq(
+    blockedContents
+      .map(item => item.trim())
+      .filter(Boolean)
+      .sort((lhs, rhs) => rhs.length - lhs.length),
+  );
+
+  let sanitized = content;
+  for (const blocked of normalizedBlocked) {
+    if (!sanitized.includes(blocked)) {
+      continue;
+    }
+    sanitized = sanitized.split(blocked).join('');
+  }
+
+  return sanitized.replace(/\n{3,}/g, '\n\n').trim();
 }
