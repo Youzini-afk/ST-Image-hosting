@@ -1,4 +1,4 @@
-import { MergeInput, MergedPlan, Prioritized } from './types';
+import { EwSettings, MergeInput, MergedPlan, Prioritized } from './types';
 import { ControllerModel } from './contracts';
 import { checkEjsSyntax } from './ejs-bridge';
 
@@ -22,7 +22,17 @@ function shouldReplace<T>(current: Prioritized<T> | undefined, next: Prioritized
   return next.flow_order >= current.flow_order;
 }
 
-export function mergeFlowResults(results: MergeInput): MergedPlan {
+/**
+ * Normalize an entry name: bare names get the dynamic entry prefix.
+ * Names that already have the prefix, or match the controller entry name, are untouched.
+ */
+function normalizeEntryName(name: string, prefix: string, controllerName: string): string {
+  if (name.startsWith(prefix)) return name;
+  if (name === controllerName) return name;
+  return prefix + name;
+}
+
+export function mergeFlowResults(results: MergeInput, settings: EwSettings): MergedPlan {
   const sorted = [...results].sort((lhs, rhs) =>
     comparePriority(
       { priority: lhs.flow.priority, flow_order: lhs.flow_order },
@@ -44,22 +54,24 @@ export function mergeFlowResults(results: MergeInput): MergedPlan {
     const worldbookOps = result.response.operations.worldbook;
 
     for (const desired of worldbookOps.desired_entries) {
+      const normalizedName = normalizeEntryName(desired.name, settings.dynamic_entry_prefix, settings.controller_entry_name);
       const next: Prioritized<{ content: string; enabled: boolean }> = {
         value: { content: desired.content, enabled: desired.enabled },
         priority,
         flow_order: flowOrder,
       };
-      const current = desiredMap.get(desired.name);
+      const current = desiredMap.get(normalizedName);
       if (shouldReplace(current, next)) {
-        desiredMap.set(desired.name, next);
+        desiredMap.set(normalizedName, next);
       }
     }
 
     for (const removal of worldbookOps.remove_entries) {
+      const normalizedName = normalizeEntryName(removal.name, settings.dynamic_entry_prefix, settings.controller_entry_name);
       const next: Prioritized<null> = { value: null, priority, flow_order: flowOrder };
-      const current = removeMap.get(removal.name);
+      const current = removeMap.get(normalizedName);
       if (shouldReplace(current, next)) {
-        removeMap.set(removal.name, next);
+        removeMap.set(normalizedName, next);
       }
     }
 

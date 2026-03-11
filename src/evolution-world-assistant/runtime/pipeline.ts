@@ -132,7 +132,7 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowO
 
     const results = dispatchOutput.results;
 
-    const mergedPlan = mergeFlowResults(results);
+    const mergedPlan = mergeFlowResults(results, settings);
     throwIfWorkflowCancelled(input);
     const controllerTemplate = await renderControllerTemplate(mergedPlan.controller_model);
     throwIfWorkflowCancelled(input);
