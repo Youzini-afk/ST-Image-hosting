@@ -1,6 +1,6 @@
 <template>
   <div class="ew-overlay" @click.self="$emit('close')">
-    <section class="ew-panel" :data-busy="busy ? '1' : '0'">
+    <section class="ew-panel" :data-busy="busy ? '1' : '0'" @dragstart="onPanelDragStart">
       <header class="ew-panel__header">
         <div class="ew-panel__title-wrap">
           <h2 class="ew-panel__title">{{ title }}</h2>
@@ -50,6 +50,21 @@ defineEmits<{
   (event: 'change-tab', tab: TabKey): void;
   (event: 'close'): void;
 }>();
+
+function onPanelDragStart(event: DragEvent) {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) {
+    event.preventDefault();
+    return;
+  }
+
+  // 允许显式声明 draggable 的组件继续工作，例如提示词排序列表。
+  if (target.closest('[draggable="true"]')) {
+    return;
+  }
+
+  event.preventDefault();
+}
 </script>
 
 <style scoped>
@@ -63,19 +78,18 @@ defineEmits<{
   /* Deeper, richer overlay mask with an emerald/violet hint */
   background:
     radial-gradient(circle at 10% 0%, rgba(138, 115, 255, 0.08), transparent 42%),
-    radial-gradient(circle at 95% 0%, rgba(38, 194, 129, 0.08), transparent 40%),
-    rgba(2, 5, 8, 0.65);
+    radial-gradient(circle at 95% 0%, rgba(38, 194, 129, 0.08), transparent 40%), rgba(2, 5, 8, 0.65);
 }
 
 .ew-panel {
   /* Plugin-local default palette: elegant dark with vibrant accents */
   --SmartThemeQuoteColor: #7e8c9f;
   --SmartThemeBodyColor: #e8edf5;
-  --ew-accent: #8b5cf6;       /* Violet accent */
+  --ew-accent: #8b5cf6; /* Violet accent */
   --ew-accent-hover: #a78bfa;
   --ew-accent-glow: rgba(139, 92, 246, 0.35);
-  --ew-success: #10b981;      /* Emerald success */
-  --ew-danger: #f43f5e;       /* Rose danger */
+  --ew-success: #10b981; /* Emerald success */
+  --ew-danger: #f43f5e; /* Rose danger */
 
   width: min(1120px, calc(100vw - 24px));
   max-height: calc(100vh - 24px);
@@ -128,7 +142,11 @@ defineEmits<{
   font-weight: 700;
   line-height: 1.1;
   letter-spacing: 0.02em;
-  background: linear-gradient(135deg, #ffffff 0%, color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 70%, transparent) 100%);
+  background: linear-gradient(
+    135deg,
+    #ffffff 0%,
+    color-mix(in srgb, var(--SmartThemeBodyColor, #edf2f9) 70%, transparent) 100%
+  );
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }

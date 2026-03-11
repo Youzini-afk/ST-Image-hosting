@@ -364,101 +364,107 @@
           <div v-else class="ew-flow-card__deferred-placeholder">正在加载行为参数编辑器…</div>
         </section>
 
-        <section class="ew-flow-card__section">
+        <section class="ew-flow-card__section ew-flow-card__section--deferred">
           <h4>上下文规则</h4>
           <p class="ew-flow-card__desc">在聊天消息发送给工作流 AI 之前，依次进行：正则处理 → 文本切片。</p>
 
-          <div class="ew-flow-card__subsection">
-            <h5>正则处理</h5>
-            <div class="ew-toggle-item">
-              <button
-                type="button"
-                class="ew-switch"
-                role="switch"
-                :aria-checked="flow.use_tavern_regex ? 'true' : 'false'"
-                @click="patch({ use_tavern_regex: !flow.use_tavern_regex })"
-              >
-                <span class="ew-switch__track" :data-enabled="flow.use_tavern_regex ? '1' : '0'">
-                  <span class="ew-switch__thumb" />
-                </span>
+          <template v-if="deferredContextReady">
+            <div class="ew-flow-card__subsection">
+              <h5>正则处理</h5>
+              <div class="ew-toggle-item">
+                <button
+                  type="button"
+                  class="ew-switch"
+                  role="switch"
+                  :aria-checked="flow.use_tavern_regex ? 'true' : 'false'"
+                  @click="patch({ use_tavern_regex: !flow.use_tavern_regex })"
+                >
+                  <span class="ew-switch__track" :data-enabled="flow.use_tavern_regex ? '1' : '0'">
+                    <span class="ew-switch__thumb" />
+                  </span>
+                </button>
+                <span class="ew-toggle-item__label">使用酒馆已启用的正则</span>
+              </div>
+              <p class="ew-flow-card__hint-text">
+                开启后，聊天消息会先经过酒馆当前激活的正则脚本处理（全局 + 角色卡正则）。
+              </p>
+              <button type="button" class="ew-mini-btn ew-mini-btn--info" @click="openRegexPreview">
+                查看当前正则
               </button>
-              <span class="ew-toggle-item__label">使用酒馆已启用的正则</span>
-            </div>
-            <p class="ew-flow-card__hint-text">
-              开启后，聊天消息会先经过酒馆当前激活的正则脚本处理（全局 + 角色卡正则）。
-            </p>
-            <button type="button" class="ew-mini-btn ew-mini-btn--info" @click="openRegexPreview">查看当前正则</button>
 
-            <div class="ew-flow-card__custom-regex-head">
-              <h6>自定义正则</h6>
-              <button type="button" class="ew-mini-btn" @click="addCustomRegex">新增</button>
+              <div class="ew-flow-card__custom-regex-head">
+                <h6>自定义正则</h6>
+                <button type="button" class="ew-mini-btn" @click="addCustomRegex">新增</button>
+              </div>
+              <div v-if="flow.custom_regex_rules.length === 0" class="ew-empty">暂无自定义正则。</div>
+              <transition-group v-else name="ew-list" tag="div" class="ew-regex-list">
+                <article v-for="(rule, ruleIndex) in flow.custom_regex_rules" :key="rule.id" class="ew-regex-item">
+                  <header class="ew-regex-item__head">
+                    <label class="ew-checkbox"
+                      ><input :checked="rule.enabled" type="checkbox" @change="setRegexEnabled(ruleIndex, $event)"
+                    /></label>
+                    <span class="ew-regex-item__name" :title="rule.name">{{
+                      rule.name || `规则 ${ruleIndex + 1}`
+                    }}</span>
+                    <button type="button" class="ew-mini-btn ew-mini-btn--danger" @click="removeCustomRegex(ruleIndex)">
+                      删除
+                    </button>
+                  </header>
+                  <div class="ew-regex-item__body">
+                    <EwFieldRow label="名称"
+                      ><input
+                        :value="rule.name"
+                        type="text"
+                        placeholder="起个名字..."
+                        @input="patchRegexText(ruleIndex, 'name', $event)"
+                    /></EwFieldRow>
+                    <EwFieldRow label="正则表达式"
+                      ><input
+                        :value="rule.find_regex"
+                        type="text"
+                        placeholder="/pattern/gi"
+                        @input="patchRegexText(ruleIndex, 'find_regex', $event)"
+                    /></EwFieldRow>
+                    <EwFieldRow label="替换文本"
+                      ><input
+                        :value="rule.replace_string"
+                        type="text"
+                        placeholder="留空则删除"
+                        @input="patchRegexText(ruleIndex, 'replace_string', $event)"
+                    /></EwFieldRow>
+                  </div>
+                </article>
+              </transition-group>
             </div>
-            <div v-if="flow.custom_regex_rules.length === 0" class="ew-empty">暂无自定义正则。</div>
-            <transition-group v-else name="ew-list" tag="div" class="ew-regex-list">
-              <article v-for="(rule, ruleIndex) in flow.custom_regex_rules" :key="rule.id" class="ew-regex-item">
-                <header class="ew-regex-item__head">
-                  <label class="ew-checkbox"
-                    ><input :checked="rule.enabled" type="checkbox" @change="setRegexEnabled(ruleIndex, $event)"
-                  /></label>
-                  <span class="ew-regex-item__name" :title="rule.name">{{ rule.name || `规则 ${ruleIndex + 1}` }}</span>
-                  <button type="button" class="ew-mini-btn ew-mini-btn--danger" @click="removeCustomRegex(ruleIndex)">
-                    删除
-                  </button>
-                </header>
-                <div class="ew-regex-item__body">
-                  <EwFieldRow label="名称"
-                    ><input
-                      :value="rule.name"
-                      type="text"
-                      placeholder="起个名字..."
-                      @input="patchRegexText(ruleIndex, 'name', $event)"
-                  /></EwFieldRow>
-                  <EwFieldRow label="正则表达式"
-                    ><input
-                      :value="rule.find_regex"
-                      type="text"
-                      placeholder="/pattern/gi"
-                      @input="patchRegexText(ruleIndex, 'find_regex', $event)"
-                  /></EwFieldRow>
-                  <EwFieldRow label="替换文本"
-                    ><input
-                      :value="rule.replace_string"
-                      type="text"
-                      placeholder="留空则删除"
-                      @input="patchRegexText(ruleIndex, 'replace_string', $event)"
-                  /></EwFieldRow>
-                </div>
-              </article>
-            </transition-group>
-          </div>
 
-          <div class="ew-flow-card__subsection">
-            <h5>文本切片</h5>
-            <div v-if="deferredEditorsReady" class="ew-grid ew-grid--two">
-              <section>
-                <div class="ew-subhead"><h6>提取规则</h6></div>
-                <p class="ew-flow-card__hint-text">只保留 start～end 之间的文本发给 AI（如：只提取正文）。</p>
-                <EwRulesEditor
-                  title="提取规则"
-                  :model-value="flow.extract_rules"
-                  @update:model-value="value => patch({ extract_rules: value })"
-                />
-              </section>
-              <section>
-                <div class="ew-subhead"><h6>排除规则</h6></div>
-                <p class="ew-flow-card__hint-text">删掉 start～end 之间的文本（如：去掉思考标记）。</p>
-                <EwRulesEditor
-                  title="排除规则"
-                  :model-value="flow.exclude_rules"
-                  @update:model-value="value => patch({ exclude_rules: value })"
-                />
-              </section>
+            <div class="ew-flow-card__subsection">
+              <h5>文本切片</h5>
+              <div class="ew-grid ew-grid--two">
+                <section>
+                  <div class="ew-subhead"><h6>提取规则</h6></div>
+                  <p class="ew-flow-card__hint-text">只保留 start～end 之间的文本发给 AI（如：只提取正文）。</p>
+                  <EwRulesEditor
+                    title="提取规则"
+                    :model-value="flow.extract_rules"
+                    @update:model-value="value => patch({ extract_rules: value })"
+                  />
+                </section>
+                <section>
+                  <div class="ew-subhead"><h6>排除规则</h6></div>
+                  <p class="ew-flow-card__hint-text">删掉 start～end 之间的文本（如：去掉思考标记）。</p>
+                  <EwRulesEditor
+                    title="排除规则"
+                    :model-value="flow.exclude_rules"
+                    @update:model-value="value => patch({ exclude_rules: value })"
+                  />
+                </section>
+              </div>
             </div>
-            <div v-else class="ew-flow-card__deferred-placeholder">正在加载文本切片编辑器…</div>
-          </div>
+          </template>
+          <div v-else class="ew-flow-card__deferred-placeholder">正在加载上下文规则编辑器…</div>
         </section>
 
-        <section class="ew-flow-card__section">
+        <section class="ew-flow-card__section ew-flow-card__section--deferred">
           <div class="ew-flow-card__section-head">
             <h4>系统提示词</h4>
             <div class="ew-flow-card__action-group">
@@ -466,30 +472,34 @@
                 type="button"
                 class="ew-mini-btn ew-mini-btn--info"
                 @click="patch({ system_prompt: DEFAULT_WORKFLOW_SYSTEM_PROMPT })"
-              >恢复默认</button>
+              >
+                恢复默认
+              </button>
             </div>
           </div>
           <textarea
+            v-if="deferredPostReady"
             :value="flow.system_prompt"
             rows="5"
             :placeholder="'留空则不追加系统提示词\n\n默认值：\n' + DEFAULT_WORKFLOW_SYSTEM_PROMPT"
             @input="(e: Event) => patch({ system_prompt: (e.target as HTMLTextAreaElement).value })"
           />
+          <div v-else class="ew-flow-card__deferred-placeholder">正在加载系统提示词编辑器…</div>
         </section>
 
-        <section class="ew-flow-card__section">
+        <section class="ew-flow-card__section ew-flow-card__section--deferred">
           <div class="ew-flow-card__section-head">
             <h4>提示词编排</h4>
           </div>
           <EwPromptOrderList
-            v-if="deferredEditorsReady"
+            v-if="deferredPromptOrderReady"
             :prompt-order="flow.prompt_order"
             @update:prompt-order="updatePromptOrder"
           />
           <div v-else class="ew-flow-card__deferred-placeholder">正在加载提示词编排编辑器…</div>
         </section>
 
-        <EwFieldRow v-if="deferredAdvancedReady" label="请求模板(JSON merge)" :help="help('flow.request_template')">
+        <EwFieldRow v-if="deferredPostReady" label="请求模板(JSON merge)" :help="help('flow.request_template')">
           <textarea
             :value="requestTemplateDraft"
             rows="4"
@@ -499,24 +509,27 @@
         </EwFieldRow>
         <div v-else class="ew-flow-card__deferred-placeholder">正在加载请求模板编辑器…</div>
 
-        <section class="ew-flow-card__section">
+        <section class="ew-flow-card__section ew-flow-card__section--deferred">
           <h4>响应后处理</h4>
-          <EwFieldRow label="移除正则" :help="help('flow.response_remove_regex')">
-            <input
-              :value="flow.response_remove_regex"
-              type="text"
-              placeholder="示例: <thinking>[\s\S]*?</thinking>"
-              @input="setText('response_remove_regex', $event)"
-            />
-          </EwFieldRow>
-          <EwFieldRow label="提取正则" :help="help('flow.response_extract_regex')">
-            <input
-              :value="flow.response_extract_regex"
-              type="text"
-              placeholder="示例: <content>([\s\S]*?)</content>"
-              @input="setText('response_extract_regex', $event)"
-            />
-          </EwFieldRow>
+          <template v-if="deferredPostReady">
+            <EwFieldRow label="移除正则" :help="help('flow.response_remove_regex')">
+              <input
+                :value="flow.response_remove_regex"
+                type="text"
+                placeholder="示例: <thinking>[\s\S]*?</thinking>"
+                @input="setText('response_remove_regex', $event)"
+              />
+            </EwFieldRow>
+            <EwFieldRow label="提取正则" :help="help('flow.response_extract_regex')">
+              <input
+                :value="flow.response_extract_regex"
+                type="text"
+                placeholder="示例: <content>([\s\S]*?)</content>"
+                @input="setText('response_extract_regex', $event)"
+              />
+            </EwFieldRow>
+          </template>
+          <div v-else class="ew-flow-card__deferred-placeholder">正在加载响应后处理编辑器…</div>
         </section>
       </div>
     </transition>
@@ -565,9 +578,9 @@
 </template>
 
 <script setup lang="ts">
+import { DEFAULT_WORKFLOW_SYSTEM_PROMPT } from '../../runtime/dispatcher';
 import { simpleHash } from '../../runtime/helpers';
 import { collectAllRegexScripts, isBeautificationReplace } from '../../runtime/regex-engine';
-import { DEFAULT_WORKFLOW_SYSTEM_PROMPT } from '../../runtime/dispatcher';
 import type { EwApiPreset, EwFlowConfig, EwPromptOrderEntry } from '../../runtime/types';
 import { EwFlowConfigSchema } from '../../runtime/types';
 import { convertStPresetToFlow, isSillyTavernPreset } from '../convertStPreset';
@@ -609,12 +622,16 @@ const flow = computed(() => props.modelValue);
 // 避免后续切换时重新挂载的开销。
 const hasBeenExpanded = ref(props.expanded);
 const deferredAdvancedReady = ref(props.expanded);
-const deferredEditorsReady = ref(props.expanded);
+const deferredContextReady = ref(props.expanded);
+const deferredPromptOrderReady = ref(props.expanded);
+const deferredPostReady = ref(props.expanded);
 const requestTemplateDraft = ref(props.modelValue.request_template);
 let deferredMountFrameA: number | null = null;
 let deferredMountFrameB: number | null = null;
 let deferredMountFrameC: number | null = null;
 let requestTemplateTimer: number | null = null;
+let deferredPromptTimeout: number | null = null;
+let deferredPostIdleId: number | null = null;
 
 function clearDeferredMountFrames() {
   if (deferredMountFrameA !== null) {
@@ -633,10 +650,44 @@ function clearDeferredMountFrames() {
     window.clearTimeout(requestTemplateTimer);
     requestTemplateTimer = null;
   }
+  if (deferredPromptTimeout !== null) {
+    window.clearTimeout(deferredPromptTimeout);
+    deferredPromptTimeout = null;
+  }
+  if (deferredPostIdleId !== null) {
+    if (typeof window.cancelIdleCallback === 'function') {
+      window.cancelIdleCallback(deferredPostIdleId);
+    } else {
+      window.clearTimeout(deferredPostIdleId);
+    }
+    deferredPostIdleId = null;
+  }
+}
+
+function scheduleDeferredPostMount() {
+  const run = () => {
+    deferredPostIdleId = null;
+    if (props.expanded) {
+      deferredPostReady.value = true;
+    }
+  };
+
+  if (typeof window.requestIdleCallback === 'function') {
+    deferredPostIdleId = window.requestIdleCallback(run, { timeout: 240 });
+    return;
+  }
+
+  deferredPostIdleId = window.setTimeout(run, 80);
 }
 
 function scheduleDeferredEditorsMount() {
-  if (deferredAdvancedReady.value && deferredEditorsReady.value) return;
+  if (
+    deferredAdvancedReady.value &&
+    deferredContextReady.value &&
+    deferredPromptOrderReady.value &&
+    deferredPostReady.value
+  )
+    return;
 
   clearDeferredMountFrames();
   deferredMountFrameA = requestAnimationFrame(() => {
@@ -646,11 +697,18 @@ function scheduleDeferredEditorsMount() {
     }
     deferredMountFrameB = requestAnimationFrame(() => {
       deferredMountFrameB = null;
+      if (props.expanded) {
+        deferredContextReady.value = true;
+      }
       deferredMountFrameC = requestAnimationFrame(() => {
         deferredMountFrameC = null;
-        if (props.expanded) {
-          deferredEditorsReady.value = true;
-        }
+        deferredPromptTimeout = window.setTimeout(() => {
+          deferredPromptTimeout = null;
+          if (props.expanded) {
+            deferredPromptOrderReady.value = true;
+          }
+        }, 40);
+        scheduleDeferredPostMount();
       });
     });
   });
@@ -725,7 +783,10 @@ function clamp(value: number, min: number, max: number) {
 function setEnabled(event: Event) {
   patch({ enabled: (event.target as HTMLInputElement).checked });
 }
-function setText(key: 'name' | 'id' | 'request_template' | 'response_extract_regex' | 'response_remove_regex', event: Event) {
+function setText(
+  key: 'name' | 'id' | 'request_template' | 'response_extract_regex' | 'response_remove_regex',
+  event: Event,
+) {
   patch({ [key]: (event.target as HTMLInputElement | HTMLTextAreaElement).value } as Partial<EwFlowConfig>);
 }
 function setRequestTemplateDraft(event: Event) {
@@ -978,6 +1039,12 @@ function openRegexPreview() {
   border-radius: 0.7rem;
   border: 1px solid color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 45%, transparent);
   background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 20%, transparent);
+
+  .ew-flow-card__section--deferred {
+    content-visibility: auto;
+    contain-intrinsic-size: 320px;
+  }
+
   color: var(--SmartThemeBodyColor, #edf2f9);
   font-size: 0.78rem;
   font-weight: 600;
