@@ -1,4 +1,7 @@
-﻿import {
+﻿import { createDefaultApiPreset, createDefaultFlow } from './factory';
+import { simpleHash } from './helpers';
+import {
+  DEFAULT_PROMPT_ORDER,
   EwApiPreset,
   EwApiPresetSchema,
   EwFlowConfig,
@@ -6,14 +9,11 @@
   EwPromptOrderEntry,
   EwSettings,
   EwSettingsSchema,
-  DEFAULT_PROMPT_ORDER,
   LastIoSummary,
   LastIoSummarySchema,
   RunSummary,
   RunSummarySchema,
 } from './types';
-import { simpleHash } from './helpers';
-import { createDefaultApiPreset, createDefaultFlow } from './factory';
 
 type SettingsListener = (settings: EwSettings) => void;
 type RunListener = (summary: RunSummary | null) => void;
@@ -156,9 +156,7 @@ function migratePromptItems(flow: EwFlowConfig): EwFlowConfig {
   if (flow.prompt_order.length !== DEFAULT_PROMPT_ORDER.length) return flow;
 
   // 检查 prompt_order 是否仍为默认值（从未被用户配置）
-  const isDefault = flow.prompt_order.every(
-    (entry, idx) => entry.identifier === DEFAULT_PROMPT_ORDER[idx].identifier,
-  );
+  const isDefault = flow.prompt_order.every((entry, idx) => entry.identifier === DEFAULT_PROMPT_ORDER[idx].identifier);
   if (!isDefault) return flow;
 
   // 如果存在 prompt_items，将其作为自定义条目追加到 prompt_order
@@ -177,8 +175,12 @@ function migratePromptItems(flow: EwFlowConfig): EwFlowConfig {
       role: item.role as 'system' | 'user' | 'assistant',
       content: item.content,
       injection_position: item.position === 'in_chat' ? 'in_chat' : 'relative',
-      injection_depth: typeof oldItem.injection_depth === 'number' ? oldItem.injection_depth
-        : typeof oldItem.depth === 'number' ? oldItem.depth : 0,
+      injection_depth:
+        typeof oldItem.injection_depth === 'number'
+          ? oldItem.injection_depth
+          : typeof oldItem.depth === 'number'
+            ? oldItem.depth
+            : 0,
     });
   }
   return { ...flow, prompt_order: migratedOrder };
@@ -281,6 +283,12 @@ export function replaceSettings(nextSettings: EwSettings): EwSettings {
   return klona(normalized);
 }
 
+export function persistSettingsDraft(nextSettings: EwSettings) {
+  const draft = klona(nextSettings);
+  cachedSettings = draft;
+  writeScriptStorage(previous => ({ ...previous, settings: draft }));
+}
+
 export function patchSettings(partial: Partial<EwSettings>): EwSettings {
   // 使用展开运算符（浅合并）替代 _.merge，避免按索引合并数组导致的数据损坏。
   // _.merge 在新数组较短时会保留旧数组的条目。
@@ -370,7 +378,9 @@ export function saveControllerBackup(chatId: string, worldbookName: string, cont
   });
 }
 
-export function readControllerBackup(chatId: string): { at: number; worldbook_name: string; controller_content: string } | null {
+export function readControllerBackup(
+  chatId: string,
+): { at: number; worldbook_name: string; controller_content: string } | null {
   const storage = readScriptStorage();
   const backup = storage.backups?.[chatId];
   return backup ? klona(backup) : null;

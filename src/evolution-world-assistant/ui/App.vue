@@ -103,10 +103,11 @@
                 <EwApiPresetCard
                   v-for="(preset, index) in store.settings.api_presets"
                   :key="preset.id"
+                  v-memo="[preset, store.expandedApiPresetId === preset.id, bindCountByPresetId[preset.id] ?? 0]"
                   :index="index"
                   :model-value="preset"
                   :expanded="store.expandedApiPresetId === preset.id"
-                  :bind-count="getPresetBindCount(preset.id)"
+                  :bind-count="bindCountByPresetId[preset.id] ?? 0"
                   @toggle-expand="store.toggleApiPresetExpanded(preset.id)"
                   @remove="store.removeApiPreset(preset.id)"
                   @update:model-value="value => updateApiPreset(index, value)"
@@ -321,6 +322,7 @@
                   <EwFlowCard
                     v-for="(flow, index) in store.settings.flows"
                     :key="flow.id"
+                    v-memo="[flow, store.expandedFlowId === flow.id, store.settings.api_presets]"
                     :index="index"
                     :model-value="flow"
                     :api-presets="store.settings.api_presets"
@@ -352,6 +354,7 @@
                   <EwFlowCard
                     v-for="(flow, index) in store.charFlows"
                     :key="flow.id"
+                    v-memo="[flow, store.expandedFlowId === flow.id, store.settings.api_presets]"
                     :index="index"
                     :model-value="flow"
                     :api-presets="store.settings.api_presets"
@@ -416,6 +419,13 @@ function emitFabChanged() {
 }
 
 const enabledFlowCount = computed(() => store.settings.flows.filter(flow => flow.enabled).length);
+const bindCountByPresetId = computed<Record<string, number>>(() => {
+  const counts: Record<string, number> = {};
+  for (const flow of store.settings.flows) {
+    counts[flow.api_preset_id] = (counts[flow.api_preset_id] ?? 0) + 1;
+  }
+  return counts;
+});
 
 async function onMigrateSnapshots() {
   if (migratingSnapshots.value) return;
@@ -458,10 +468,6 @@ function updateApiPreset(index: number, nextPreset: EwApiPreset) {
   if (store.expandedApiPresetId === previousId && previousId !== nextPreset.id) {
     store.setExpandedApiPreset(nextPreset.id);
   }
-}
-
-function getPresetBindCount(presetId: string) {
-  return store.settings.flows.filter(flow => flow.api_preset_id === presetId).length;
 }
 
 function onApplyHide() {

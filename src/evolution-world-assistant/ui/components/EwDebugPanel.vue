@@ -43,25 +43,25 @@
           共 {{ store.promptPreview.length }} 条消息，当前渲染 {{ visiblePromptMessages.length }} 条
         </div>
         <div
-          v-for="(msg, idx) in visiblePromptMessages"
-          :key="idx"
+          v-for="entry in visiblePromptMessages"
+          :key="entry.originalIndex"
           class="dbg-msg-card"
-          :data-role="msg.role"
-          :data-debug-only="msg.debugOnly ? '1' : '0'"
+          :data-role="entry.role"
+          :data-debug-only="entry.debugOnly ? '1' : '0'"
         >
-          <div class="dbg-msg-header" @click="toggleMsgExpand(idx)">
-            <span class="dbg-role-badge" :data-role="msg.role">{{ msg.role }}</span>
-            <span v-if="msg.previewTitle" class="dbg-marker-title">{{ msg.previewTitle }}</span>
-            <span v-if="msg.name" class="dbg-msg-name">{{ msg.name }}</span>
-            <span class="dbg-msg-idx">#{{ idx }}</span>
-            <span class="dbg-msg-len">{{ msg.content.length }} chars</span>
-            <span class="dbg-expand-icon">{{ expandedMsgs.has(idx) ? '▼' : '▶' }}</span>
+          <div class="dbg-msg-header" @click="toggleMsgExpand(entry.originalIndex)">
+            <span class="dbg-role-badge" :data-role="entry.role">{{ entry.role }}</span>
+            <span v-if="entry.previewTitle" class="dbg-marker-title">{{ entry.previewTitle }}</span>
+            <span v-if="entry.name" class="dbg-msg-name">{{ entry.name }}</span>
+            <span class="dbg-msg-idx">#{{ entry.originalIndex }}</span>
+            <span class="dbg-msg-len">{{ entry.content.length }} chars</span>
+            <span class="dbg-expand-icon">{{ expandedMsgs.has(entry.originalIndex) ? '▼' : '▶' }}</span>
           </div>
-          <div v-if="expandedMsgs.has(idx)" class="dbg-msg-body">
-            <pre v-html="highlightEwTags(msg.content)"></pre>
+          <div v-if="expandedMsgs.has(entry.originalIndex)" class="dbg-msg-body">
+            <pre v-html="highlightEwTags(entry.content)"></pre>
           </div>
           <div v-else class="dbg-msg-preview">
-            <span v-html="msg.previewHtml"></span>
+            <span v-html="entry.previewHtml"></span>
           </div>
         </div>
         <div v-if="hasMorePromptMessages" class="dbg-actions">
@@ -204,17 +204,18 @@ const expandedIos = ref(new Set<number>());
 const promptRenderCount = ref(24);
 
 type DisplayPromptMessage = (typeof store.promptPreview extends Ref<infer T> ? NonNullable<T>[number] : never) & {
+  originalIndex: number;
   previewHtml: string;
 };
 
 const allFlows = computed(() => [...store.settings.flows, ...store.charFlows]);
-const displayPromptMessages = computed<DisplayPromptMessage[]>(() => {
-  return (store.promptPreview ?? []).map(msg => ({
+const visiblePromptMessages = computed<DisplayPromptMessage[]>(() => {
+  return (store.promptPreview ?? []).slice(0, promptRenderCount.value).map((msg, index) => ({
     ...msg,
+    originalIndex: index,
     previewHtml: highlightEwTags(truncate(msg.content, msg.debugOnly ? 200 : 120)),
   }));
 });
-const visiblePromptMessages = computed(() => displayPromptMessages.value.slice(0, promptRenderCount.value));
 const hasMorePromptMessages = computed(() => (store.promptPreview?.length ?? 0) > visiblePromptMessages.value.length);
 
 const dynEntries = computed(() => {

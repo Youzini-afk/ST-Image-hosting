@@ -1,48 +1,40 @@
 <template>
   <EwSectionCard title="楼层快照时间线" subtitle="每个楼层的 EW 条目变更记录。">
     <div class="hist-toolbar">
-      <button type="button" class="ew-btn" :disabled="store.busy" @click="store.loadFloorSnapshots">
-        🔄 刷新
-      </button>
-      <span class="hist-stats">
-        {{ hasSnapshotCount }} / {{ store.floorSnapshots.length }} 楼层有快照
-      </span>
+      <button type="button" class="ew-btn" :disabled="store.busy" @click="store.loadFloorSnapshots">🔄 刷新</button>
+      <span class="hist-stats"> {{ hasSnapshotCount }} / {{ store.floorSnapshots.length }} 楼层有快照 </span>
     </div>
 
     <div v-if="store.floorSnapshots.length > 0" class="hist-grid-wrap">
       <div class="hist-grid">
         <div
-          v-for="(floor, idx) in store.floorSnapshots"
-          :key="floor.messageId"
+          v-for="item in timelineItems"
+          :key="item.floor.messageId"
           class="hist-block"
-          :data-has-snapshot="floor.snapshot ? '1' : '0'"
-          @click="openFloor(floor.messageId)"
+          :data-has-snapshot="item.floor.snapshot ? '1' : '0'"
+          @click="openFloor(item.floor.messageId)"
         >
-          <span class="hist-block-floor">#{{ floor.messageId }}</span>
-          <div v-if="floor.snapshot" class="hist-block-changes">
-            <span v-if="getDiff(idx).created.length" class="hist-tag hist-tag--created">
-              +{{ getDiff(idx).created.length }}
+          <span class="hist-block-floor">#{{ item.floor.messageId }}</span>
+          <div v-if="item.floor.snapshot" class="hist-block-changes">
+            <span v-if="item.diff.created.length" class="hist-tag hist-tag--created">
+              +{{ item.diff.created.length }}
             </span>
-            <span v-if="getDiff(idx).modified.length" class="hist-tag hist-tag--modified">
-              ~{{ getDiff(idx).modified.length }}
+            <span v-if="item.diff.modified.length" class="hist-tag hist-tag--modified">
+              ~{{ item.diff.modified.length }}
             </span>
-            <span v-if="getDiff(idx).deleted.length" class="hist-tag hist-tag--deleted">
-              −{{ getDiff(idx).deleted.length }}
+            <span v-if="item.diff.deleted.length" class="hist-tag hist-tag--deleted">
+              −{{ item.diff.deleted.length }}
             </span>
-            <span v-if="getDiff(idx).toggled.length" class="hist-tag hist-tag--toggled">
-              ⇄{{ getDiff(idx).toggled.length }}
+            <span v-if="item.diff.toggled.length" class="hist-tag hist-tag--toggled">
+              ⇄{{ item.diff.toggled.length }}
             </span>
-            <span v-if="getDiff(idx).controllerChanged" class="hist-tag hist-tag--modified">
-              ≈C
-            </span>
+            <span v-if="item.diff.controllerChanged" class="hist-tag hist-tag--modified"> ≈C </span>
           </div>
           <div v-else class="hist-block-empty">—</div>
         </div>
       </div>
     </div>
-    <div v-else class="hist-empty">
-      暂无楼层数据。点击「刷新」加载。
-    </div>
+    <div v-else class="hist-empty">暂无楼层数据。点击「刷新」加载。</div>
   </EwSectionCard>
 
   <EwFloorDetailModal
@@ -55,19 +47,17 @@
 </template>
 
 <script setup lang="ts">
-import EwSectionCard from './EwSectionCard.vue';
-import EwFloorDetailModal from './EwFloorDetailModal.vue';
 import { diffSnapshots, type SnapshotDiff } from '../../runtime/floor-binding';
 import type { SnapshotData } from '../../runtime/snapshot-storage';
 import { useEwStore } from '../store';
+import EwFloorDetailModal from './EwFloorDetailModal.vue';
+import EwSectionCard from './EwSectionCard.vue';
 
 const store = useEwStore();
 const modalVisible = ref(false);
 const selectedFloorId = ref(0);
 
-const hasSnapshotCount = computed(() =>
-  store.floorSnapshots.filter(f => f.snapshot !== null).length,
-);
+const hasSnapshotCount = computed(() => store.floorSnapshots.filter(f => f.snapshot !== null).length);
 
 const selectedSnapshot = computed<SnapshotData | null>(() => {
   const floor = store.floorSnapshots.find(f => f.messageId === selectedFloorId.value);
@@ -84,26 +74,22 @@ const selectedPrevSnapshot = computed<SnapshotData | null>(() => {
   return null;
 });
 
-// 缓存 diff 结果以避免 v-for 中重复计算
-const diffCache = computed(() => {
-  const cache = new Map<number, SnapshotDiff>();
-  const floors = store.floorSnapshots;
-  for (let i = 0; i < floors.length; i++) {
-    const curr = floors[i].snapshot;
-    let prev: SnapshotData | null = null;
-    for (let j = i - 1; j >= 0; j--) {
-      if (floors[j].snapshot) { prev = floors[j].snapshot; break; }
-    }
-    cache.set(i, diffSnapshots(prev, curr));
-  }
-  return cache;
-});
-
 const emptyDiff: SnapshotDiff = { created: [], modified: [], deleted: [], toggled: [], controllerChanged: false };
+const timelineItems = computed(() => {
+  const items: Array<{ floor: (typeof store.floorSnapshots)[number]; diff: SnapshotDiff }> = [];
+  let previousSnapshot: SnapshotData | null = null;
 
-function getDiff(idx: number): SnapshotDiff {
-  return diffCache.value.get(idx) ?? emptyDiff;
-}
+  for (const floor of store.floorSnapshots) {
+    const currentSnapshot = floor.snapshot;
+    const diff = diffSnapshots(previousSnapshot, currentSnapshot) ?? emptyDiff;
+    items.push({ floor, diff });
+    if (currentSnapshot) {
+      previousSnapshot = currentSnapshot;
+    }
+  }
+
+  return items;
+});
 
 function openFloor(messageId: number) {
   selectedFloorId.value = messageId;
@@ -144,7 +130,10 @@ function openFloor(messageId: number) {
   background: color-mix(in srgb, var(--SmartThemeQuoteColor, #7f92ab) 8%, rgba(0, 0, 0, 0.12));
   padding: 0.5rem;
   cursor: pointer;
-  transition: border-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    transform 0.15s ease,
+    box-shadow 0.2s ease;
   min-height: 4.5rem;
   display: flex;
   flex-direction: column;
@@ -220,10 +209,24 @@ function openFloor(messageId: number) {
   font-weight: 600;
   padding: 0.4rem 0.85rem;
   cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.2s ease;
 }
-.ew-btn:hover { border-color: var(--ew-accent); background: color-mix(in srgb, var(--ew-accent) 25%, transparent); color: #fff; transform: translateY(-2px); box-shadow: 0 4px 12px var(--ew-accent-glow); }
-.ew-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.ew-btn:hover {
+  border-color: var(--ew-accent);
+  background: color-mix(in srgb, var(--ew-accent) 25%, transparent);
+  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--ew-accent-glow);
+}
+.ew-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
 
 /* ── Mobile ── */
 @media (max-width: 768px) {
@@ -234,7 +237,11 @@ function openFloor(messageId: number) {
     min-height: 3.5rem;
     padding: 0.35rem;
   }
-  .hist-block-floor { font-size: 0.68rem; }
-  .hist-tag { font-size: 0.58rem; }
+  .hist-block-floor {
+    font-size: 0.68rem;
+  }
+  .hist-tag {
+    font-size: 0.58rem;
+  }
 }
 </style>

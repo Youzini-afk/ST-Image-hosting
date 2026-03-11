@@ -14,6 +14,7 @@ import {
   getLastRun,
   getSettings,
   patchSettings,
+  persistSettingsDraft,
   replaceSettings,
   subscribeLastIo,
   subscribeLastRun,
@@ -74,12 +75,7 @@ export const useEwStore = defineStore('evolution-world-store', () => {
 
   function flushSettingsPersist() {
     clearScheduledPersist();
-    suppressPersist = true;
-    const persisted = replaceSettings(settings.value);
-    settings.value = persisted;
-    queueMicrotask(() => {
-      suppressPersist = false;
-    });
+    persistSettingsDraft(settings.value);
   }
 
   function scheduleSettingsPersist() {
