@@ -138,18 +138,65 @@ function resolveWorldInfoPromptGetter(): {
   return {};
 }
 
-function getRuntimeCharacterCardFields(): ReturnType<typeof getCharacterCardFields> {
-  const { getter } = resolveCharacterCardFieldsGetter();
-  if (typeof getter === 'function') {
-    const chid = getRuntimeCharacterId();
-    if (Number.isFinite(chid) && chid >= 0) {
-      return getter({ chid });
-    }
-
-    return getter();
+function hasCharacterCardFieldValue(fields: ReturnType<typeof getCharacterCardFields> | undefined): boolean {
+  if (!fields) {
+    return false;
   }
 
-  return undefined;
+  return Boolean(
+    fields.description?.trim() ||
+    fields.personality?.trim() ||
+    fields.persona?.trim() ||
+    fields.scenario?.trim() ||
+    fields.mesExamples?.trim() ||
+    fields.system?.trim() ||
+    fields.jailbreak?.trim(),
+  );
+}
+
+function resolveRuntimeCharacterCardFields(): {
+  fields?: ReturnType<typeof getCharacterCardFields>;
+  source?: string;
+  note?: string;
+} {
+  const { getter, source } = resolveCharacterCardFieldsGetter();
+  if (typeof getter !== 'function') {
+    return { note: '未检测到 getCharacterCardFields getter' };
+  }
+
+  const chid = getRuntimeCharacterId();
+  if (Number.isFinite(chid) && chid >= 0) {
+    const withChid = getter({ chid });
+    if (hasCharacterCardFieldValue(withChid)) {
+      return { fields: withChid, source: `${source}({ chid: ${chid} })` };
+    }
+
+    const withoutChid = getter();
+    if (hasCharacterCardFieldValue(withoutChid)) {
+      return {
+        fields: withoutChid,
+        source: `${source}()`,
+        note: `带 chid 调用为空，已回退到无参调用；chid=${chid}`,
+      };
+    }
+
+    return {
+      fields: withChid ?? withoutChid,
+      source: `${source}({ chid: ${chid} })`,
+      note: `getter 存在，但带 chid 与无参调用都为空；chid=${chid}`,
+    };
+  }
+
+  const withoutChid = getter();
+  return {
+    fields: withoutChid,
+    source: `${source}()`,
+    note: '未解析出有效 chid，直接使用无参调用',
+  };
+}
+
+function getRuntimeCharacterCardFields(): ReturnType<typeof getCharacterCardFields> {
+  return resolveRuntimeCharacterCardFields().fields;
 }
 
 function getRuntimeCharacterId(): number {
@@ -195,25 +242,44 @@ function getRuntimeCharacters(): SillyTavern.v1CharData[] {
   return [];
 }
 
-function getRuntimeCharData(): SillyTavern.v1CharData | null {
+function getRuntimeCharData(): { value: SillyTavern.v1CharData | null; source?: string; note?: string } {
   const hostRuntime = getHostRuntime();
   const ctx = getRuntimeContext();
   const characterId = getRuntimeCharacterId();
   const runtimeCharacters = getRuntimeCharacters();
 
+  if (typeof hostRuntime.getCharData === 'function') {
+    const current = hostRuntime.getCharData('current') ?? null;
+    if (current) {
+      return { value: current, source: 'hostRuntime.getCharData(current)' };
+    }
+  }
+
+  if (typeof getCharData === 'function') {
+    const current = getCharData('current') ?? null;
+    if (current) {
+      return { value: current, source: 'global getCharData(current)' };
+    }
+  }
+
   if (Number.isFinite(characterId) && characterId >= 0 && runtimeCharacters[characterId]) {
-    return runtimeCharacters[characterId] as SillyTavern.v1CharData;
+    return {
+      value: runtimeCharacters[characterId] as SillyTavern.v1CharData,
+      source: `runtimeCharacters[${characterId}]`,
+    };
   }
 
   if (Number.isFinite(Number(ctx?.characterId)) && Number(ctx?.characterId) >= 0 && Array.isArray(ctx?.characters)) {
-    return (ctx.characters[Number(ctx.characterId)] as SillyTavern.v1CharData) ?? null;
+    return {
+      value: (ctx.characters[Number(ctx.characterId)] as SillyTavern.v1CharData) ?? null,
+      source: `ctx.characters[${Number(ctx.characterId)}]`,
+    };
   }
 
-  if (typeof hostRuntime.getCharData === 'function') {
-    return hostRuntime.getCharData('current') ?? null;
-  }
-
-  return getCharData?.('current') ?? null;
+  return {
+    value: null,
+    note: `characterId=${characterId}; runtimeCharacters=${runtimeCharacters.length}; ctx.characterId=${String(ctx?.characterId ?? '')}`,
+  };
 }
 
 function getRuntimeLastMessageId(): number {
@@ -375,13 +441,15 @@ function getRuntimeCharacterFields(): {
   dialogueExamples: string;
   diagnostics: PromptDiagnosticMap;
 } {
-  const helperFields = getRuntimeCharacterCardFields();
-  const charData = getRuntimeCharData();
+  const helperResult = resolveRuntimeCharacterCardFields();
+  const helperFields = helperResult.fields;
+  const charDataResult = getRuntimeCharData();
+  const charData = charDataResult.value;
   const ctx = getRuntimeContext();
-  const { source: helperSource } = resolveCharacterCardFieldsGetter();
+  const helperSource = helperResult.source;
   const charDataState = charData
-    ? `charData available (${charData.name || charData.avatar || 'unnamed'})`
-    : 'charData unavailable';
+    ? `charData available (${charData.name || charData.avatar || 'unnamed'}) from ${charDataResult.source ?? 'unknown'}`
+    : `charData unavailable${charDataResult.note ? `; ${charDataResult.note}` : ''}`;
 
   const main = resolveTextCandidate(
     [
@@ -451,24 +519,27 @@ function getRuntimeCharacterFields(): {
       main: appendDiagnosticNote(main.diagnostic, `helper=${helperSource ?? 'none'}; ${charDataState}`)!,
       postHistoryInstructions: appendDiagnosticNote(
         jailbreak.diagnostic,
-        `helper=${helperSource ?? 'none'}; ${charDataState}`,
+        [helperResult.note, `helper=${helperSource ?? 'none'}; ${charDataState}`].filter(Boolean).join('; '),
       )!,
       charDescription: appendDiagnosticNote(
         charDescription.diagnostic,
-        `helper=${helperSource ?? 'none'}; ${charDataState}`,
+        [helperResult.note, `helper=${helperSource ?? 'none'}; ${charDataState}`].filter(Boolean).join('; '),
       )!,
       charPersonality: appendDiagnosticNote(
         charPersonality.diagnostic,
-        `helper=${helperSource ?? 'none'}; ${charDataState}`,
+        [helperResult.note, `helper=${helperSource ?? 'none'}; ${charDataState}`].filter(Boolean).join('; '),
       )!,
-      scenario: appendDiagnosticNote(scenario.diagnostic, `helper=${helperSource ?? 'none'}; ${charDataState}`)!,
+      scenario: appendDiagnosticNote(
+        scenario.diagnostic,
+        [helperResult.note, `helper=${helperSource ?? 'none'}; ${charDataState}`].filter(Boolean).join('; '),
+      )!,
       personaDescription: appendDiagnosticNote(
         personaDescription.diagnostic,
-        `helper=${helperSource ?? 'none'}; ${charDataState}`,
+        [helperResult.note, `helper=${helperSource ?? 'none'}; ${charDataState}`].filter(Boolean).join('; '),
       )!,
       dialogueExamples: appendDiagnosticNote(
         dialogueExamples.diagnostic,
-        `helper=${helperSource ?? 'none'}; ${charDataState}`,
+        [helperResult.note, `helper=${helperSource ?? 'none'}; ${charDataState}`].filter(Boolean).join('; '),
       )!,
     },
   };
