@@ -7,12 +7,12 @@ export const TextSliceRuleSchema = z
   })
   .prefault({});
 
-
 export const FlowRequestSchema = z.object({
   version: z.literal('ew-flow/v1'),
   request_id: z.string().min(1),
   chat_id: z.string().min(1),
   message_id: z.number(),
+  user_input: z.string().default(''),
   flow: z.object({
     id: z.string().min(1),
     name: z.string().default(''),

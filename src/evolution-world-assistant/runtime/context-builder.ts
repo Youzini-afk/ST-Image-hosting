@@ -1,20 +1,21 @@
-import { FlowRequestV1, FlowRequestSchema } from './contracts';
-import { EwFlowConfig, EwSettings } from './types';
+import { FlowRequestSchema, FlowRequestV1 } from './contracts';
 import { uuidv4 } from './helpers';
+import { EwFlowConfig, EwSettings } from './types';
 import { resolveTargetWorldbook } from './worldbook-runtime';
 
 export type BuildRequestInput = {
   settings: EwSettings;
   flow: EwFlowConfig;
   message_id: number;
+  user_input: string;
   request_id?: string;
   serial_results?: Record<string, any>[];
 };
 
-
 export async function buildFlowRequest(input: BuildRequestInput): Promise<FlowRequestV1> {
   const chatId = String(
-    (typeof SillyTavern !== 'undefined' ? SillyTavern?.getCurrentChatId?.() ?? (SillyTavern as any).chatId : null) ?? 'unknown',
+    (typeof SillyTavern !== 'undefined' ? (SillyTavern?.getCurrentChatId?.() ?? (SillyTavern as any).chatId) : null) ??
+      'unknown',
   );
   const requestId = input.request_id ?? uuidv4();
 
@@ -32,6 +33,7 @@ export async function buildFlowRequest(input: BuildRequestInput): Promise<FlowRe
     request_id: requestId,
     chat_id: chatId,
     message_id: input.message_id,
+    user_input: input.user_input,
     flow: {
       id: input.flow.id,
       name: input.flow.name,

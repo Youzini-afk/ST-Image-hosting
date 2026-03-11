@@ -109,6 +109,7 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowO
         settings,
         flows: enabledFlows,
         message_id: input.message_id,
+        user_input: input.user_input,
         request_id: requestId,
         abortSignal: input.abortSignal,
         isCancelled: input.isCancelled,

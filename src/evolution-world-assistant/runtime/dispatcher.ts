@@ -12,6 +12,7 @@ type DispatchInput = {
   settings: EwSettings;
   flows: EwFlowConfig[];
   message_id: number;
+  user_input: string;
   request_id: string;
   abortSignal?: AbortSignal;
   isCancelled?: () => boolean;
@@ -577,6 +578,7 @@ async function executeFlow(
   flow: EwFlowConfig,
   flowOrder: number,
   messageId: number,
+  userInput: string,
   requestId: string,
   serialResults: Record<string, any>[],
   abortSignal?: AbortSignal,
@@ -596,6 +598,7 @@ async function executeFlow(
     settings,
     flow,
     message_id: messageId,
+    user_input: userInput,
     request_id: requestId,
     serial_results: serialResults,
   });
@@ -617,35 +620,23 @@ async function executeFlow(
         abortSignal,
         isCancelled,
       );
-    } else {
+    } else if (shouldUseGenerateRawCustomApi(apiPreset)) {
       // 自定义 API：优先走官方 generateRaw.custom_api；若需要自定义 headers 再回退到 ST backend
-      if (shouldUseGenerateRawCustomApi(apiPreset)) {
-        try {
-          response = await executeFlowViaGenerateRawCustomApi(
-            flow,
-            apiPreset,
-            body,
-            promptComponents,
-            settings.controller_entry_name,
-            generationId,
-            abortSignal,
-            isCancelled,
-          );
-        } catch (error) {
-          console.warn(
-            `[EW] Flow "${flow.id}": generateRaw.custom_api failed, fallback to ST backend — ${toErrorMessage(error)}`,
-          );
-          response = await executeFlowViaStBackend(
-            flow,
-            apiPreset,
-            body,
-            promptComponents,
-            settings.controller_entry_name,
-            abortSignal,
-            isCancelled,
-          );
-        }
-      } else {
+      try {
+        response = await executeFlowViaGenerateRawCustomApi(
+          flow,
+          apiPreset,
+          body,
+          promptComponents,
+          settings.controller_entry_name,
+          generationId,
+          abortSignal,
+          isCancelled,
+        );
+      } catch (error) {
+        console.warn(
+          `[EW] Flow "${flow.id}": generateRaw.custom_api failed, fallback to ST backend — ${toErrorMessage(error)}`,
+        );
         response = await executeFlowViaStBackend(
           flow,
           apiPreset,
@@ -656,6 +647,16 @@ async function executeFlow(
           isCancelled,
         );
       }
+    } else {
+      response = await executeFlowViaStBackend(
+        flow,
+        apiPreset,
+        body,
+        promptComponents,
+        settings.controller_entry_name,
+        abortSignal,
+        isCancelled,
+      );
     }
 
     throwIfDispatchAborted(abortSignal, isCancelled);
@@ -704,6 +705,7 @@ export async function dispatchFlows(input: DispatchInput): Promise<DispatchFlows
         flow,
         index,
         input.message_id,
+        input.user_input,
         input.request_id,
         serialResults,
         input.abortSignal,
@@ -740,6 +742,7 @@ export async function dispatchFlows(input: DispatchInput): Promise<DispatchFlows
         flow,
         index,
         input.message_id,
+        input.user_input,
         input.request_id,
         [],
         input.abortSignal,
