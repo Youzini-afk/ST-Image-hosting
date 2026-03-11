@@ -1,4 +1,4 @@
-﻿import { EwSettings } from './types';
+import { EwSettings } from './types';
 
 export type TargetWorldbook = {
   worldbook_name: string;
@@ -143,22 +143,22 @@ function nextUid(entries: WorldbookEntry[]): number {
   return (maxUid ?? 0) + 1;
 }
 
-export function ensureDefaultEntry(name: string, content: string, enabled: boolean, entries: WorldbookEntry[], constant = false): WorldbookEntry {
+export function ensureDefaultEntry(name: string, content: string, enabled: boolean, entries: WorldbookEntry[], _constant = false): WorldbookEntry {
   return {
     uid: nextUid(entries),
     name,
     enabled,
     strategy: {
-      type: constant ? 'constant' : 'selective',
+      type: 'constant',
       keys: [],
       keys_secondary: { logic: 'and_any', keys: [] },
       scan_depth: 'same_as_global',
     },
     position: {
-      type: 'at_depth',
+      type: 'before_character_definition',
       role: 'system',
       depth: 0,
-      order: 14720,
+      order: 100,
     },
     content,
     probability: 100,
