@@ -1,4 +1,4 @@
-﻿import { MergedPlan, EwSettings } from './types';
+import { MergedPlan, EwSettings } from './types';
 import { resolveTargetWorldbook, ensureDefaultEntry } from './worldbook-runtime';
 import { markFloorEntries } from './floor-binding';
 import { saveControllerBackup } from './settings';
@@ -31,6 +31,7 @@ function applyDeclarativeDiff(
   currentEntries: WorldbookEntry[],
   desiredEntries: Array<{ name: string; content: string; enabled: boolean }>,
   removeEntries: Array<{ name: string }>,
+  settings: EwSettings,
 ): WorldbookEntry[] {
   // 步骤 1：移除条目。
   const removeSet = new Set(removeEntries.map(e => e.name));
@@ -44,13 +45,18 @@ function applyDeclarativeDiff(
 
   // 步骤 3：应用目标状态（在已克隆的数组上就地修改）。
   for (const desired of desiredEntries) {
+    // EW/Dyn/ 条目必须始终禁用（红灯）——它们由 EW/Controller 的 getwi() 拉取，
+    // 不需要通过酒馆的关键词扫描激活。AI 返回的 enabled 字段对 Dyn 条目无效。
+    const isDynEntry = desired.name.startsWith(settings.dynamic_entry_prefix);
+    const effectiveEnabled = isDynEntry ? false : desired.enabled;
+
     const existingIndex = indexByName.get(desired.name);
 
     if (existingIndex !== undefined) {
       result[existingIndex].content = desired.content;
-      result[existingIndex].enabled = desired.enabled;
+      result[existingIndex].enabled = effectiveEnabled;
     } else {
-      const newEntry = ensureDefaultEntry(desired.name, desired.content, desired.enabled, result);
+      const newEntry = ensureDefaultEntry(desired.name, desired.content, effectiveEnabled, result);
       indexByName.set(desired.name, result.length);
       result.push(newEntry);
     }
@@ -89,6 +95,7 @@ export async function commitMergedPlan(
     beforeEntries,
     mergedPlan.worldbook.desired_entries,
     mergedPlan.worldbook.remove_entries,
+    settings,
   );
 
   // 将 EJS controller 条目写入角色世界书。
