@@ -5,9 +5,11 @@ export const MVU_ENTRY_COMMENT_REGEX = /\[(mvu_update|mvu_plot|initvar)\]/i;
 
 const MVU_UPDATE_BLOCK_REGEX = /\n?<(update(?:variable)?|variableupdate)>(?:(?!<\1>).)*<\/\1?>/gis;
 const MVU_STATUS_PLACEHOLDER_REGEX = /\n?<StatusPlaceHolderImpl\/>/gi;
-const MVU_STATUS_CURRENT_VARIABLE_REGEX = /\n?<status_current_variable>[\s\S]*?<\/status_current_variable>/gi;
-const MVU_VARIABLE_OUTPUT_ENTRY_REGEX = /^\s*---\s*[\r\n]+变量输出格式:\s*[\s\S]*?<UpdateVariable>/i;
-const MVU_VARIABLE_RULES_ENTRY_REGEX = /^\s*---\s*[\r\n]+变量更新规则:\s*[\s\S]*?(?:当前时间:|近期事务:)/i;
+const MVU_STATUS_CURRENT_VARIABLE_REPLACE_REGEX =
+  /\n?<status_current_variables?>[\s\S]*?<\/status_current_variables?>/gi;
+const MVU_STATUS_CURRENT_VARIABLE_DETECT_REGEX = /<status_current_variables?>[\s\S]*?<\/status_current_variables?>/i;
+const MVU_VARIABLE_OUTPUT_ENTRY_REGEX = /变量输出格式:\s*[\s\S]*?<UpdateVariable>/i;
+const MVU_VARIABLE_RULES_ENTRY_REGEX = /变量更新规则:\s*[\s\S]*?(?:type:\s*|check:\s*|当前时间:|近期事务:)/i;
 
 export function isMvuTaggedWorldInfoComment(comment: string): boolean {
   return MVU_ENTRY_COMMENT_REGEX.test(comment);
@@ -28,7 +30,7 @@ export function isLikelyMvuWorldInfoContent(content: string): boolean {
   }
 
   return (
-    MVU_STATUS_CURRENT_VARIABLE_REGEX.test(normalized) ||
+    MVU_STATUS_CURRENT_VARIABLE_DETECT_REGEX.test(normalized) ||
     MVU_VARIABLE_OUTPUT_ENTRY_REGEX.test(normalized) ||
     MVU_VARIABLE_RULES_ENTRY_REGEX.test(normalized)
   );
@@ -42,7 +44,7 @@ export function stripMvuPromptArtifacts(content: string): string {
   return content
     .replace(MVU_UPDATE_BLOCK_REGEX, '')
     .replace(MVU_STATUS_PLACEHOLDER_REGEX, '')
-    .replace(MVU_STATUS_CURRENT_VARIABLE_REGEX, '')
+    .replace(MVU_STATUS_CURRENT_VARIABLE_REPLACE_REGEX, '')
     .trim();
 }
 
