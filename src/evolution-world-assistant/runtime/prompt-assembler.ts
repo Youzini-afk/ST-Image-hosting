@@ -18,6 +18,15 @@ declare function getCharacterCardFields():
 declare function getLastMessageId(): number;
 declare function getChatMessages(range: string, opts?: Record<string, any>): any[];
 declare function getCharData(name: 'current' | string): SillyTavern.v1CharData | null;
+declare function getWorldInfoPrompt(
+  chat: string[],
+  max_context: number,
+  is_dry_run: boolean,
+): Promise<{
+  worldInfoString?: string;
+  worldInfoBefore?: string;
+  worldInfoAfter?: string;
+}>;
 declare const SillyTavern: { getContext(): Record<string, any> } | undefined;
 declare const characters: SillyTavern.v1CharData[] | undefined;
 declare const this_chid: number | string | undefined;
@@ -80,18 +89,67 @@ function getRuntimeContext(): Record<string, any> | undefined {
   return undefined;
 }
 
-function getRuntimeCharacterCardFields(): ReturnType<typeof getCharacterCardFields> {
+function resolveCharacterCardFieldsGetter(): {
+  getter?: ({ chid }?: { chid?: number }) => any;
+  source?: string;
+} {
   const hostRuntime = getHostRuntime();
-  if (typeof hostRuntime.getCharacterCardFields === 'function') {
-    const chid = getRuntimeCharacterId();
-    if (Number.isFinite(chid) && chid >= 0) {
-      return hostRuntime.getCharacterCardFields({ chid });
-    }
+  const ctx = getRuntimeContext();
 
-    return hostRuntime.getCharacterCardFields();
+  if (typeof ctx?.getCharacterCardFields === 'function') {
+    return { getter: ctx.getCharacterCardFields, source: 'ctx.getCharacterCardFields' };
+  }
+  if (typeof hostRuntime.getCharacterCardFields === 'function') {
+    return { getter: hostRuntime.getCharacterCardFields, source: 'hostRuntime.getCharacterCardFields' };
+  }
+  if (typeof (hostRuntime as any).SillyTavern?.getCharacterCardFields === 'function') {
+    return {
+      getter: (hostRuntime as any).SillyTavern.getCharacterCardFields,
+      source: 'hostRuntime.SillyTavern.getCharacterCardFields',
+    };
+  }
+  if (typeof getCharacterCardFields === 'function') {
+    return { getter: getCharacterCardFields, source: 'global getCharacterCardFields' };
   }
 
-  return getCharacterCardFields?.();
+  return {};
+}
+
+function resolveWorldInfoPromptGetter(): {
+  getter?: (chat: string[], maxContext: number, isDryRun: boolean) => Promise<any>;
+  source?: string;
+} {
+  const hostRuntime = getHostRuntime();
+  const ctx = getRuntimeContext();
+
+  if (typeof ctx?.getWorldInfoPrompt === 'function') {
+    return { getter: ctx.getWorldInfoPrompt, source: 'ctx.getWorldInfoPrompt' };
+  }
+  if (typeof hostRuntime.getWorldInfoPrompt === 'function') {
+    return { getter: hostRuntime.getWorldInfoPrompt, source: 'hostRuntime.getWorldInfoPrompt' };
+  }
+  if (typeof hostRuntime.SillyTavern?.getWorldInfoPrompt === 'function') {
+    return { getter: hostRuntime.SillyTavern.getWorldInfoPrompt, source: 'hostRuntime.SillyTavern.getWorldInfoPrompt' };
+  }
+  if (typeof getWorldInfoPrompt === 'function') {
+    return { getter: getWorldInfoPrompt, source: 'global getWorldInfoPrompt' };
+  }
+
+  return {};
+}
+
+function getRuntimeCharacterCardFields(): ReturnType<typeof getCharacterCardFields> {
+  const { getter } = resolveCharacterCardFieldsGetter();
+  if (typeof getter === 'function') {
+    const chid = getRuntimeCharacterId();
+    if (Number.isFinite(chid) && chid >= 0) {
+      return getter({ chid });
+    }
+
+    return getter();
+  }
+
+  return undefined;
 }
 
 function getRuntimeCharacterId(): number {
@@ -320,6 +378,10 @@ function getRuntimeCharacterFields(): {
   const helperFields = getRuntimeCharacterCardFields();
   const charData = getRuntimeCharData();
   const ctx = getRuntimeContext();
+  const { source: helperSource } = resolveCharacterCardFieldsGetter();
+  const charDataState = charData
+    ? `charData available (${charData.name || charData.avatar || 'unnamed'})`
+    : 'charData unavailable';
 
   const main = resolveTextCandidate(
     [
@@ -386,13 +448,28 @@ function getRuntimeCharacterFields(): {
     personaDescription: personaDescription.value,
     dialogueExamples: dialogueExamples.value,
     diagnostics: {
-      main: main.diagnostic,
-      postHistoryInstructions: jailbreak.diagnostic,
-      charDescription: charDescription.diagnostic,
-      charPersonality: charPersonality.diagnostic,
-      scenario: scenario.diagnostic,
-      personaDescription: personaDescription.diagnostic,
-      dialogueExamples: dialogueExamples.diagnostic,
+      main: appendDiagnosticNote(main.diagnostic, `helper=${helperSource ?? 'none'}; ${charDataState}`)!,
+      postHistoryInstructions: appendDiagnosticNote(
+        jailbreak.diagnostic,
+        `helper=${helperSource ?? 'none'}; ${charDataState}`,
+      )!,
+      charDescription: appendDiagnosticNote(
+        charDescription.diagnostic,
+        `helper=${helperSource ?? 'none'}; ${charDataState}`,
+      )!,
+      charPersonality: appendDiagnosticNote(
+        charPersonality.diagnostic,
+        `helper=${helperSource ?? 'none'}; ${charDataState}`,
+      )!,
+      scenario: appendDiagnosticNote(scenario.diagnostic, `helper=${helperSource ?? 'none'}; ${charDataState}`)!,
+      personaDescription: appendDiagnosticNote(
+        personaDescription.diagnostic,
+        `helper=${helperSource ?? 'none'}; ${charDataState}`,
+      )!,
+      dialogueExamples: appendDiagnosticNote(
+        dialogueExamples.diagnostic,
+        `helper=${helperSource ?? 'none'}; ${charDataState}`,
+      )!,
     },
   };
 }
@@ -403,17 +480,17 @@ async function populateWorldInfoComponents(components: PromptComponents): Promis
 
   try {
     const ctx = getRuntimeContext();
-    const hostRuntime = getHostRuntime();
+    const { getter: worldInfoGetter, source: worldInfoSource } = resolveWorldInfoPromptGetter();
 
     const cachedBefore = getPreferredText(ctx?.worldInfoBefore);
     const cachedAfter = getPreferredText(ctx?.worldInfoAfter);
     beforeAttempts.push(describeAttempt('ctx.worldInfoBefore', ctx?.worldInfoBefore));
     afterAttempts.push(describeAttempt('ctx.worldInfoAfter', ctx?.worldInfoAfter));
 
-    if (typeof hostRuntime.SillyTavern?.getWorldInfoPrompt === 'function') {
+    if (typeof worldInfoGetter === 'function') {
       const chat = components.chatMessages.map(msg => msg.content).filter(Boolean);
-      const maxContext = Number(ctx?.maxContext ?? hostRuntime.SillyTavern?.maxContext ?? 0);
-      const result = await hostRuntime.SillyTavern.getWorldInfoPrompt(chat, maxContext, true);
+      const maxContext = Number(ctx?.maxContext ?? getHostRuntime().SillyTavern?.maxContext ?? 0);
+      const result = await worldInfoGetter(chat, maxContext, true);
 
       const before = resolveTextCandidate(
         [
@@ -421,14 +498,14 @@ async function populateWorldInfoComponents(components: PromptComponents): Promis
           { label: 'getWorldInfoPrompt().worldInfoString', value: result?.worldInfoString },
           { label: 'ctx.worldInfoBefore', value: cachedBefore },
         ],
-        `chat=${chat.length}; maxContext=${maxContext}; dryRun=true`,
+        `getter=${worldInfoSource ?? 'unknown'}; chat=${chat.length}; maxContext=${maxContext}; dryRun=true`,
       );
       const after = resolveTextCandidate(
         [
           { label: 'getWorldInfoPrompt().worldInfoAfter', value: result?.worldInfoAfter },
           { label: 'ctx.worldInfoAfter', value: cachedAfter },
         ],
-        `chat=${chat.length}; maxContext=${maxContext}; dryRun=true`,
+        `getter=${worldInfoSource ?? 'unknown'}; chat=${chat.length}; maxContext=${maxContext}; dryRun=true`,
       );
 
       components.worldInfoBefore = before.value;
@@ -455,12 +532,12 @@ async function populateWorldInfoComponents(components: PromptComponents): Promis
     components.diagnostics.worldInfoBefore = {
       selectedSource: cachedBefore ? 'ctx.worldInfoBefore' : undefined,
       attempts: beforeAttempts,
-      note: '未检测到 SillyTavern.getWorldInfoPrompt，回退到上下文缓存',
+      note: '未检测到 getWorldInfoPrompt（ctx / host / global），回退到上下文缓存',
     };
     components.diagnostics.worldInfoAfter = {
       selectedSource: cachedAfter ? 'ctx.worldInfoAfter' : undefined,
       attempts: afterAttempts,
-      note: '未检测到 SillyTavern.getWorldInfoPrompt，回退到上下文缓存',
+      note: '未检测到 getWorldInfoPrompt（ctx / host / global），回退到上下文缓存',
     };
   } catch (e) {
     components.diagnostics.worldInfoBefore = appendDiagnosticNote(
