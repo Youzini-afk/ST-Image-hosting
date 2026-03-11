@@ -15,6 +15,13 @@ const EW_SNAPSHOT_FILE_KEY = 'ew_snapshot_file';
 
 export type DynSnapshot = { name: string; content: string; enabled: boolean };
 
+function normalizeDynSnapshot(snapshot: DynSnapshot): DynSnapshot {
+  return {
+    ...snapshot,
+    enabled: false,
+  };
+}
+
 const floorBindingListenerStops: EventOnReturn[] = [];
 
 function clearInlineSnapshotFields(data: Record<string, unknown>) {
@@ -61,7 +68,9 @@ export async function markFloorEntries(
   const msg = messages[0];
   const previousSnapshotFile = _.get(msg.data, EW_SNAPSHOT_FILE_KEY);
   const normalizedEntryNames = _.uniq(entryNames.filter(name => typeof name === 'string' && name.trim()));
-  const normalizedDynSnapshots = (dynSnapshots ?? []).filter(snap => snap.name && typeof snap.content === 'string');
+  const normalizedDynSnapshots = (dynSnapshots ?? [])
+    .filter(snap => snap.name && typeof snap.content === 'string')
+    .map(normalizeDynSnapshot);
   const hasSnapshotPayload = Boolean(
     controllerSnapshot !== undefined || normalizedDynSnapshots.length > 0 || normalizedEntryNames.length > 0,
   );
@@ -219,12 +228,13 @@ export async function purgeAndRestoreForChat(settings: EwSettings): Promise<void
   const { controller: controllerSnapshot, dyn: dynSnapshots } = await collectLatestSnapshots();
 
   for (const snap of dynSnapshots.values()) {
+    const normalizedSnap = normalizeDynSnapshot(snap);
     const existing = nextEntries.find(e => e.name === snap.name);
     if (existing) {
-      existing.content = snap.content;
-      existing.enabled = snap.enabled;
+      existing.content = normalizedSnap.content;
+      existing.enabled = false;
     } else {
-      nextEntries.push(ensureDefaultEntry(snap.name, snap.content, snap.enabled, nextEntries));
+      nextEntries.push(ensureDefaultEntry(normalizedSnap.name, normalizedSnap.content, false, nextEntries));
     }
   }
 
@@ -468,12 +478,13 @@ export async function rollbackToFloor(settings: EwSettings, targetMessageId: num
   }
 
   for (const snap of dynMerged.values()) {
+    const normalizedSnap = normalizeDynSnapshot(snap);
     const existing = nextEntries.find(e => e.name === snap.name);
     if (existing) {
-      existing.content = snap.content;
-      existing.enabled = snap.enabled;
+      existing.content = normalizedSnap.content;
+      existing.enabled = false;
     } else {
-      nextEntries.push(ensureDefaultEntry(snap.name, snap.content, snap.enabled, nextEntries));
+      nextEntries.push(ensureDefaultEntry(normalizedSnap.name, normalizedSnap.content, false, nextEntries));
     }
   }
 

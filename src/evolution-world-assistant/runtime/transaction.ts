@@ -1,7 +1,7 @@
-import { MergedPlan, EwSettings } from './types';
-import { resolveTargetWorldbook, ensureDefaultEntry } from './worldbook-runtime';
 import { markFloorEntries } from './floor-binding';
 import { saveControllerBackup } from './settings';
+import { EwSettings, MergedPlan } from './types';
+import { ensureDefaultEntry, resolveTargetWorldbook } from './worldbook-runtime';
 
 type CommitResult = {
   worldbook_name: string;
@@ -113,13 +113,14 @@ export async function commitMergedPlan(
 
   // 标记楼层绑定：记录 EW/Dyn 条目、其内容快照和 Controller 快照。
   if (settings.floor_binding_enabled && messageId >= 0) {
-    const dynDesired = mergedPlan.worldbook.desired_entries
-      .filter(entry => entry.name.startsWith(settings.dynamic_entry_prefix));
+    const dynDesired = mergedPlan.worldbook.desired_entries.filter(entry =>
+      entry.name.startsWith(settings.dynamic_entry_prefix),
+    );
 
     const dynSnapshots = dynDesired.map(entry => ({
       name: entry.name,
       content: entry.content,
-      enabled: entry.enabled,
+      enabled: false,
     }));
 
     if (dynSnapshots.length > 0 || controllerTemplate) {
