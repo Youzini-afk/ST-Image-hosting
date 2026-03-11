@@ -94,8 +94,8 @@ function renderCharDetection(model: ControllerModel, dynPrefix: string): string 
   code += `var _ewChars = Array.from(_ewDetected);\n`;
   code += `%>\n\n`;
 
-  // 循环加载条目 — 用 forEach 回避 for(i<len) 中的 < 被 EJS 语法检查误判
-  code += `<% _ewChars.forEach(function(_ewName) { %>\n`;
+  // 循环加载条目 — 用 for...of 避免在普通 forEach 回调里使用 await。
+  code += `<% for (const _ewName of _ewChars) { %>\n`;
   for (const pattern of patterns) {
     // {name} → _ewName
     // 构建动态 getwi 调用
@@ -112,7 +112,7 @@ function renderCharDetection(model: ControllerModel, dynPrefix: string): string 
       code += `<%- await getwi(null, ${quoteSingle(dynPrefix + pattern)}) %>\n`;
     }
   }
-  code += `<% }); %>\n`;
+  code += `<% } %>\n`;
 
   return code;
 }
@@ -125,13 +125,13 @@ function renderForEach(model: ControllerModel, dynPrefix: string): string {
   model.for_each.forEach((fe, idx) => {
     const listVar = `_ewList${idx}`;
     code += `<%\nvar ${listVar} = getvar(${quoteSingle(fe.list_var)}, { defaults: [] });\n%>\n`;
-    code += `<% ${listVar}.forEach(function(_feItem) { %>\n`;
+    code += `<% for (const _feItem of ${listVar}) { %>\n`;
 
     const prefix = quoteSingle(dynPrefix + fe.entry_prefix);
     const suffix = fe.entry_suffix ? ` + ${quoteSingle(fe.entry_suffix)}` : '';
     code += `<%- await getwi(null, ${prefix} + _feItem${suffix}) %>\n`;
 
-    code += `<% }); %>\n`;
+    code += `<% } %>\n`;
   });
 
   return code;
