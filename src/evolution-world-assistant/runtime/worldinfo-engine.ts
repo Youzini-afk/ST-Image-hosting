@@ -132,9 +132,20 @@ interface NormalizedEntry {
   role: string;
 }
 
+export interface ResolvedWiEntry {
+  name: string;
+  content: string;
+  role: 'system' | 'user' | 'assistant';
+  position: number;
+  depth: number;
+  order: number;
+}
+
 export interface ResolvedWorldInfo {
-  before: Array<{ name: string; content: string }>;
-  after: Array<{ name: string; content: string }>;
+  before: ResolvedWiEntry[];
+  after: ResolvedWiEntry[];
+  /** Entries with position = atDepth (depth-injected into chat history) */
+  atDepth: ResolvedWiEntry[];
 }
 
 // ---------------------------------------------------------------------------
@@ -617,16 +628,17 @@ async function collectAllWorldbookEntries(): Promise<NormalizedEntry[]> {
 // Position Classification
 // ---------------------------------------------------------------------------
 
-function classifyPosition(entry: NormalizedEntry): 'before' | 'after' {
+function classifyPosition(entry: NormalizedEntry): 'before' | 'after' | 'atDepth' {
   switch (entry.position) {
     case WI_POSITION.before:
     case WI_POSITION.EMTop:
     case WI_POSITION.ANTop:
       return 'before';
+    case WI_POSITION.atDepth:
+      return 'atDepth';
     case WI_POSITION.after:
     case WI_POSITION.EMBottom:
     case WI_POSITION.ANBottom:
-    case WI_POSITION.atDepth:
     default:
       return 'after';
   }
@@ -648,7 +660,13 @@ export async function resolveWorldInfo(
   _settings: EwSettings,
   chatMessages: string[],
 ): Promise<ResolvedWorldInfo> {
-  const result: ResolvedWorldInfo = { before: [], after: [] };
+  const result: ResolvedWorldInfo = { before: [], after: [], atDepth: [] };
+
+  const roleMap: Record<string, 'system' | 'user' | 'assistant'> = {
+    system: 'system',
+    user: 'user',
+    assistant: 'assistant',
+  };
 
   try {
     // 1. Collect all entries
@@ -686,7 +704,15 @@ export async function resolveWorldInfo(
       if (!rendered.trim()) continue;
 
       const bucket = classifyPosition(entry);
-      result[bucket].push({ name: entry.name, content: rendered });
+      const resolvedEntry: ResolvedWiEntry = {
+        name: entry.name,
+        content: rendered,
+        role: roleMap[entry.role] ?? 'system',
+        position: entry.position,
+        depth: entry.depth,
+        order: entry.order,
+      };
+      result[bucket].push(resolvedEntry);
     }
   } catch (e) {
     console.error('[EW WI Engine] resolveWorldInfo failed:', e);

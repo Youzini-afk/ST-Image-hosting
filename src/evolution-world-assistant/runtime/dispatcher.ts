@@ -599,7 +599,7 @@ async function executeFlow(
   const generationId = `${requestId}:${flow.id}`;
 
   // Collect prompt components once — shared by buildFlowRequest (metadata) and assembler (messages)
-  const promptComponentsPromise = collectPromptComponents(flow);
+  const promptComponentsPromise = collectPromptComponents(flow, settings);
 
   const request = await buildFlowRequest({
     settings,

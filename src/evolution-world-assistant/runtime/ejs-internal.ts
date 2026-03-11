@@ -1,10 +1,12 @@
 /**
  * EJS Internal Engine – self-contained EJS rendering for Evolution World.
  *
- * Unlike ejs-bridge.ts (which depends on ST-Prompt-Template's globalThis.EjsTemplate API),
- * this module bundles the EJS engine directly, providing full control over when and how
- * EJS templates are rendered. Used exclusively for workflow prompt assembly where we need
+ * Bundles the EJS engine directly, providing full control over when and how
+ * EJS templates are rendered. Used for workflow prompt assembly where we need
  * to execute worldbook EJS (e.g., Controller getwi calls) independently from ST's pipeline.
+ *
+ * Also provides `checkEjsSyntax` for syntax validation and `renderEjsContent`
+ * as a simple render-without-worldbook-context helper.
  */
 
 // The EJS library is a UMD bundle that self-registers on globalThis.
@@ -494,4 +496,49 @@ export function createRenderContext(
     renderStack: new Set(),
     maxRecursion,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Simple EJS render (no worldbook context, for user-defined prompts)
+// ---------------------------------------------------------------------------
+
+/**
+ * Render EJS content without worldbook context.
+ *
+ * Used for user-defined prompt entries that may contain EJS tags
+ * but don't need worldbook getwi access.
+ */
+export async function renderEjsContent(content: string): Promise<string> {
+  if (!content.includes('<%')) return content;
+  const ctx = createRenderContext([]);
+  try {
+    return await evalEjsTemplate(content, ctx);
+  } catch (e) {
+    console.warn('[EW EJS Internal] renderEjsContent failed:', e);
+    return content;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// EJS Syntax Check
+// ---------------------------------------------------------------------------
+
+/**
+ * Check EJS syntax without executing.
+ *
+ * @returns A human-readable error string if syntax is invalid, or `null` if valid.
+ */
+export function checkEjsSyntax(content: string): string | null {
+  if (!content.includes('<%')) return null;
+  try {
+    ejs.compile(content, {
+      async: true,
+      client: true,
+      _with: true,
+      localsName: 'locals',
+    });
+    return null;
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e);
+  }
 }

@@ -1,6 +1,6 @@
 import { EwSettings, MergeInput, MergedPlan, Prioritized } from './types';
 import { ControllerModel } from './contracts';
-import { checkEjsSyntax } from './ejs-bridge';
+import { checkEjsSyntax } from './ejs-internal';
 
 function comparePriority(lhs: { priority: number; flow_order: number }, rhs: { priority: number; flow_order: number }): number {
   if (lhs.priority !== rhs.priority) {

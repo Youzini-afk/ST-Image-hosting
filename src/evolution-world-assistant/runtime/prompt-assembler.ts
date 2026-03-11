@@ -1,7 +1,7 @@
-import { renderEjsContent } from './ejs-bridge';
+import { renderEjsContent } from './ejs-internal';
 import { applyTavernRegex } from './regex-engine';
 import type { EwFlowConfig, EwPromptOrderEntry, EwSettings } from './types';
-import { resolveWorldInfo } from './worldinfo-engine';
+import { resolveWorldInfo, type ResolvedWiEntry } from './worldinfo-engine';
 
 // SillyTavern 运行时全局变量，在扩展上下文中可用
 declare function getCharacterCardFields():
@@ -519,11 +519,17 @@ async function populateWorldInfoComponents(components: PromptComponents, setting
     const chatTexts = components.chatMessages.map(msg => msg.content).filter(Boolean);
     const resolved = await resolveWorldInfo(settings, chatTexts);
 
-    const formatEntries = (entries: Array<{ name: string; content: string }>) =>
-      entries.map(e => `【${e.name}】\n${e.content}`).join('\n\n');
+    components.worldInfoBefore = resolved.before;
+    components.worldInfoAfter = resolved.after;
 
-    components.worldInfoBefore = formatEntries(resolved.before);
-    components.worldInfoAfter = formatEntries(resolved.after);
+    // atDepth entries → depth injection system
+    for (const entry of resolved.atDepth) {
+      components.depthInjections.push({
+        content: `【${entry.name}】\n${entry.content}`,
+        depth: entry.depth,
+        role: entry.role,
+      });
+    }
 
     components.diagnostics.worldInfoBefore = {
       selectedSource: 'ew-worldinfo-engine',
@@ -533,7 +539,7 @@ async function populateWorldInfoComponents(components: PromptComponents, setting
     components.diagnostics.worldInfoAfter = {
       selectedSource: 'ew-worldinfo-engine',
       attempts: [{ label: 'resolveWorldInfo().after', hasValue: resolved.after.length > 0, length: resolved.after.length, detail: `${resolved.after.length} entries` }],
-      note: `内置世界书引擎: ${resolved.after.length} 条 after 条目`,
+      note: `内置世界书引擎: ${resolved.after.length} 条 after 条目, ${resolved.atDepth.length} 条 atDepth 条目`,
     };
   } catch (e) {
     components.diagnostics.worldInfoBefore = appendDiagnosticNote(
@@ -559,8 +565,8 @@ export type PromptComponents = {
   charPersonality: string;
   scenario: string;
   personaDescription: string;
-  worldInfoBefore: string;
-  worldInfoAfter: string;
+  worldInfoBefore: ResolvedWiEntry[];
+  worldInfoAfter: ResolvedWiEntry[];
   dialogueExamples: string;
   chatMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string; name?: string }>;
   /** Extension prompts that need depth-based injection into chat history (ST position=IN_CHAT) */
@@ -593,8 +599,8 @@ export async function collectPromptComponents(flow: EwFlowConfig, settings?: EwS
     charPersonality: '',
     scenario: '',
     personaDescription: '',
-    worldInfoBefore: '',
-    worldInfoAfter: '',
+    worldInfoBefore: [],
+    worldInfoAfter: [],
     dialogueExamples: '',
     chatMessages: [],
     depthInjections: [],
@@ -708,7 +714,16 @@ export async function collectPromptComponents(flow: EwFlowConfig, settings?: EwS
       // IN_PROMPT entries: append to worldInfoBefore as fallback
       // (only if we didn't already get WI from context)
       if (inPromptEntries.length) {
-        components.worldInfoBefore = [components.worldInfoBefore, ...inPromptEntries].filter(s => s).join('\n');
+        for (const extContent of inPromptEntries) {
+          components.worldInfoBefore.push({
+            name: 'ExtPrompt',
+            content: extContent,
+            role: 'system',
+            position: 0,
+            depth: 0,
+            order: 999,
+          });
+        }
         components.diagnostics.worldInfoBefore = {
           ...(components.diagnostics.worldInfoBefore ?? { attempts: [] }),
           selectedSource: components.diagnostics.worldInfoBefore?.selectedSource ?? 'extensionPrompts(IN_PROMPT)',
@@ -848,6 +863,19 @@ export async function assembleOrderedPrompts(
         continue;
       }
 
+      // World Info markers expand into individual per-entry messages
+      if (entry.identifier === 'worldInfoBefore' || entry.identifier === 'worldInfoAfter') {
+        const wiEntries = entry.identifier === 'worldInfoBefore'
+          ? components.worldInfoBefore
+          : components.worldInfoAfter;
+        for (const wi of wiEntries) {
+          if (wi.content.trim()) {
+            result.push({ role: wi.role, content: `【${wi.name}】\n${wi.content}` });
+          }
+        }
+        continue;
+      }
+
       const content = await renderEjsContent(resolveMarkerContent(entry.identifier, components));
       if (content.trim()) {
         result.push({ role: entry.role, content });
@@ -917,9 +945,8 @@ function resolveMarkerContent(identifier: string, components: PromptComponents):
     case 'personaDescription':
       return components.personaDescription;
     case 'worldInfoBefore':
-      return components.worldInfoBefore;
     case 'worldInfoAfter':
-      return components.worldInfoAfter;
+      return ''; // Handled inline by assembleOrderedPrompts as individual entries
     case 'dialogueExamples':
       return components.dialogueExamples;
     case 'postHistoryInstructions':
