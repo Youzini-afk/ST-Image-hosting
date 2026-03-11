@@ -464,7 +464,6 @@ async function executeFlowViaGenerateRawCustomApi(
 /**
  * 自定义 API 路径：通过 ST 后端代理 /api/backends/chat-completions/generate 转发请求。
  * 直接控制 model / temperature / max_tokens 等参数，不依赖 TavernHelper。
- * 参考 shujuku(神·数据库) 的 callApi_ACU 实现。
  */
 async function executeFlowViaStBackend(
   flow: EwFlowConfig,
@@ -592,7 +591,7 @@ async function executeFlow(
   const generationId = `${requestId}:${flow.id}`;
 
   // Collect prompt components once — shared by buildFlowRequest (metadata) and assembler (messages)
-  const promptComponents = collectPromptComponents(flow);
+  const promptComponentsPromise = collectPromptComponents(flow);
 
   const request = await buildFlowRequest({
     settings,
@@ -606,6 +605,7 @@ async function executeFlow(
   try {
     throwIfDispatchAborted(abortSignal, isCancelled);
     const body = applyTemplate(request as unknown as Record<string, any>, flow.request_template);
+    const promptComponents = await promptComponentsPromise;
 
     let response: NonNullable<DispatchFlowAttempt['response']>;
 

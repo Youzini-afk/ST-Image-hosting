@@ -17,6 +17,7 @@ declare function getCharacterCardFields():
   | undefined;
 declare function getLastMessageId(): number;
 declare function getChatMessages(range: string, opts?: Record<string, any>): any[];
+declare function getCharData(name: 'current' | string): SillyTavern.v1CharData | null;
 declare const SillyTavern: { getContext(): Record<string, any> } | undefined;
 
 function getHostRuntime(): Record<string, any> {
@@ -47,10 +48,38 @@ function getRuntimeContext(): Record<string, any> | undefined {
 function getRuntimeCharacterCardFields(): ReturnType<typeof getCharacterCardFields> {
   const hostRuntime = getHostRuntime();
   if (typeof hostRuntime.getCharacterCardFields === 'function') {
+    const ctx = getRuntimeContext();
+    const chid = Number(ctx?.characterId);
+    if (Number.isFinite(chid) && chid >= 0) {
+      return hostRuntime.getCharacterCardFields({ chid });
+    }
+
     return hostRuntime.getCharacterCardFields();
   }
 
   return getCharacterCardFields?.();
+}
+
+function getRuntimeCharData(): SillyTavern.v1CharData | null {
+  const hostRuntime = getHostRuntime();
+  const ctx = getRuntimeContext();
+  const characterId = Number(ctx?.characterId);
+
+  const runtimeCharacters = Array.isArray(hostRuntime.SillyTavern?.characters)
+    ? hostRuntime.SillyTavern.characters
+    : Array.isArray((SillyTavern as any)?.characters)
+      ? (SillyTavern as any).characters
+      : [];
+
+  if (Number.isFinite(characterId) && characterId >= 0 && runtimeCharacters[characterId]) {
+    return runtimeCharacters[characterId] as SillyTavern.v1CharData;
+  }
+
+  if (typeof hostRuntime.getCharData === 'function') {
+    return hostRuntime.getCharData('current') ?? null;
+  }
+
+  return getCharData?.('current') ?? null;
 }
 
 function getRuntimeLastMessageId(): number {
@@ -69,6 +98,100 @@ function getRuntimeChatMessages(range: string, opts?: Record<string, any>): any[
   }
 
   return getChatMessages(range, opts);
+}
+
+function getPreferredText(...values: unknown[]): string {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) {
+      return value;
+    }
+  }
+
+  return '';
+}
+
+function getRuntimePersonaDescription(): string {
+  const hostRuntime = getHostRuntime();
+  const ctx = getRuntimeContext();
+
+  return getPreferredText(
+    ctx?.powerUserSettings?.persona_description,
+    hostRuntime.power_user?.persona_description,
+    hostRuntime.SillyTavern?.powerUserSettings?.persona_description,
+    getRuntimeCharacterCardFields()?.persona,
+  );
+}
+
+function getRuntimeCharacterFields(): {
+  main: string;
+  jailbreak: string;
+  charDescription: string;
+  charPersonality: string;
+  scenario: string;
+  personaDescription: string;
+  dialogueExamples: string;
+} {
+  const helperFields = getRuntimeCharacterCardFields();
+  const charData = getRuntimeCharData();
+  const ctx = getRuntimeContext();
+
+  const charDescription = getPreferredText(
+    helperFields?.description,
+    charData?.description,
+    charData?.data?.description,
+    ctx?.name2_description,
+  );
+
+  const charPersonality = getPreferredText(
+    helperFields?.personality,
+    charData?.personality,
+    charData?.data?.personality,
+    ctx?.name2_personality,
+  );
+
+  const scenario = getPreferredText(helperFields?.scenario, charData?.scenario, charData?.data?.scenario);
+  const dialogueExamples = getPreferredText(
+    helperFields?.mesExamples,
+    charData?.mes_example,
+    charData?.data?.mes_example,
+  );
+  const main = getPreferredText(helperFields?.system, charData?.data?.system_prompt);
+  const jailbreak = getPreferredText(helperFields?.jailbreak, charData?.data?.post_history_instructions);
+
+  return {
+    main,
+    jailbreak,
+    charDescription,
+    charPersonality,
+    scenario,
+    personaDescription: getRuntimePersonaDescription(),
+    dialogueExamples,
+  };
+}
+
+async function populateWorldInfoComponents(components: PromptComponents): Promise<void> {
+  try {
+    const ctx = getRuntimeContext();
+    const hostRuntime = getHostRuntime();
+
+    const cachedBefore = getPreferredText(ctx?.worldInfoBefore);
+    const cachedAfter = getPreferredText(ctx?.worldInfoAfter);
+
+    if (typeof hostRuntime.SillyTavern?.getWorldInfoPrompt === 'function') {
+      const chat = components.chatMessages.map(msg => msg.content).filter(Boolean);
+      const maxContext = Number(ctx?.maxContext ?? hostRuntime.SillyTavern?.maxContext ?? 0);
+      const result = await hostRuntime.SillyTavern.getWorldInfoPrompt(chat, maxContext, true);
+
+      components.worldInfoBefore = getPreferredText(result?.worldInfoBefore, result?.worldInfoString, cachedBefore);
+      components.worldInfoAfter = getPreferredText(result?.worldInfoAfter, cachedAfter);
+      return;
+    }
+
+    components.worldInfoBefore = cachedBefore;
+    components.worldInfoAfter = cachedAfter;
+  } catch (e) {
+    console.debug('[Evolution World] world info prompt read failed:', e);
+  }
 }
 
 /**
@@ -107,7 +230,7 @@ type AssemblePreviewOptions = {
  * Gathers raw content for every system marker that can appear in a flow's
  * prompt_order: character card fields, world info, jailbreak, and chat messages.
  */
-export function collectPromptComponents(flow: EwFlowConfig): PromptComponents {
+export async function collectPromptComponents(flow: EwFlowConfig): Promise<PromptComponents> {
   const components: PromptComponents = {
     main: '',
     jailbreak: '',
@@ -125,39 +248,40 @@ export function collectPromptComponents(flow: EwFlowConfig): PromptComponents {
 
   // ── 1. Character card fields ──────────────────────────────────────────
   try {
-    const fields = getRuntimeCharacterCardFields();
-    if (fields) {
-      components.charDescription = fields.description ?? '';
-      components.charPersonality = fields.personality ?? '';
-      components.scenario = fields.scenario ?? '';
-      components.personaDescription = fields.persona ?? '';
-      components.dialogueExamples = fields.mesExamples ?? '';
-      components.main = fields.system ?? '';
-      components.jailbreak = fields.jailbreak ?? '';
-    }
+    const fields = getRuntimeCharacterFields();
+    components.charDescription = fields.charDescription;
+    components.charPersonality = fields.charPersonality;
+    components.scenario = fields.scenario;
+    components.personaDescription = fields.personaDescription;
+    components.dialogueExamples = fields.dialogueExamples;
+    components.main = fields.main;
+    components.jailbreak = fields.jailbreak;
   } catch (e) {
     console.debug('[Evolution World] getCharacterCardFields failed:', e);
   }
 
-  // ── 2. World Info (before/after) from SillyTavern context ───────────────
-  // ST computes worldInfoBefore/After via getWorldInfoPrompt() and may expose
-  // them on the context object. These are the non-depth WI entries.
+  // ── 2. Chat messages ──────────────────────────────────────────────────
   try {
-    const ctx = getRuntimeContext();
-    if (ctx) {
-      // Try to read pre-computed WI strings from context
-      if (typeof ctx.worldInfoBefore === 'string' && ctx.worldInfoBefore.trim()) {
-        components.worldInfoBefore = ctx.worldInfoBefore;
-      }
-      if (typeof ctx.worldInfoAfter === 'string' && ctx.worldInfoAfter.trim()) {
-        components.worldInfoAfter = ctx.worldInfoAfter;
-      }
+    const lastId = getRuntimeLastMessageId();
+    if (lastId >= 0) {
+      const msgs = getRuntimeChatMessages(`0-${lastId}`, { hide_state: 'unhidden' });
+      components.chatMessages = msgs
+        .slice(-flow.context_turns)
+        .map((msg: any) => ({
+          role: msg.role as 'system' | 'user' | 'assistant',
+          content: msg.message ?? '',
+          name: msg.name,
+        }))
+        .filter((msg: any) => Boolean(msg.content.trim()));
     }
   } catch (e) {
-    console.debug('[Evolution World] context worldInfo read failed:', e);
+    console.debug('[Evolution World] getChatMessages failed:', e);
   }
 
-  // ── 3. Extension prompts (depth injections, before-prompt, etc.) ────────
+  // ── 3. World Info (before/after) ───────────────────────────────────────
+  await populateWorldInfoComponents(components);
+
+  // ── 4. Extension prompts (depth injections, before-prompt, etc.) ────────
   // SillyTavern stores computed extension prompts in `extension_prompts`.
   // Each entry: { value: string, position: number, depth: number, role: number }
   //   position: IN_PROMPT(0) = in prompt area, IN_CHAT(1) = depth injection,
@@ -209,25 +333,7 @@ export function collectPromptComponents(flow: EwFlowConfig): PromptComponents {
     console.debug('[Evolution World] extension_prompts read failed:', e);
   }
 
-  // ── 3. Chat messages ──────────────────────────────────────────────────
-  try {
-    const lastId = getRuntimeLastMessageId();
-    if (lastId >= 0) {
-      const msgs = getRuntimeChatMessages(`0-${lastId}`, { hide_state: 'unhidden' });
-      components.chatMessages = msgs
-        .slice(-flow.context_turns)
-        .map((msg: any) => ({
-          role: msg.role as 'system' | 'user' | 'assistant',
-          content: msg.message ?? '',
-          name: msg.name,
-        }))
-        .filter((msg: any) => Boolean(msg.content.trim()));
-    }
-  } catch (e) {
-    console.debug('[Evolution World] getChatMessages failed:', e);
-  }
-
-  // ── 4. 正则处理 ─────────────────────────────────────────────────────
+  // ── 5. 正则处理 ─────────────────────────────────────────────────────
   // 当 flow 启用 use_tavern_regex 时，对聊天消息应用酒馆的正则脚本
   // （预设 + 全局 + 角色卡局部，跳过 markdownOnly）
   if (flow.use_tavern_regex && components.chatMessages.length > 0) {
@@ -463,7 +569,7 @@ export async function injectEntryNames(messages: AssembledMessage[], controllerE
  * anything to the AI. Returns the messages array for UI display.
  */
 export async function previewPrompt(flow: EwFlowConfig, controllerEntryName: string): Promise<PromptPreviewMessage[]> {
-  const components = collectPromptComponents(flow);
+  const components = await collectPromptComponents(flow);
   const messages = await assembleOrderedPrompts(flow.prompt_order, components, { includeMarkerPlaceholders: true });
   await injectEntryNames(messages, controllerEntryName);
   return messages;
