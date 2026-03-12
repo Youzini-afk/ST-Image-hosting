@@ -92,13 +92,31 @@
         <!-- Controller -->
         <div class="dbg-snap-section">
           <h4 class="dbg-snap-label">
-            Controller
-            <span class="dbg-snap-status" :data-ok="store.snapshotPreview.controller ? '1' : '0'">
-              {{ store.snapshotPreview.controller ? '✅ 有内容' : '❌ 空' }}
+            Controller ({{ controllerEntries.length }})
+            <span class="dbg-snap-status" :data-ok="controllerEntries.length ? '1' : '0'">
+              {{ controllerEntries.length ? '✅ 有内容' : '❌ 空' }}
             </span>
           </h4>
-          <div v-if="store.snapshotPreview.controller" class="dbg-snap-content">
-            <pre>{{ truncate(store.snapshotPreview.controller, 500) }}</pre>
+          <div v-if="controllerEntries.length > 0" class="dbg-snap-table-wrap">
+            <table class="dbg-snap-table">
+              <thead>
+                <tr>
+                  <th>工作流</th>
+                  <th>条目名</th>
+                  <th>内容摘要</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="controller in controllerEntries"
+                  :key="controller.entry_name || controller.flow_id || controller.flow_name"
+                >
+                  <td class="dbg-snap-name">{{ controller.flow_name || controller.flow_id || 'Legacy' }}</td>
+                  <td class="dbg-snap-name">{{ controller.entry_name || '待迁移条目' }}</td>
+                  <td class="dbg-snap-excerpt">{{ truncate(controller.content, 80) }}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -222,6 +240,8 @@ const dynEntries = computed(() => {
   if (!store.snapshotPreview) return [];
   return [...store.snapshotPreview.dyn.values()];
 });
+
+const controllerEntries = computed(() => store.snapshotPreview?.controllers ?? []);
 
 watch(
   () => store.promptPreview,

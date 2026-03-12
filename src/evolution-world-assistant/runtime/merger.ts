@@ -1,5 +1,6 @@
 import { ControllerModel } from './contracts';
 import { checkEjsSyntax } from './ejs-internal';
+import { resolveControllerEntryNameMap } from './helpers';
 import { EwSettings, MergeInput, MergedPlan, Prioritized } from './types';
 
 function comparePriority(
@@ -62,8 +63,8 @@ export function mergeFlowResults(results: MergeInput, settings: EwSettings): Mer
   const desiredMap = new Map<string, Prioritized<{ content: string; enabled: boolean }>>();
   const removeMap = new Map<string, Prioritized<null>>();
 
-  // Multi-controller: each flow keeps its own controller_model, keyed by flow.name.
-  const controllerModels = new Map<string, ControllerModel>();
+  // Multi-controller: each flow keeps its own controller_model, keyed by flow.id.
+  const controllerModels = new Map<string, MergedPlan['controller_models'][number]>();
   const replyParts: string[] = [];
   const diagnostics: Record<string, any> = {};
 
@@ -103,9 +104,14 @@ export function mergeFlowResults(results: MergeInput, settings: EwSettings): Mer
     }
 
     if (result.response.operations.controller_model) {
-      // Each flow keeps its own controller_model, keyed by flow.name (or flow.id as fallback).
-      const flowKey = result.flow.name?.trim() || result.flow.id;
-      controllerModels.set(flowKey, result.response.operations.controller_model);
+      const flowId = result.flow.id;
+      const flowName = result.flow.name?.trim() || result.flow.id;
+      controllerModels.set(flowId, {
+        flow_id: flowId,
+        flow_name: flowName,
+        entry_name: '',
+        model: result.response.operations.controller_model,
+      });
     }
 
     if (result.response.reply_instruction.trim()) {
@@ -133,6 +139,14 @@ export function mergeFlowResults(results: MergeInput, settings: EwSettings): Mer
     console.warn('[EW Merger] No flow returned controller_model — all controllers will be empty.');
   }
 
+  const controllerEntryNameMap = resolveControllerEntryNameMap(
+    settings.controller_entry_prefix,
+    [...controllerModels.values()].map(slot => ({
+      flow_id: slot.flow_id,
+      flow_name: slot.flow_name,
+    })),
+  );
+
   const desiredEntries = [...desiredMap.entries()].map(([name, value]) => ({
     name,
     content: value.value.content,
@@ -153,14 +167,11 @@ export function mergeFlowResults(results: MergeInput, settings: EwSettings): Mer
   }
 
   // Normalize entry names inside each controller_model (add EW/Dyn/ prefix).
-  const normalizedControllers: Record<string, ControllerModel> = {};
-  for (const [flowName, model] of controllerModels) {
-    normalizedControllers[flowName] = normalizeControllerModel(
-      model,
-      settings.dynamic_entry_prefix,
-      settings.controller_entry_prefix,
-    );
-  }
+  const normalizedControllers = [...controllerModels.values()].map(slot => ({
+    ...slot,
+    entry_name: controllerEntryNameMap.get(slot.flow_id) ?? slot.entry_name,
+    model: normalizeControllerModel(slot.model, settings.dynamic_entry_prefix, settings.controller_entry_prefix),
+  }));
 
   return {
     worldbook: {

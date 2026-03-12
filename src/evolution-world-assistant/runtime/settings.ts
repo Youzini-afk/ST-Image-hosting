@@ -2,6 +2,7 @@ import { createDefaultApiPreset, createDefaultFlow } from './factory';
 import { simpleHash } from './helpers';
 import { readSharedSettings, writeSharedSettings } from './shared-settings-storage';
 import {
+  ControllerEntrySnapshot,
   DEFAULT_PROMPT_ORDER,
   EwApiPreset,
   EwApiPresetSchema,
@@ -24,7 +25,14 @@ type ScriptStorageShape = {
   settings?: EwSettings;
   last_run?: RunSummary | null;
   last_io?: LastIoSummary | null;
-  backups?: Record<string, { at: number; worldbook_name: string; controller_content: string | Record<string, string> }>;
+  backups?: Record<
+    string,
+    {
+      at: number;
+      worldbook_name: string;
+      controller_content: string | Record<string, string> | ControllerEntrySnapshot[];
+    }
+  >;
 };
 
 const SCRIPT_STORAGE_KEY = 'evolution_world_assistant';
@@ -445,7 +453,11 @@ export function subscribeLastIo(listener: IoListener): { stop: () => void } {
   return { stop: () => ioListeners.delete(listener) };
 }
 
-export function saveControllerBackup(chatId: string, worldbookName: string, controllerContent: Record<string, string>) {
+export function saveControllerBackup(
+  chatId: string,
+  worldbookName: string,
+  controllerContent: ControllerEntrySnapshot[],
+) {
   const MAX_BACKUPS = 10;
   writeScriptStorage(previous => {
     const backups = { ...(previous.backups ?? {}) };
@@ -471,17 +483,32 @@ export function saveControllerBackup(chatId: string, worldbookName: string, cont
 
 export function readControllerBackup(
   chatId: string,
-): { at: number; worldbook_name: string; controller_content: Record<string, string> } | null {
+): { at: number; worldbook_name: string; controller_content: ControllerEntrySnapshot[] } | null {
   const storage = readScriptStorage();
   const backup = storage.backups?.[chatId];
   if (!backup) return null;
 
-  // Legacy compat: old backups stored a single string.
   const content = backup.controller_content;
-  const controllers: Record<string, string> =
-    typeof content === 'string'
-      ? content ? { legacy: content } : {}
-      : content ?? {};
+  let controllers: ControllerEntrySnapshot[] = [];
+  if (Array.isArray(content)) {
+    controllers = content
+      .filter(entry => entry && typeof entry === 'object')
+      .map(entry => ({
+        entry_name: String((entry as ControllerEntrySnapshot).entry_name ?? ''),
+        content: String((entry as ControllerEntrySnapshot).content ?? ''),
+        flow_id: (entry as ControllerEntrySnapshot).flow_id,
+        flow_name: (entry as ControllerEntrySnapshot).flow_name,
+        legacy: Boolean((entry as ControllerEntrySnapshot).legacy),
+      }))
+      .filter(entry => entry.content);
+  } else if (typeof content === 'string') {
+    controllers = content ? [{ entry_name: '', content, flow_name: 'Legacy Controller', legacy: true }] : [];
+  } else if (content && typeof content === 'object') {
+    controllers = Object.entries(content).map(([entryName, value]) => ({
+      entry_name: entryName,
+      content: String(value ?? ''),
+    }));
+  }
 
   return klona({ at: backup.at, worldbook_name: backup.worldbook_name, controller_content: controllers });
 }

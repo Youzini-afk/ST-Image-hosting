@@ -1,4 +1,5 @@
 import { TextSliceRule } from './contracts';
+import type { ControllerEntrySnapshot } from './types';
 
 export function uuidv4(): string {
   // Prefer the native crypto API for correctness and collision resistance.
@@ -17,7 +18,10 @@ export function uuidv4(): string {
   }
 
   // Last resort: Math.random (non-cryptographic, kept for edge-case environments).
-  const random = () => Math.floor(Math.random() * 0x100000000).toString(16).padStart(8, '0');
+  const random = () =>
+    Math.floor(Math.random() * 0x100000000)
+      .toString(16)
+      .padStart(8, '0');
   return `${random().slice(0, 8)}-${random().slice(0, 4)}-4${random().slice(0, 3)}-a${random().slice(0, 3)}-${random()}${random().slice(0, 4)}`;
 }
 
@@ -131,12 +135,113 @@ export function extractSlices(text: string, rules: TextSliceRule[]): string {
 }
 
 export function toSafeIdentifier(input: string): string {
-  const normalized = input
-    .replace(/[^a-zA-Z0-9_$]/g, '_')
-    .replace(/^[^a-zA-Z_$]/, '_$&');
+  const normalized = input.replace(/[^a-zA-Z0-9_$]/g, '_').replace(/^[^a-zA-Z_$]/, '_$&');
   return normalized || 'v';
 }
 
 export function quoteSingle(input: string): string {
   return `'${input.replaceAll('\\', '\\\\').replaceAll("'", "\\'")}'`;
+}
+
+export function sanitizeWorldbookEntrySegment(input: string): string {
+  const trimmed = input.trim();
+  if (!trimmed) {
+    return 'flow';
+  }
+
+  const sanitized = trimmed
+    .replace(/[\\/:*?"<>|]+/g, '_')
+    .replace(/\s+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  return sanitized || 'flow';
+}
+
+export type ControllerFlowIdentity = {
+  flow_id: string;
+  flow_name: string;
+};
+
+function buildControllerEntryBaseName(prefix: string, flowName: string, flowId: string): string {
+  const safeName = sanitizeWorldbookEntrySegment(flowName || flowId);
+  return `${prefix}${safeName}`;
+}
+
+function buildControllerEntryConflictName(prefix: string, flowId: string, flowName: string): string {
+  const baseName = buildControllerEntryBaseName(prefix, flowName, flowId);
+  const suffix = simpleHash(flowId).slice(0, 5);
+  return `${baseName}__${suffix}`;
+}
+
+function buildLegacyHashedControllerEntryName(prefix: string, flowId: string, flowName: string): string {
+  const baseName = buildControllerEntryBaseName(prefix, flowName, flowId);
+  const suffix = simpleHash(flowId).slice(0, 9);
+  return `${baseName}__${suffix}`;
+}
+
+export function buildControllerEntryName(prefix: string, flowId: string, flowName: string): string {
+  return buildControllerEntryBaseName(prefix, flowName, flowId);
+}
+
+export function resolveControllerEntryNameMap(prefix: string, flows: ControllerFlowIdentity[]): Map<string, string> {
+  const grouped = new Map<string, ControllerFlowIdentity[]>();
+
+  for (const flow of flows) {
+    const flowId = String(flow.flow_id ?? '').trim();
+    if (!flowId) {
+      continue;
+    }
+
+    const flowName = String(flow.flow_name ?? '').trim() || flowId;
+    const baseName = buildControllerEntryBaseName(prefix, flowName, flowId);
+    const bucket = grouped.get(baseName) ?? [];
+    bucket.push({ flow_id: flowId, flow_name: flowName });
+    grouped.set(baseName, bucket);
+  }
+
+  const resolved = new Map<string, string>();
+  for (const [baseName, bucket] of grouped.entries()) {
+    if (bucket.length === 1) {
+      resolved.set(bucket[0].flow_id, baseName);
+      continue;
+    }
+
+    for (const flow of bucket) {
+      resolved.set(flow.flow_id, buildControllerEntryConflictName(prefix, flow.flow_id, flow.flow_name));
+    }
+  }
+
+  return resolved;
+}
+
+export function buildLegacyControllerEntryName(prefix: string): string {
+  return `${prefix}Legacy_Controller__legacy`;
+}
+
+export function resolveControllerSnapshotEntryName(prefix: string, snapshot: ControllerEntrySnapshot): string {
+  const explicitEntryName = String(snapshot.entry_name ?? '').trim();
+  if (explicitEntryName.startsWith(prefix)) {
+    return explicitEntryName;
+  }
+
+  if (snapshot.legacy) {
+    return buildLegacyControllerEntryName(prefix);
+  }
+
+  const flowId = String(snapshot.flow_id ?? '').trim();
+  const flowName = String(snapshot.flow_name ?? '').trim();
+  if (flowId) {
+    return buildLegacyHashedControllerEntryName(prefix, flowId, flowName || flowId);
+  }
+
+  if (explicitEntryName) {
+    return explicitEntryName;
+  }
+
+  if (flowName) {
+    return `${prefix}${flowName}`;
+  }
+
+  return buildLegacyControllerEntryName(prefix);
 }

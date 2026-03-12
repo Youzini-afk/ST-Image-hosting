@@ -1,5 +1,6 @@
 import { validateEjsTemplate } from './controller-renderer';
 import { rerollCurrentAfterReplyWorkflow } from './events';
+import { resolveControllerSnapshotEntryName } from './helpers';
 import { runWorkflow } from './pipeline';
 import { getLastIo, getLastRun, getSettings, patchSettings, readControllerBackup } from './settings';
 import { EwSettingsSchema } from './types';
@@ -50,6 +51,7 @@ async function validateControllerSyntax(): Promise<{ ok: boolean; reason?: strin
 
 async function rollbackController(): Promise<{ ok: boolean; reason?: string }> {
   try {
+    const settings = getSettings();
     const chatId = String(SillyTavern.getCurrentChatId?.() ?? SillyTavern.chatId ?? 'unknown');
     const backup = readControllerBackup(chatId);
     if (!backup) {
@@ -58,12 +60,32 @@ async function rollbackController(): Promise<{ ok: boolean; reason?: string }> {
 
     const entries = klona(await getWorldbook(backup.worldbook_name));
 
-    // Restore each backed-up controller entry.
-    for (const [entryName, content] of Object.entries(backup.controller_content)) {
+    const backupByEntryName = new Map(
+      backup.controller_content.map(snapshot => [
+        resolveControllerSnapshotEntryName(settings.controller_entry_prefix, snapshot),
+        snapshot,
+      ]),
+    );
+
+    for (const entry of entries) {
+      if (!entry.name.startsWith(settings.controller_entry_prefix)) {
+        continue;
+      }
+      const restored = backupByEntryName.get(entry.name);
+      if (restored) {
+        entry.content = restored.content;
+        entry.enabled = true;
+      } else {
+        entry.content = '';
+        entry.enabled = false;
+      }
+    }
+
+    for (const snapshot of backup.controller_content) {
+      const entryName = resolveControllerSnapshotEntryName(settings.controller_entry_prefix, snapshot);
       const controller = entries.find(entry => entry.name === entryName);
       if (controller) {
-        controller.content = content;
-        controller.enabled = true;
+        continue;
       } else {
         const uid = (_.max(entries.map(entry => entry.uid)) ?? 0) + 1;
         entries.push({
@@ -82,7 +104,7 @@ async function rollbackController(): Promise<{ ok: boolean; reason?: string }> {
             depth: 0,
             order: 14720,
           },
-          content,
+          content: snapshot.content,
           probability: 100,
           recursion: { prevent_incoming: true, prevent_outgoing: true, delay_until: null },
           effect: { sticky: null, cooldown: null, delay: null },

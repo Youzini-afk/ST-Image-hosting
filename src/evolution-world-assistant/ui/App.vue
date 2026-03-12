@@ -412,6 +412,7 @@
 <script setup lang="ts">
 import { checkEjsSyntax, renderEjsContent } from '../runtime/ejs-internal';
 import { migrateSnapshots } from '../runtime/floor-binding';
+import { resolveControllerEntryNameMap } from '../runtime/helpers';
 import { applyFloorLimit, runFullHideCheck, unhideAll } from '../runtime/hide-engine';
 import { patchSettings } from '../runtime/settings';
 import type { EwApiPreset, EwFlowConfig } from '../runtime/types';
@@ -642,11 +643,25 @@ function help(key: string) {
   return getFieldHelp(key);
 }
 
+function collectControllerFlowIdentities(
+  globalFlows: EwFlowConfig[],
+  charFlows: EwFlowConfig[],
+): Array<{ flow_id: string; flow_name: string }> {
+  return [...globalFlows, ...charFlows].map(flow => ({
+    flow_id: flow.id,
+    flow_name: flow.name?.trim() || flow.id,
+  }));
+}
+
+let pendingControllerRenamePrevious: Array<{ flow_id: string; flow_name: string }> | null = null;
+let pendingControllerRenamePrefix = '';
+
 function updateFlow(index: number, nextFlow: EwFlowConfig) {
   const previousFlow = store.settings.flows[index];
   const previousId = previousFlow?.id;
   const oldName = previousFlow?.name?.trim();
   const newName = nextFlow.name?.trim();
+  const previousDescriptors = collectControllerFlowIdentities(store.settings.flows, store.charFlows);
 
   store.settings.flows.splice(index, 1, nextFlow);
   if (store.expandedFlowId === previousId && previousId !== nextFlow.id) {
@@ -654,7 +669,7 @@ function updateFlow(index: number, nextFlow: EwFlowConfig) {
   }
 
   if (oldName && newName && oldName !== newName) {
-    renameControllerEntry(oldName, newName);
+    scheduleControllerEntryRename(previousDescriptors, store.settings.controller_entry_prefix);
   }
 }
 
@@ -663,6 +678,7 @@ function updateCharFlow(index: number, nextFlow: EwFlowConfig) {
   const previousId = previousFlow?.id;
   const oldName = previousFlow?.name?.trim();
   const newName = nextFlow.name?.trim();
+  const previousDescriptors = collectControllerFlowIdentities(store.settings.flows, store.charFlows);
 
   store.charFlows.splice(index, 1, nextFlow);
   if (store.expandedFlowId === previousId && previousId !== nextFlow.id) {
@@ -670,28 +686,74 @@ function updateCharFlow(index: number, nextFlow: EwFlowConfig) {
   }
 
   if (oldName && newName && oldName !== newName) {
-    renameControllerEntry(oldName, newName);
+    scheduleControllerEntryRename(previousDescriptors, store.settings.controller_entry_prefix);
   }
 }
 
-let renameTimer: ReturnType<typeof setTimeout> | null = null;
-async function renameControllerEntry(oldName: string, newName: string) {
-  if (renameTimer) clearTimeout(renameTimer);
-  renameTimer = setTimeout(async () => {
-    renameTimer = null;
+let controllerRenameTimer: ReturnType<typeof setTimeout> | null = null;
+function scheduleControllerEntryRename(
+  previousDescriptors: Array<{ flow_id: string; flow_name: string }>,
+  prefix: string,
+) {
+  if (!pendingControllerRenamePrevious) {
+    pendingControllerRenamePrevious = previousDescriptors;
+    pendingControllerRenamePrefix = prefix;
+  }
+
+  if (controllerRenameTimer) {
+    clearTimeout(controllerRenameTimer);
+  }
+
+  controllerRenameTimer = setTimeout(async () => {
+    controllerRenameTimer = null;
     try {
-      const prefix = store.settings.controller_entry_prefix;
-      const oldEntryName = prefix + oldName;
-      const newEntryName = prefix + newName;
+      const previousFlowDescriptors = pendingControllerRenamePrevious ?? previousDescriptors;
+      const previousPrefix = pendingControllerRenamePrefix || prefix;
+      pendingControllerRenamePrevious = null;
+      pendingControllerRenamePrefix = '';
+
+      const nextFlowDescriptors = collectControllerFlowIdentities(store.settings.flows, store.charFlows);
+      const previousNameMap = resolveControllerEntryNameMap(previousPrefix, previousFlowDescriptors);
+      const nextNameMap = resolveControllerEntryNameMap(store.settings.controller_entry_prefix, nextFlowDescriptors);
+
+      const allFlowIds = new Set<string>([...previousNameMap.keys(), ...nextNameMap.keys()]);
+      const renamePairs = [...allFlowIds]
+        .map(flowId => ({
+          oldEntryName: previousNameMap.get(flowId),
+          newEntryName: nextNameMap.get(flowId),
+        }))
+        .filter(pair => pair.oldEntryName && pair.newEntryName && pair.oldEntryName !== pair.newEntryName) as Array<{
+        oldEntryName: string;
+        newEntryName: string;
+      }>;
+
+      if (renamePairs.length === 0) {
+        return;
+      }
 
       const { resolveTargetWorldbook } = await import('../runtime/worldbook-runtime');
       const target = await resolveTargetWorldbook(store.settings);
       const entries = klona(target.entries);
-      const ctrl = entries.find((e: any) => e.name === oldEntryName);
-      if (ctrl) {
-        ctrl.name = newEntryName;
+      const entriesByOriginalName = new Map<string, any>();
+      for (const entry of entries) {
+        if (!entriesByOriginalName.has(entry.name)) {
+          entriesByOriginalName.set(entry.name, entry);
+        }
+      }
+      let changed = false;
+
+      for (const pair of renamePairs) {
+        const ctrl = entriesByOriginalName.get(pair.oldEntryName);
+        if (!ctrl) {
+          continue;
+        }
+        ctrl.name = pair.newEntryName;
+        changed = true;
+        console.info(`[EW] Controller entry renamed: ${pair.oldEntryName} → ${pair.newEntryName}`);
+      }
+
+      if (changed) {
         await replaceWorldbook(target.worldbook_name, entries, { render: 'debounced' });
-        console.info(`[EW] Controller entry renamed: ${oldEntryName} → ${newEntryName}`);
       }
     } catch (e) {
       console.warn('[EW] Controller rename failed:', e);
@@ -792,6 +854,19 @@ watch(
     }
   },
   { immediate: true },
+);
+
+watch(
+  () => store.settings.controller_entry_prefix,
+  (nextPrefix, previousPrefix) => {
+    if (nextPrefix === previousPrefix) {
+      return;
+    }
+    scheduleControllerEntryRename(
+      collectControllerFlowIdentities(store.settings.flows, store.charFlows),
+      previousPrefix,
+    );
+  },
 );
 
 onUnmounted(() => {

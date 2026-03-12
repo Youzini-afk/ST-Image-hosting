@@ -27,6 +27,7 @@ import {
   EwSettingsSchema,
   LastIoSummary,
   RunSummary,
+  type ControllerEntrySnapshot,
 } from '../runtime/types';
 import { convertStPresetToFlow, isSillyTavernPreset } from './convertStPreset';
 import type { TabKey } from './help-meta';
@@ -51,7 +52,7 @@ export const useEwStore = defineStore('evolution-world-store', () => {
 
   // ── 调试预览 ──
   const promptPreview = ref<PromptPreviewMessage[] | null>(null);
-  const snapshotPreview = ref<{ controller: string | null; dyn: Map<string, DynSnapshot> } | null>(null);
+  const snapshotPreview = ref<{ controllers: ControllerEntrySnapshot[]; dyn: Map<string, DynSnapshot> } | null>(null);
   const previewFlowId = ref<string>('');
 
   // ── 历史记录 ──
@@ -575,8 +576,12 @@ export const useEwStore = defineStore('evolution-world-store', () => {
     try {
       snapshotPreview.value = await collectLatestSnapshots();
       const dynCount = snapshotPreview.value.dyn.size;
-      const hasCtrl = snapshotPreview.value.controller ? '✅' : '❌';
-      showEwNotice({ title: '调试', message: `Controller: ${hasCtrl} | Dyn 条目: ${dynCount}`, level: 'success' });
+      const controllerCount = snapshotPreview.value.controllers.length;
+      showEwNotice({
+        title: '调试',
+        message: `Controller: ${controllerCount} 条 | Dyn 条目: ${dynCount}`,
+        level: 'success',
+      });
     } catch (e) {
       console.error('[Evolution World] loadSnapshotPreview failed:', e);
       showEwNotice({ title: '调试', message: '快照读取失败: ' + (e as Error).message, level: 'error' });

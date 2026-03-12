@@ -1,4 +1,4 @@
-import { TextSliceRuleSchema } from './contracts';
+﻿import { TextSliceRuleSchema } from './contracts';
 
 export const EwApiPresetSchema = z.object({
   id: z.string().min(1),
@@ -413,12 +413,34 @@ export type Prioritized<T> = {
   flow_order: number;
 };
 
+export type ControllerEntrySnapshot = {
+  entry_name: string;
+  content: string;
+  flow_id?: string;
+  flow_name?: string;
+  legacy?: boolean;
+};
+
+export type ControllerModelSlot = {
+  flow_id: string;
+  flow_name: string;
+  entry_name: string;
+  model: import('./contracts').ControllerModel;
+};
+
+export type ControllerTemplateSlot = {
+  flow_id: string;
+  flow_name: string;
+  entry_name: string;
+  content: string;
+};
+
 export type MergedPlan = {
   worldbook: {
     desired_entries: Array<{ name: string; content: string; enabled: boolean }>;
     remove_entries: Array<{ name: string }>;
   };
-  controller_models: Record<string, import('./contracts').ControllerModel>;
+  controller_models: ControllerModelSlot[];
   reply_instruction: string;
   diagnostics: Record<string, any>;
 };

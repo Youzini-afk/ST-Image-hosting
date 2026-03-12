@@ -28,7 +28,9 @@
             <span v-if="item.diff.toggled.length" class="hist-tag hist-tag--toggled">
               ⇄{{ item.diff.toggled.length }}
             </span>
-            <span v-if="item.diff.controllerChanged" class="hist-tag hist-tag--modified"> ≈C </span>
+            <span v-if="Object.keys(item.diff.controllersChanged).length" class="hist-tag hist-tag--modified">
+              ≈C{{ Object.keys(item.diff.controllersChanged).length }}
+            </span>
           </div>
           <div v-else class="hist-block-empty">—</div>
         </div>
@@ -74,7 +76,7 @@ const selectedPrevSnapshot = computed<SnapshotData | null>(() => {
   return null;
 });
 
-const emptyDiff: SnapshotDiff = { created: [], modified: [], deleted: [], toggled: [], controllerChanged: false };
+const emptyDiff: SnapshotDiff = { created: [], modified: [], deleted: [], toggled: [], controllersChanged: {} };
 const timelineItems = computed(() => {
   const items: Array<{ floor: (typeof store.floorSnapshots)[number]; diff: SnapshotDiff }> = [];
   let previousSnapshot: SnapshotData | null = null;

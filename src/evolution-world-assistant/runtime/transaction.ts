@@ -1,6 +1,6 @@
 import { markFloorEntries } from './floor-binding';
 import { saveControllerBackup } from './settings';
-import { EwSettings, MergedPlan } from './types';
+import { ControllerEntrySnapshot, ControllerTemplateSlot, EwSettings, MergedPlan } from './types';
 import { ensureDefaultEntry, resolveTargetWorldbook } from './worldbook-runtime';
 
 type CommitResult = {
@@ -64,7 +64,7 @@ function applyDeclarativeDiff(
 export async function commitMergedPlan(
   settings: EwSettings,
   mergedPlan: MergedPlan,
-  controllerTemplates: Record<string, string>,
+  controllerTemplates: ControllerTemplateSlot[],
   _requestId: string,
   messageId: number,
 ): Promise<CommitResult> {
@@ -73,10 +73,13 @@ export async function commitMergedPlan(
   const chatId = String(SillyTavern.getCurrentChatId?.() ?? SillyTavern.chatId ?? 'unknown');
 
   // 覆写前备份当前所有 controller 条目内容。
-  const previousControllers: Record<string, string> = {};
+  const previousControllers: ControllerEntrySnapshot[] = [];
   for (const entry of beforeEntries) {
     if (entry.name.startsWith(settings.controller_entry_prefix)) {
-      previousControllers[entry.name] = entry.content;
+      previousControllers.push({
+        entry_name: entry.name,
+        content: entry.content,
+      });
     }
   }
   saveControllerBackup(chatId, target.worldbook_name, previousControllers);
@@ -99,16 +102,28 @@ export async function commitMergedPlan(
     settings,
   );
 
-  // 将多个 EJS controller 条目写入角色世界书。
-  for (const [flowName, template] of Object.entries(controllerTemplates)) {
-    const entryName = settings.controller_entry_prefix + flowName;
-    const ctrlExisting = nextEntries.find(e => e.name === entryName);
-    if (ctrlExisting) {
-      ctrlExisting.content = template;
-      ctrlExisting.enabled = true;
-    } else {
-      nextEntries.push(ensureDefaultEntry(entryName, template, true, nextEntries, true));
+  const desiredControllerByName = new Map(controllerTemplates.map(slot => [slot.entry_name, slot]));
+
+  for (const entry of nextEntries) {
+    if (!entry.name.startsWith(settings.controller_entry_prefix)) {
+      continue;
     }
+    const desiredController = desiredControllerByName.get(entry.name);
+    if (desiredController) {
+      entry.content = desiredController.content;
+      entry.enabled = true;
+    } else {
+      entry.content = '';
+      entry.enabled = false;
+    }
+  }
+
+  for (const slot of controllerTemplates) {
+    const ctrlExisting = nextEntries.find(e => e.name === slot.entry_name);
+    if (ctrlExisting) {
+      continue;
+    }
+    nextEntries.push(ensureDefaultEntry(slot.entry_name, slot.content, true, nextEntries, true));
   }
 
   // 在一次原子操作中提交所有变更。
@@ -126,7 +141,7 @@ export async function commitMergedPlan(
       enabled: false,
     }));
 
-    if (dynSnapshots.length > 0 || Object.keys(controllerTemplates).length > 0) {
+    if (dynSnapshots.length > 0 || controllerTemplates.length > 0) {
       await markFloorEntries(
         settings,
         messageId,

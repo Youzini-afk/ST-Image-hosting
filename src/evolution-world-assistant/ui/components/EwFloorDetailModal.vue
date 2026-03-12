@@ -14,27 +14,40 @@
           <!-- Normal Detail View -->
           <div v-if="!isComparing" class="hist-modal-body">
             <div v-if="diff" class="hist-changes">
-              <div v-if="diff.controllerChanged" class="hist-change-item hist-change--modified">
+              <div
+                v-for="[controllerKey, change] in Object.entries(diff.controllersChanged)"
+                :key="`ctrl-${controllerKey}`"
+                class="hist-change-item hist-change--modified"
+              >
                 <span class="hist-change-icon">≈</span>
-                <span>Controller  已变更</span>
+                <span>Controller {{ controllerKey }} · {{ change }}</span>
               </div>
-              <div v-for="name in diff.created" :key="'c-'+name" class="hist-change-item hist-change--created">
+              <div v-for="name in diff.created" :key="'c-' + name" class="hist-change-item hist-change--created">
                 <span class="hist-change-icon">+</span>
                 <span class="hist-change-name">{{ name }}</span>
               </div>
-              <div v-for="name in diff.modified" :key="'m-'+name" class="hist-change-item hist-change--modified">
+              <div v-for="name in diff.modified" :key="'m-' + name" class="hist-change-item hist-change--modified">
                 <span class="hist-change-icon">~</span>
                 <span class="hist-change-name">{{ name }}</span>
               </div>
-              <div v-for="name in diff.deleted" :key="'d-'+name" class="hist-change-item hist-change--deleted">
+              <div v-for="name in diff.deleted" :key="'d-' + name" class="hist-change-item hist-change--deleted">
                 <span class="hist-change-icon">−</span>
                 <span class="hist-change-name">{{ name }}</span>
               </div>
-              <div v-for="name in diff.toggled" :key="'t-'+name" class="hist-change-item hist-change--toggled">
+              <div v-for="name in diff.toggled" :key="'t-' + name" class="hist-change-item hist-change--toggled">
                 <span class="hist-change-icon">⇄</span>
                 <span class="hist-change-name">{{ name }}</span>
               </div>
-              <div v-if="!diff.created.length && !diff.modified.length && !diff.deleted.length && !diff.toggled.length && !diff.controllerChanged" class="hist-empty">
+              <div
+                v-if="
+                  !diff.created.length &&
+                  !diff.modified.length &&
+                  !diff.deleted.length &&
+                  !diff.toggled.length &&
+                  !Object.keys(diff.controllersChanged).length
+                "
+                class="hist-empty"
+              >
                 此楼层无变更。
               </div>
             </div>
@@ -43,9 +56,13 @@
             <!-- Snapshot content -->
             <div v-if="snapshot" class="hist-snapshot-detail">
               <h4 class="hist-sub-title">快照内容</h4>
-              <div v-if="snapshot.controller" class="hist-detail-block">
-                <strong>Controller</strong>
-                <pre>{{ truncate(snapshot.controller, 500) }}</pre>
+              <div
+                v-for="controller in snapshot.controllers"
+                :key="controller.entry_name || controller.flow_id || controller.flow_name"
+                class="hist-detail-block"
+              >
+                <strong>Controller · {{ controller.flow_name || controller.flow_id || 'Legacy' }}</strong>
+                <pre>{{ truncate(controller.content, 500) }}</pre>
               </div>
               <div v-for="entry in snapshot.dyn_entries" :key="entry.name" class="hist-detail-block">
                 <strong>
@@ -58,12 +75,8 @@
 
             <!-- Actions -->
             <div class="hist-modal-actions">
-              <button type="button" class="ew-btn" :disabled="store.busy" @click="doRollback">
-                ↩ 回滚到此楼层
-              </button>
-              <button type="button" class="ew-btn" @click="startCompare">
-                ⇋ 对比其他楼层
-              </button>
+              <button type="button" class="ew-btn" :disabled="store.busy" @click="doRollback">↩ 回滚到此楼层</button>
+              <button type="button" class="ew-btn" @click="startCompare">⇋ 对比其他楼层</button>
             </div>
           </div>
 
@@ -84,11 +97,20 @@
               <div class="hist-diff-col">
                 <h4 class="hist-diff-title">楼层 #{{ floorId }}</h4>
                 <div v-if="snapshot" class="hist-diff-entries">
-                  <div v-if="snapshot.controller" class="hist-diff-entry">
-                    <strong>Controller</strong>
-                    <pre>{{ truncate(snapshot.controller, 300) }}</pre>
+                  <div
+                    v-for="controller in snapshot.controllers"
+                    :key="`left-${controller.entry_name || controller.flow_id || controller.flow_name}`"
+                    class="hist-diff-entry"
+                  >
+                    <strong>Controller · {{ controller.flow_name || controller.flow_id || 'Legacy' }}</strong>
+                    <pre>{{ truncate(controller.content, 300) }}</pre>
                   </div>
-                  <div v-for="e in snapshot.dyn_entries" :key="e.name" class="hist-diff-entry" :class="diffEntryClass(e.name, 'left')">
+                  <div
+                    v-for="e in snapshot.dyn_entries"
+                    :key="e.name"
+                    class="hist-diff-entry"
+                    :class="diffEntryClass(e.name, 'left')"
+                  >
                     <strong>{{ e.name }}</strong>
                     <pre>{{ truncate(e.content, 200) }}</pre>
                   </div>
@@ -99,11 +121,20 @@
               <div class="hist-diff-col">
                 <h4 class="hist-diff-title">楼层 #{{ compareTargetId }}</h4>
                 <div v-if="compareSnapshot" class="hist-diff-entries">
-                  <div v-if="compareSnapshot.controller" class="hist-diff-entry">
-                    <strong>Controller</strong>
-                    <pre>{{ truncate(compareSnapshot.controller, 300) }}</pre>
+                  <div
+                    v-for="controller in compareSnapshot.controllers"
+                    :key="`right-${controller.entry_name || controller.flow_id || controller.flow_name}`"
+                    class="hist-diff-entry"
+                  >
+                    <strong>Controller · {{ controller.flow_name || controller.flow_id || 'Legacy' }}</strong>
+                    <pre>{{ truncate(controller.content, 300) }}</pre>
                   </div>
-                  <div v-for="e in compareSnapshot.dyn_entries" :key="e.name" class="hist-diff-entry" :class="diffEntryClass(e.name, 'right')">
+                  <div
+                    v-for="e in compareSnapshot.dyn_entries"
+                    :key="e.name"
+                    class="hist-diff-entry"
+                    :class="diffEntryClass(e.name, 'right')"
+                  >
                     <strong>{{ e.name }}</strong>
                     <pre>{{ truncate(e.content, 200) }}</pre>
                   </div>
@@ -280,25 +311,33 @@ function truncate(str: string, maxLen: number): string {
   background: color-mix(in srgb, #22c55e 12%, transparent);
   color: #86efac;
 }
-.hist-change--created .hist-change-icon { color: #22c55e; }
+.hist-change--created .hist-change-icon {
+  color: #22c55e;
+}
 
 .hist-change--modified {
   background: color-mix(in srgb, #f59e0b 12%, transparent);
   color: #fcd34d;
 }
-.hist-change--modified .hist-change-icon { color: #f59e0b; }
+.hist-change--modified .hist-change-icon {
+  color: #f59e0b;
+}
 
 .hist-change--deleted {
   background: color-mix(in srgb, #ef4444 12%, transparent);
   color: #fca5a5;
 }
-.hist-change--deleted .hist-change-icon { color: #ef4444; }
+.hist-change--deleted .hist-change-icon {
+  color: #ef4444;
+}
 
 .hist-change--toggled {
   background: color-mix(in srgb, #6366f1 12%, transparent);
   color: #a5b4fc;
 }
-.hist-change--toggled .hist-change-icon { color: #6366f1; }
+.hist-change--toggled .hist-change-icon {
+  color: #6366f1;
+}
 
 /* ── Snapshot Detail ── */
 .hist-snapshot-detail {
@@ -431,9 +470,18 @@ function truncate(str: string, maxLen: number): string {
   overflow: auto;
 }
 
-.hist-diff--created { background: color-mix(in srgb, #22c55e 10%, transparent); border-color: color-mix(in srgb, #22c55e 25%, transparent); }
-.hist-diff--modified { background: color-mix(in srgb, #f59e0b 10%, transparent); border-color: color-mix(in srgb, #f59e0b 25%, transparent); }
-.hist-diff--deleted { background: color-mix(in srgb, #ef4444 10%, transparent); border-color: color-mix(in srgb, #ef4444 25%, transparent); }
+.hist-diff--created {
+  background: color-mix(in srgb, #22c55e 10%, transparent);
+  border-color: color-mix(in srgb, #22c55e 25%, transparent);
+}
+.hist-diff--modified {
+  background: color-mix(in srgb, #f59e0b 10%, transparent);
+  border-color: color-mix(in srgb, #f59e0b 25%, transparent);
+}
+.hist-diff--deleted {
+  background: color-mix(in srgb, #ef4444 10%, transparent);
+  border-color: color-mix(in srgb, #ef4444 25%, transparent);
+}
 
 /* ── Shared ── */
 .hist-empty {
@@ -453,27 +501,62 @@ function truncate(str: string, maxLen: number): string {
   font-weight: 600;
   padding: 0.4rem 0.85rem;
   cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.2s ease;
 }
-.ew-btn:hover { border-color: var(--ew-accent); background: color-mix(in srgb, var(--ew-accent) 25%, transparent); color: #fff; transform: translateY(-2px); box-shadow: 0 4px 12px var(--ew-accent-glow); }
-.ew-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-.ew-btn--sm { font-size: 0.72rem; padding: 0.3rem 0.6rem; }
+.ew-btn:hover {
+  border-color: var(--ew-accent);
+  background: color-mix(in srgb, var(--ew-accent) 25%, transparent);
+  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--ew-accent-glow);
+}
+.ew-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+.ew-btn--sm {
+  font-size: 0.72rem;
+  padding: 0.3rem 0.6rem;
+}
 
 /* ── Transition ── */
-.hist-modal-enter-active, .hist-modal-leave-active {
+.hist-modal-enter-active,
+.hist-modal-leave-active {
   transition: opacity 0.25s ease;
 }
-.hist-modal-enter-active .hist-modal-container, .hist-modal-leave-active .hist-modal-container {
+.hist-modal-enter-active .hist-modal-container,
+.hist-modal-leave-active .hist-modal-container {
   transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-.hist-modal-enter-from, .hist-modal-leave-to { opacity: 0; }
-.hist-modal-enter-from .hist-modal-container { transform: scale(0.95) translateY(10px); }
-.hist-modal-leave-to .hist-modal-container { transform: scale(0.95) translateY(10px); }
+.hist-modal-enter-from,
+.hist-modal-leave-to {
+  opacity: 0;
+}
+.hist-modal-enter-from .hist-modal-container {
+  transform: scale(0.95) translateY(10px);
+}
+.hist-modal-leave-to .hist-modal-container {
+  transform: scale(0.95) translateY(10px);
+}
 
 /* ── Mobile ── */
 @media (max-width: 768px) {
-  .hist-modal-overlay { padding: 0; align-items: stretch; }
-  .hist-modal-container { max-width: 100%; max-height: 100vh; border-radius: 0; }
-  .hist-diff-view { grid-template-columns: 1fr; }
+  .hist-modal-overlay {
+    padding: 0;
+    align-items: stretch;
+  }
+  .hist-modal-container {
+    max-width: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+  .hist-diff-view {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

@@ -8,30 +8,52 @@
  * (flat layout — ST file API doesn't support subdirectories)
  */
 
+import type { ControllerEntrySnapshot } from './types';
+
 export type SnapshotData = {
-  controllers: Record<string, string>;
+  controllers: ControllerEntrySnapshot[];
   dyn_entries: Array<{ name: string; content: string; enabled: boolean }>;
 };
 
 /**
- * Upgrade legacy snapshot format (single `controller: string`) to the new
- * multi-controller format (`controllers: Record<string, string>`).
+ * Upgrade legacy snapshot formats to the new multi-controller array structure.
  */
 export function upgradeSnapshotData(raw: any): SnapshotData | null {
   if (!raw || typeof raw !== 'object') return null;
 
-  // New format: { controllers: {...}, dyn_entries: [...] }
-  if (raw.controllers && typeof raw.controllers === 'object' && !Array.isArray(raw.controllers)) {
+  if (Array.isArray(raw.controllers)) {
     return {
-      controllers: raw.controllers,
+      controllers: raw.controllers
+        .filter((entry: unknown) => entry && typeof entry === 'object')
+        .map((entry: ControllerEntrySnapshot) => ({
+          entry_name: String(entry.entry_name ?? ''),
+          content: String(entry.content ?? ''),
+          flow_id: entry.flow_id,
+          flow_name: entry.flow_name,
+          legacy: Boolean(entry.legacy),
+        }))
+        .filter((entry: ControllerEntrySnapshot) => entry.content),
       dyn_entries: Array.isArray(raw.dyn_entries) ? raw.dyn_entries : [],
     };
   }
 
-  // Legacy format: { controller: "...", dyn_entries: [...] }
+  if (raw.controllers && typeof raw.controllers === 'object' && !Array.isArray(raw.controllers)) {
+    return {
+      controllers: Object.entries(raw.controllers as Record<string, unknown>).map(([key, value]) => ({
+        entry_name: key.startsWith('EW/Controller/') ? key : '',
+        flow_name: key.startsWith('EW/Controller/') ? undefined : key,
+        content: String(value ?? ''),
+        legacy: key === 'legacy',
+      })),
+      dyn_entries: Array.isArray(raw.dyn_entries) ? raw.dyn_entries : [],
+    };
+  }
+
   if (typeof raw.controller === 'string') {
     return {
-      controllers: raw.controller ? { legacy: raw.controller } : {},
+      controllers: raw.controller
+        ? [{ entry_name: '', flow_name: 'Legacy Controller', content: raw.controller, legacy: true }]
+        : [],
       dyn_entries: Array.isArray(raw.dyn_entries) ? raw.dyn_entries : [],
     };
   }
@@ -138,11 +160,7 @@ export async function deleteSnapshot(fileName: string): Promise<void> {
  * Since ST doesn't provide a "list files" API, we verify files
  * based on message IDs found in the current chat.
  */
-export async function findSnapshotFiles(
-  charName: string,
-  chatId: string,
-  messageIds: number[],
-): Promise<string[]> {
+export async function findSnapshotFiles(charName: string, chatId: string, messageIds: number[]): Promise<string[]> {
   const prefix = buildFilePrefix(charName, chatId);
   const candidates = messageIds.map(id => `user/files/${prefix}msg-${id}.json`);
 
@@ -156,7 +174,7 @@ export async function findSnapshotFiles(
     });
     if (!response.ok) return [];
 
-    const result = await response.json() as Record<string, boolean>;
+    const result = (await response.json()) as Record<string, boolean>;
     return Object.entries(result)
       .filter(([, exists]) => exists)
       .map(([url]) => url.replace('user/files/', ''));

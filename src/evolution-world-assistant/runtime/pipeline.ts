@@ -6,7 +6,7 @@ import { injectReplyInstructionOnce } from './injection';
 import { mergeFlowResults } from './merger';
 import { getSettings, setLastIo, setLastRun } from './settings';
 import { commitMergedPlan } from './transaction';
-import { DispatchFlowAttempt, RunSummarySchema, WorkflowProgressUpdate } from './types';
+import { ControllerTemplateSlot, DispatchFlowAttempt, RunSummarySchema, WorkflowProgressUpdate } from './types';
 
 type RunWorkflowInput = {
   message_id: number;
@@ -155,12 +155,14 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowO
     throwIfWorkflowCancelled(input);
 
     // Render each flow's controller_model into an EJS template.
-    const controllerTemplates: Record<string, string> = {};
-    for (const [flowName, model] of Object.entries(mergedPlan.controller_models)) {
-      controllerTemplates[flowName] = await renderControllerTemplate(
-        model,
-        settings.dynamic_entry_prefix,
-      );
+    const controllerTemplates: ControllerTemplateSlot[] = [];
+    for (const slot of mergedPlan.controller_models) {
+      controllerTemplates.push({
+        flow_id: slot.flow_id,
+        flow_name: slot.flow_name,
+        entry_name: slot.entry_name,
+        content: await renderControllerTemplate(slot.model, settings.dynamic_entry_prefix),
+      });
     }
     throwIfWorkflowCancelled(input);
     input.onProgress?.({
