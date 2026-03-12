@@ -370,11 +370,13 @@ async function executeWorkflowWithPolicy(
       level: 'warning',
       persist: true,
       busy: true,
+      action: undefined,
     });
   };
 
   const processingReminder = createProcessingReminder(cancelWorkflow);
   processingReminder.update(buildAbortableReminder(options.reminderMessage));
+  let reminderSettled = false;
 
   const trimPreview = (text: string | undefined, maxLength: number) => {
     const normalized = String(text ?? '')
@@ -387,6 +389,10 @@ async function executeWorkflowWithPolicy(
   };
 
   const handleWorkflowProgress = (update: WorkflowProgressUpdate) => {
+    if (reminderSettled) {
+      return;
+    }
+
     switch (update.phase) {
       case 'preparing':
       case 'dispatching':
@@ -430,10 +436,18 @@ async function executeWorkflowWithPolicy(
   };
 
   const finalizeUserAbort = () => {
+    reminderSettled = true;
     processingReminder.update({
       title: 'Evolution World',
       message: '已终止本轮处理。',
       level: 'warning',
+      persist: false,
+      busy: false,
+      action: undefined,
+      island: {
+        entry_name: '',
+        content: '',
+      },
       duration_ms: 2200,
     });
     return {
@@ -503,20 +517,28 @@ async function executeWorkflowWithPolicy(
       const displayReason = formatReasonForDisplay(result.reason);
       switch (policy) {
         case 'continue_generation':
+          reminderSettled = true;
           processingReminder.update({
             title: 'Evolution World',
             message: `工作流失败：${displayReason}。原消息是否继续发送取决于放行策略。`,
             level: 'warning',
+            persist: false,
+            busy: false,
+            action: undefined,
             duration_ms: 3200,
           });
           toastr.warning(`工作流失败，原消息是否继续发送取决于放行策略: ${displayReason}`, 'Evolution World');
           break;
         case 'allow_partial_success':
         case 'notify_only':
+          reminderSettled = true;
           processingReminder.update({
             title: 'Evolution World',
             message: `工作流失败：${displayReason}`,
             level: 'warning',
+            persist: false,
+            busy: false,
+            action: undefined,
             duration_ms: 3200,
           });
           toastr.info(`工作流失败: ${displayReason}`, 'Evolution World');
@@ -524,10 +546,14 @@ async function executeWorkflowWithPolicy(
         case 'stop_generation':
         case 'retry_once':
         default:
+          reminderSettled = true;
           processingReminder.update({
             title: 'Evolution World',
             message: `动态世界流程失败，本轮已中止：${displayReason}`,
             level: 'error',
+            persist: false,
+            busy: false,
+            action: undefined,
             duration_ms: 4200,
           });
           stopGenerationNow();
@@ -547,10 +573,14 @@ async function executeWorkflowWithPolicy(
     }
   }
 
+  reminderSettled = true;
   processingReminder.update({
     title: 'Evolution World',
     message: options.successMessage,
     level: 'success',
+    persist: false,
+    busy: false,
+    action: undefined,
     duration_ms: 2200,
   });
   return {

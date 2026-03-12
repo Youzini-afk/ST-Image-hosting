@@ -410,13 +410,13 @@ function ensureWorkflowStyle(doc: Document) {
     }
 
     .ew-workflow-notice__icon {
-      width: 32px;
-      height: 32px;
-      border-radius: 11px;
+      width: 38px;
+      height: 38px;
+      border-radius: 13px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      font-size: 15px;
+      font-size: 20px;
       font-weight: 800;
       color: #f4f8ff;
       background: color-mix(in srgb, var(--ew-notice-accent) 28%, rgba(6, 12, 20, 0.6));
