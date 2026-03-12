@@ -6,7 +6,7 @@ import { injectReplyInstructionOnce } from './injection';
 import { mergeFlowResults } from './merger';
 import { getSettings, setLastIo, setLastRun } from './settings';
 import { commitMergedPlan } from './transaction';
-import { DispatchFlowAttempt, RunSummarySchema } from './types';
+import { DispatchFlowAttempt, RunSummarySchema, WorkflowProgressUpdate } from './types';
 
 type RunWorkflowInput = {
   message_id: number;
@@ -16,6 +16,7 @@ type RunWorkflowInput = {
   inject_reply?: boolean;
   abortSignal?: AbortSignal;
   isCancelled?: () => boolean;
+  onProgress?: (update: WorkflowProgressUpdate) => void;
 };
 
 export type RunWorkflowOutput = {
@@ -106,6 +107,11 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowO
 
   try {
     throwIfWorkflowCancelled(input);
+    input.onProgress?.({
+      phase: 'preparing',
+      request_id: requestId,
+      message: '正在准备工作流上下文…',
+    });
     // Merge global flows + per-character flows (from EW/Flows worldbook entry).
     const enabledFlows = await getEffectiveFlows(settings);
     if (enabledFlows.length === 0) {
@@ -113,6 +119,11 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowO
     }
 
     throwIfWorkflowCancelled(input);
+    input.onProgress?.({
+      phase: 'dispatching',
+      request_id: requestId,
+      message: `已装载 ${enabledFlows.length} 条工作流，正在请求模型…`,
+    });
 
     const dispatchOutput = await withTimeout(
       dispatchFlows({
@@ -124,6 +135,7 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowO
         request_id: requestId,
         abortSignal: input.abortSignal,
         isCancelled: input.isCancelled,
+        onProgress: input.onProgress,
       }),
       settings.total_timeout_ms,
     );
@@ -134,10 +146,23 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowO
 
     const results = dispatchOutput.results;
 
+    input.onProgress?.({
+      phase: 'merging',
+      request_id: requestId,
+      message: '模型响应已返回，正在合并条目结果…',
+    });
     const mergedPlan = mergeFlowResults(results, settings);
     throwIfWorkflowCancelled(input);
-    const controllerTemplate = await renderControllerTemplate(mergedPlan.controller_model, settings.dynamic_entry_prefix);
+    const controllerTemplate = await renderControllerTemplate(
+      mergedPlan.controller_model,
+      settings.dynamic_entry_prefix,
+    );
     throwIfWorkflowCancelled(input);
+    input.onProgress?.({
+      phase: 'committing',
+      request_id: requestId,
+      message: '正在写回世界书与控制器…',
+    });
 
     const commitResult = await commitMergedPlan(settings, mergedPlan, controllerTemplate, requestId, input.message_id);
     throwIfWorkflowCancelled(input);
@@ -159,9 +184,20 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowO
     });
     setLastRun(summary);
 
+    input.onProgress?.({
+      phase: 'completed',
+      request_id: requestId,
+      message: '工作流处理完成。',
+    });
+
     return { ok: true, request_id: requestId, diagnostics: mergedPlan.diagnostics };
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
+    input.onProgress?.({
+      phase: 'failed',
+      request_id: requestId,
+      message: reason,
+    });
     if (error instanceof DispatchFlowsError) {
       attempts = error.attempts;
       saveIoSummary(requestId, currentChatId, input.mode, attempts);

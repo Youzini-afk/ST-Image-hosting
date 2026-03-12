@@ -1,7 +1,15 @@
 import { buildFlowRequest } from './context-builder';
 import { FlowResponseSchema, FlowTriggerV1 } from './contracts';
 import { assembleOrderedPrompts, collectPromptComponents, PromptComponents } from './prompt-assembler';
-import { DispatchFlowAttempt, DispatchFlowResult, EwApiPreset, EwFlowConfig, EwSettings } from './types';
+import {
+  DispatchFlowAttempt,
+  DispatchFlowResult,
+  EwApiPreset,
+  EwFlowConfig,
+  EwSettings,
+  WorkflowProgressUpdate,
+  WorkflowStreamPreview,
+} from './types';
 
 type DispatchInput = {
   settings: EwSettings;
@@ -12,6 +20,7 @@ type DispatchInput = {
   request_id: string;
   abortSignal?: AbortSignal;
   isCancelled?: () => boolean;
+  onProgress?: (update: WorkflowProgressUpdate) => void;
 };
 
 export type DispatchFlowsOutput = {
@@ -220,6 +229,218 @@ function buildCustomIncludeHeaders(apiPreset: EwApiPreset): string {
 
 function shouldUseGenerateRawCustomApi(apiPreset: EwApiPreset): boolean {
   return !apiPreset.headers_json.trim();
+}
+
+function extractLatestJsonStringField(source: string, fieldName: string): { raw: string; index: number } | null {
+  const pattern = new RegExp(`\\"${fieldName}\\"\\s*:\\s*\\"`, 'g');
+  let match: RegExpExecArray | null;
+  let last: { raw: string; index: number } | null = null;
+
+  while ((match = pattern.exec(source))) {
+    const start = match.index + match[0].length;
+    let raw = '';
+    let escaped = false;
+
+    for (let cursor = start; cursor < source.length; cursor += 1) {
+      const char = source[cursor];
+      if (escaped) {
+        raw += char;
+        escaped = false;
+        continue;
+      }
+      if (char === '\\') {
+        raw += char;
+        escaped = true;
+        continue;
+      }
+      if (char === '"') {
+        break;
+      }
+      raw += char;
+    }
+
+    last = { raw, index: match.index };
+  }
+
+  return last;
+}
+
+function decodePartialJsonString(raw: string): string {
+  let result = '';
+
+  for (let index = 0; index < raw.length; index += 1) {
+    const char = raw[index];
+    if (char !== '\\') {
+      result += char;
+      continue;
+    }
+
+    const next = raw[index + 1];
+    if (!next) {
+      break;
+    }
+
+    index += 1;
+    switch (next) {
+      case 'n':
+        result += '\n';
+        break;
+      case 'r':
+        result += '\r';
+        break;
+      case 't':
+        result += '\t';
+        break;
+      case 'b':
+        result += '\b';
+        break;
+      case 'f':
+        result += '\f';
+        break;
+      case '"':
+      case '\\':
+      case '/':
+        result += next;
+        break;
+      case 'u': {
+        const code = raw.slice(index + 1, index + 5);
+        if (/^[0-9a-fA-F]{4}$/.test(code)) {
+          result += String.fromCharCode(Number.parseInt(code, 16));
+          index += 4;
+        }
+        break;
+      }
+      default:
+        result += next;
+        break;
+    }
+  }
+
+  return result;
+}
+
+function extractStreamPreview(fullText: string): WorkflowStreamPreview | undefined {
+  const desiredEntriesIndex = fullText.lastIndexOf('"desired_entries"');
+  const searchArea = desiredEntriesIndex >= 0 ? fullText.slice(desiredEntriesIndex) : fullText;
+  const nameField = extractLatestJsonStringField(searchArea, 'name');
+  const contentField = extractLatestJsonStringField(searchArea, 'content');
+
+  if (!nameField && !contentField) {
+    return undefined;
+  }
+
+  const entryName = nameField ? decodePartialJsonString(nameField.raw).trim() : '';
+  const content = contentField ? decodePartialJsonString(contentField.raw).replace(/\s+/g, ' ').trim() : '';
+
+  if (!entryName && !content) {
+    return undefined;
+  }
+
+  return {
+    entry_name: entryName,
+    content,
+  };
+}
+
+function extractStreamDeltaFromPayload(payload: any): { delta?: string; full?: string } {
+  const openAiDelta = payload?.choices?.[0]?.delta?.content;
+  if (typeof openAiDelta === 'string' && openAiDelta) {
+    return { delta: openAiDelta };
+  }
+
+  const openAiFull = payload?.choices?.[0]?.message?.content ?? payload?.choices?.[0]?.text ?? payload?.content;
+  if (typeof openAiFull === 'string' && openAiFull) {
+    return { full: openAiFull };
+  }
+
+  const anthropicDelta = payload?.delta?.text ?? payload?.content_block?.text;
+  if (typeof anthropicDelta === 'string' && anthropicDelta) {
+    return { delta: anthropicDelta };
+  }
+
+  const candidatesText = payload?.candidates?.[0]?.content?.parts
+    ?.map((part: any) => (typeof part?.text === 'string' ? part.text : ''))
+    .join('');
+  if (typeof candidatesText === 'string' && candidatesText) {
+    return { full: candidatesText };
+  }
+
+  return {};
+}
+
+async function readStreamingSseText(response: Response, onText?: (fullText: string) => void): Promise<string> {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error('stream response body is unavailable');
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let fullText = '';
+
+  const processEventBlock = (block: string) => {
+    const trimmed = block.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    const dataLines = trimmed
+      .split(/\r?\n/)
+      .filter(line => line.startsWith('data:'))
+      .map(line => line.slice(5).trim());
+
+    if (!dataLines.length) {
+      return;
+    }
+
+    const payloadText = dataLines.join('\n');
+    if (!payloadText || payloadText === '[DONE]') {
+      return;
+    }
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(payloadText);
+    } catch {
+      return;
+    }
+
+    const extracted = extractStreamDeltaFromPayload(parsed);
+    if (typeof extracted.full === 'string' && extracted.full) {
+      fullText = extracted.full;
+      onText?.(fullText);
+      return;
+    }
+    if (typeof extracted.delta === 'string' && extracted.delta) {
+      fullText += extracted.delta;
+      onText?.(fullText);
+    }
+  };
+
+  while (true) {
+    const { value, done } = await reader.read();
+    buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+
+    const normalized = buffer.replace(/\r\n/g, '\n');
+    const chunks = normalized.split('\n\n');
+    buffer = chunks.pop() ?? '';
+    for (const chunk of chunks) {
+      processEventBlock(chunk);
+    }
+
+    if (done) {
+      const finalBuffer = decoder.decode();
+      if (finalBuffer) {
+        buffer += finalBuffer;
+      }
+      if (buffer.trim()) {
+        processEventBlock(buffer);
+      }
+      break;
+    }
+  }
+
+  return fullText;
 }
 
 async function buildOrderedPromptsForFlow(
@@ -437,6 +658,7 @@ async function executeFlowViaLlmConnector(
   flow: EwFlowConfig,
   orderedPrompts: Array<{ role: 'system' | 'assistant' | 'user'; content: string }>,
   generationId: string,
+  onStreamText?: (fullText: string) => void,
   abortSignal?: AbortSignal,
   isCancelled?: () => boolean,
 ): Promise<NonNullable<DispatchFlowAttempt['response']>> {
@@ -455,30 +677,43 @@ async function executeFlowViaLlmConnector(
     }
   }
 
-  const rawText = await generateRawFn({
-    generation_id: generationId,
-    should_stream: false,
-    should_silence: true,
-    ordered_prompts: orderedPrompts,
-  });
+  const stopStreamListener =
+    flow.generation_options.stream && onStreamText
+      ? eventOn(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, (fullText, streamGenerationId) => {
+          if (streamGenerationId === generationId) {
+            onStreamText(fullText);
+          }
+        })
+      : null;
 
-  throwIfDispatchAborted(abortSignal, isCancelled);
+  try {
+    const rawText = await generateRawFn({
+      generation_id: generationId,
+      should_stream: flow.generation_options.stream,
+      should_silence: true,
+      ordered_prompts: orderedPrompts,
+    });
 
-  const processed = applyResponseRegex(rawText, flow);
-  const parsedJson = parseJsonFromText(processed, flow.id);
-  normalizeAiResponse(parsedJson, flow.id, flow.priority);
-  const parsed = FlowResponseSchema.safeParse(parsedJson);
-  if (!parsed.success) {
-    throw new Error(
-      `[${flow.id}] response schema invalid: ${parsed.error.issues
-        .map(issue => `${issue.path.join('.')}: ${issue.message}`)
-        .join('; ')}`,
-    );
+    throwIfDispatchAborted(abortSignal, isCancelled);
+
+    const processed = applyResponseRegex(rawText, flow);
+    const parsedJson = parseJsonFromText(processed, flow.id);
+    normalizeAiResponse(parsedJson, flow.id, flow.priority);
+    const parsed = FlowResponseSchema.safeParse(parsedJson);
+    if (!parsed.success) {
+      throw new Error(
+        `[${flow.id}] response schema invalid: ${parsed.error.issues
+          .map(issue => `${issue.path.join('.')}: ${issue.message}`)
+          .join('; ')}`,
+      );
+    }
+    return parsed.data;
+  } finally {
+    stopStreamListener?.stop();
+    if (abortSignal) {
+      abortSignal.removeEventListener('abort', abortGeneration);
+    }
   }
-  if (abortSignal) {
-    abortSignal.removeEventListener('abort', abortGeneration);
-  }
-  return parsed.data;
 }
 
 async function executeFlowViaGenerateRawCustomApi(
@@ -486,6 +721,7 @@ async function executeFlowViaGenerateRawCustomApi(
   apiPreset: EwApiPreset,
   orderedPrompts: Array<{ role: 'system' | 'assistant' | 'user'; content: string }>,
   generationId: string,
+  onStreamText?: (fullText: string) => void,
   abortSignal?: AbortSignal,
   isCancelled?: () => boolean,
 ): Promise<NonNullable<DispatchFlowAttempt['response']>> {
@@ -513,10 +749,19 @@ async function executeFlowViaGenerateRawCustomApi(
     }
   }
 
+  const stopStreamListener =
+    flow.generation_options.stream && onStreamText
+      ? eventOn(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, (fullText, streamGenerationId) => {
+          if (streamGenerationId === generationId) {
+            onStreamText(fullText);
+          }
+        })
+      : null;
+
   try {
     const rawText = await generateRawFn({
       generation_id: generationId,
-      should_stream: false,
+      should_stream: flow.generation_options.stream,
       should_silence: true,
       custom_api: customApi,
       ordered_prompts: orderedPrompts,
@@ -537,6 +782,7 @@ async function executeFlowViaGenerateRawCustomApi(
     }
     return parsed.data;
   } finally {
+    stopStreamListener?.stop();
     if (abortSignal) {
       abortSignal.removeEventListener('abort', abortGeneration);
     }
@@ -551,6 +797,7 @@ async function executeFlowViaStBackend(
   flow: EwFlowConfig,
   apiPreset: EwApiPreset,
   orderedPrompts: Array<{ role: 'system' | 'assistant' | 'user'; content: string }>,
+  onStreamText?: (fullText: string) => void,
   abortSignal?: AbortSignal,
   isCancelled?: () => boolean,
 ): Promise<NonNullable<DispatchFlowAttempt['response']>> {
@@ -571,7 +818,7 @@ async function executeFlowViaStBackend(
     top_p: genOpts.top_p,
     frequency_penalty: genOpts.frequency_penalty,
     presence_penalty: genOpts.presence_penalty,
-    stream: false,
+    stream: genOpts.stream,
     chat_completion_source: 'custom',
     group_names: [],
     include_reasoning: flow.behavior_options.request_thinking,
@@ -614,13 +861,12 @@ async function executeFlowViaStBackend(
 
     throwIfDispatchAborted(abortSignal, isCancelled);
 
-    const data = await response.json();
-
-    // 提取 AI 回复文本 — 兼容 OpenAI 格式和简化格式
-    const rawText = data?.choices?.[0]?.message?.content?.trim() ?? data?.content?.trim() ?? '';
+    const rawText = genOpts.stream
+      ? await readStreamingSseText(response, onStreamText)
+      : await response.json().then(data => data?.choices?.[0]?.message?.content?.trim() ?? data?.content?.trim() ?? '');
 
     if (!rawText) {
-      throw new Error(`[${flow.id}] API returned empty response: ${JSON.stringify(data).slice(0, 200)}`);
+      throw new Error(`[${flow.id}] API returned empty response`);
     }
 
     const processed = applyResponseRegex(rawText, flow);
@@ -662,6 +908,7 @@ async function executeFlow(
   serialResults: Record<string, any>[],
   abortSignal?: AbortSignal,
   isCancelled?: () => boolean,
+  onProgress?: (update: WorkflowProgressUpdate) => void,
 ): Promise<DispatchFlowAttempt> {
   const startedAt = Date.now();
   throwIfDispatchAborted(abortSignal, isCancelled);
@@ -669,6 +916,39 @@ async function executeFlow(
   const usesTavernMain = apiPreset.mode === 'llm_connector' || apiPreset.use_main_api;
   const attemptApiUrl = usesTavernMain ? 'tavern://main_api' : apiPreset.api_url;
   const generationId = `${requestId}:${flow.id}`;
+  const streamEnabled = flow.generation_options.stream;
+  let lastStreamSignature = '';
+
+  onProgress?.({
+    phase: 'flow_started',
+    request_id: requestId,
+    flow_id: flow.id,
+    flow_name: flow.name,
+    flow_order: flowOrder,
+    generation_id: generationId,
+    stream_enabled: streamEnabled,
+    message: flow.name.trim() ? `正在执行工作流「${flow.name}」…` : `正在执行工作流 ${flow.id}…`,
+  });
+
+  const emitStreamProgress = (fullText: string) => {
+    const preview = extractStreamPreview(fullText);
+    const signature = `${preview?.entry_name ?? ''}\u0000${preview?.content ?? ''}\u0000${fullText.length}`;
+    if (signature === lastStreamSignature) {
+      return;
+    }
+    lastStreamSignature = signature;
+    onProgress?.({
+      phase: 'streaming',
+      request_id: requestId,
+      flow_id: flow.id,
+      flow_name: flow.name,
+      flow_order: flowOrder,
+      generation_id: generationId,
+      stream_enabled: true,
+      stream_text: fullText,
+      stream_preview: preview,
+    });
+  };
 
   // Collect prompt components once — shared by buildFlowRequest (metadata) and assembler (messages)
   const promptComponentsPromise = collectPromptComponents(flow, settings);
@@ -707,12 +987,19 @@ async function executeFlow(
         ...requestDebugBase,
         transport_request: {
           generation_id: generationId,
-          should_stream: false,
+          should_stream: streamEnabled,
           should_silence: true,
           ordered_prompts: orderedPrompts,
         },
       };
-      response = await executeFlowViaLlmConnector(flow, orderedPrompts, generationId, abortSignal, isCancelled);
+      response = await executeFlowViaLlmConnector(
+        flow,
+        orderedPrompts,
+        generationId,
+        streamEnabled ? emitStreamProgress : undefined,
+        abortSignal,
+        isCancelled,
+      );
     } else if (shouldUseGenerateRawCustomApi(apiPreset)) {
       // 自定义 API：优先走官方 generateRaw.custom_api；若需要自定义 headers 再回退到 ST backend
       try {
@@ -720,7 +1007,7 @@ async function executeFlow(
           ...requestDebugBase,
           transport_request: {
             generation_id: generationId,
-            should_stream: false,
+            should_stream: streamEnabled,
             should_silence: true,
             custom_api: buildGenerateRawCustomApi(apiPreset, flow),
             ordered_prompts: orderedPrompts,
@@ -731,6 +1018,7 @@ async function executeFlow(
           apiPreset,
           orderedPrompts,
           generationId,
+          streamEnabled ? emitStreamProgress : undefined,
           abortSignal,
           isCancelled,
         );
@@ -746,7 +1034,7 @@ async function executeFlow(
           top_p: flow.generation_options.top_p,
           frequency_penalty: flow.generation_options.frequency_penalty,
           presence_penalty: flow.generation_options.presence_penalty,
-          stream: false,
+          stream: streamEnabled,
           chat_completion_source: 'custom',
           group_names: [],
           include_reasoning: flow.behavior_options.request_thinking,
@@ -764,7 +1052,14 @@ async function executeFlow(
           route: '/api/backends/chat-completions/generate (fallback)',
           transport_request: fallbackRequestBody,
         };
-        response = await executeFlowViaStBackend(flow, apiPreset, orderedPrompts, abortSignal, isCancelled);
+        response = await executeFlowViaStBackend(
+          flow,
+          apiPreset,
+          orderedPrompts,
+          streamEnabled ? emitStreamProgress : undefined,
+          abortSignal,
+          isCancelled,
+        );
       }
     } else {
       requestDebug = {
@@ -777,7 +1072,7 @@ async function executeFlow(
           top_p: flow.generation_options.top_p,
           frequency_penalty: flow.generation_options.frequency_penalty,
           presence_penalty: flow.generation_options.presence_penalty,
-          stream: false,
+          stream: streamEnabled,
           chat_completion_source: 'custom',
           group_names: [],
           include_reasoning: flow.behavior_options.request_thinking,
@@ -791,7 +1086,14 @@ async function executeFlow(
           custom_prompt_post_processing: 'strict',
         },
       };
-      response = await executeFlowViaStBackend(flow, apiPreset, orderedPrompts, abortSignal, isCancelled);
+      response = await executeFlowViaStBackend(
+        flow,
+        apiPreset,
+        orderedPrompts,
+        streamEnabled ? emitStreamProgress : undefined,
+        abortSignal,
+        isCancelled,
+      );
     }
 
     throwIfDispatchAborted(abortSignal, isCancelled);
@@ -850,6 +1152,7 @@ export async function dispatchFlows(input: DispatchInput): Promise<DispatchFlows
         serialResults,
         input.abortSignal,
         input.isCancelled,
+        input.onProgress,
       );
       attempts.push(attempt);
 
@@ -888,6 +1191,7 @@ export async function dispatchFlows(input: DispatchInput): Promise<DispatchFlows
         [],
         input.abortSignal,
         input.isCancelled,
+        input.onProgress,
       ),
     ),
   );

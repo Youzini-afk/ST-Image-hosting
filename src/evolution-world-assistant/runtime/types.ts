@@ -377,6 +377,34 @@ export type DispatchFlowAttempt = {
   error?: string;
 };
 
+export type WorkflowProgressPhase =
+  | 'preparing'
+  | 'dispatching'
+  | 'flow_started'
+  | 'streaming'
+  | 'merging'
+  | 'committing'
+  | 'completed'
+  | 'failed';
+
+export type WorkflowStreamPreview = {
+  entry_name?: string;
+  content?: string;
+};
+
+export type WorkflowProgressUpdate = {
+  phase: WorkflowProgressPhase;
+  request_id: string;
+  message?: string;
+  flow_id?: string;
+  flow_name?: string;
+  flow_order?: number;
+  generation_id?: string;
+  stream_enabled?: boolean;
+  stream_text?: string;
+  stream_preview?: WorkflowStreamPreview;
+};
+
 export type MergeInput = DispatchFlowResult[];
 
 export type Prioritized<T> = {

@@ -1,4 +1,4 @@
-import { showManagedEwNotice } from '../ui/notice';
+import { EwWorkflowNoticeInput, showManagedWorkflowNotice } from '../ui/notice';
 import { disposeFloorBindingEvents, initFloorBindingEvents, rollbackBeforeFloor } from './floor-binding';
 import { runIncrementalHideCheck } from './hide-engine';
 import { markIntercepted, resetInterceptGuard, wasRecentlyIntercepted } from './intercept-guard';
@@ -19,7 +19,7 @@ import {
   shouldHandleGenerationAfter,
   wasAfterReplyHandled,
 } from './state';
-import { EwSettings } from './types';
+import { EwSettings, WorkflowProgressUpdate } from './types';
 
 const listenerStops: EventOnReturn[] = [];
 const domCleanup: Array<() => void> = [];
@@ -28,6 +28,7 @@ const HOOK_RETRY_DELAY_MS = 1200;
 let sendIntentRetryTimer: ReturnType<typeof setTimeout> | null = null;
 let tavernHelperRetryTimer: ReturnType<typeof setTimeout> | null = null;
 const NON_SEND_GENERATION_TYPES = new Set(['continue', 'regenerate', 'swipe']);
+const WORKFLOW_NOTICE_COLLAPSE_MS = 12000;
 
 function getHostWindow(): Window & typeof globalThis {
   try {
@@ -224,18 +225,41 @@ function formatReasonForDisplay(reason: string | undefined, maxLen = 160): strin
 }
 
 function createProcessingReminder(onAbort: () => void) {
-  return showManagedEwNotice({
+  let state: EwWorkflowNoticeInput = {
     title: 'Evolution World',
     message: '正在读取上下文并处理本轮工作流，请稍后…',
     level: 'info',
     persist: true,
     busy: true,
+    collapse_after_ms: WORKFLOW_NOTICE_COLLAPSE_MS,
+    island: {},
     action: {
       label: '终止处理',
       kind: 'danger',
       onClick: onAbort,
     },
-  });
+  };
+
+  const handle = showManagedWorkflowNotice(state);
+
+  const update = (next: Partial<EwWorkflowNoticeInput>) => {
+    state = {
+      ...state,
+      ...next,
+      island: {
+        ...(state.island ?? {}),
+        ...(next.island ?? {}),
+      },
+    };
+    handle.update(state);
+  };
+
+  return {
+    update,
+    dismiss: handle.dismiss,
+    collapse: handle.collapse,
+    expand: handle.expand,
+  };
 }
 
 type WorkflowExecutionOutcome = {
@@ -352,6 +376,59 @@ async function executeWorkflowWithPolicy(
   const processingReminder = createProcessingReminder(cancelWorkflow);
   processingReminder.update(buildAbortableReminder(options.reminderMessage));
 
+  const trimPreview = (text: string | undefined, maxLength: number) => {
+    const normalized = String(text ?? '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (normalized.length <= maxLength) {
+      return normalized;
+    }
+    return `${normalized.slice(0, maxLength)}...`;
+  };
+
+  const handleWorkflowProgress = (update: WorkflowProgressUpdate) => {
+    switch (update.phase) {
+      case 'preparing':
+      case 'dispatching':
+      case 'merging':
+      case 'committing':
+        processingReminder.update({
+          message: update.message ?? options.reminderMessage,
+          level: update.phase === 'merging' || update.phase === 'committing' ? 'info' : 'info',
+          persist: true,
+          busy: true,
+        });
+        break;
+      case 'flow_started':
+        processingReminder.update({
+          message: update.message ?? options.reminderMessage,
+          persist: true,
+          busy: true,
+          level: 'info',
+        });
+        break;
+      case 'streaming': {
+        const previewName = trimPreview(update.stream_preview?.entry_name, 28);
+        const previewContent = trimPreview(update.stream_preview?.content, 54);
+        processingReminder.update({
+          message: update.flow_name?.trim() ? `正在流式读取「${update.flow_name}」输出…` : '正在流式读取工作流输出…',
+          persist: true,
+          busy: true,
+          level: 'info',
+          island: {
+            entry_name: previewName,
+            content: previewContent,
+          },
+        });
+        break;
+      }
+      case 'completed':
+      case 'failed':
+      default:
+        break;
+    }
+  };
+
   const finalizeUserAbort = () => {
     processingReminder.update({
       title: 'Evolution World',
@@ -376,6 +453,7 @@ async function executeWorkflowWithPolicy(
       inject_reply: options.injectReply,
       abortSignal: workflowAbortController.signal,
       isCancelled: () => abortedByUser,
+      onProgress: handleWorkflowProgress,
     });
   } catch (error) {
     if (abortedByUser) {
@@ -406,6 +484,7 @@ async function executeWorkflowWithPolicy(
           inject_reply: options.injectReply,
           abortSignal: workflowAbortController.signal,
           isCancelled: () => abortedByUser,
+          onProgress: handleWorkflowProgress,
         });
       } catch (error) {
         if (abortedByUser) {
