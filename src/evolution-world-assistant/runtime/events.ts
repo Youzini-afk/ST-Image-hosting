@@ -454,27 +454,11 @@ function createWorkflowIslandTracker(processingReminder: ReturnType<typeof creat
       .filter(island => island.tone !== 'streaming')
       .sort((left, right) => right.updated_at - left.updated_at || left.flow_order - right.flow_order);
     const visibleIslands = [...activeIslands, ...settledIslands].slice(0, WORKFLOW_NOTICE_MAX_ISLANDS);
-    const latestIsland = [...allIslands].sort((left, right) => right.updated_at - left.updated_at)[0];
-
-    const summaryName =
-      activeIslands.length > 1
-        ? `${activeIslands.length} 条工作流并行中`
-        : latestIsland?.entry_name?.trim() || latestIsland?.id || '';
-    const summaryContent = latestIsland
-      ? activeIslands.length > 1
-        ? trimWorkflowNoticeText(
-            latestIsland.content?.trim()
-              ? `${latestIsland.entry_name} · ${latestIsland.content}`
-              : `${latestIsland.entry_name} 正在更新`,
-            54,
-          )
-        : trimWorkflowNoticeText(latestIsland.content, 54)
-      : '';
 
     processingReminder.update({
       island: {
-        entry_name: summaryName,
-        content: summaryContent,
+        entry_name: '',
+        content: '',
       },
       islands: visibleIslands.map(island => ({
         id: island.id,
