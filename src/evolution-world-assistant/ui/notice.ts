@@ -51,6 +51,9 @@ const HOST_ID = 'ew-floating-notice-host';
 const WORKFLOW_STYLE_ID = 'ew-workflow-notice-style';
 const WORKFLOW_HOST_ID = 'ew-workflow-notice-host';
 
+/** Module-level singleton: ensures only one workflow notice exists at a time. */
+let _currentWorkflowHandle: { dismiss: () => void } | null = null;
+
 function resolveNoticeDocument(): Document {
   const runtime = globalThis as Record<string, any>;
   const chatDocument = runtime.SillyTavern?.Chat?.document;
@@ -1071,8 +1074,24 @@ export function showManagedWorkflowNotice(input: EwWorkflowNoticeInput): EwWorkf
   ensureWorkflowStyle(doc);
   const host = ensureWorkflowHost(doc);
 
-  // Remove any existing workflow notice (singleton)
-  host.querySelectorAll('.ew-workflow-notice').forEach(existing => existing.remove());
+  // Module-level singleton: dismiss previous notice (may be in a different document)
+  if (_currentWorkflowHandle) {
+    try { _currentWorkflowHandle.dismiss(); } catch { /* already removed */ }
+    _currentWorkflowHandle = null;
+  }
+
+  // Also purge any stale workflow notices from ALL known documents
+  const docsToClean: Document[] = [doc];
+  try {
+    if (doc !== document) docsToClean.push(document);
+    const parentDoc = window.parent?.document;
+    if (parentDoc && parentDoc !== doc && parentDoc !== document) docsToClean.push(parentDoc);
+  } catch { /* cross-origin */ }
+  for (const d of docsToClean) {
+    try {
+      d.querySelectorAll('.ew-workflow-notice').forEach(el => el.remove());
+    } catch { /* */ }
+  }
 
   const item = doc.createElement('article');
   item.className = 'ew-workflow-notice';
@@ -1237,10 +1256,13 @@ export function showManagedWorkflowNotice(input: EwWorkflowNoticeInput): EwWorkf
 
   host.appendChild(item);
 
-  return {
+  const handle: EwWorkflowNoticeHandle = {
     update,
     dismiss: close,
     collapse,
     expand,
   };
+
+  _currentWorkflowHandle = handle;
+  return handle;
 }
