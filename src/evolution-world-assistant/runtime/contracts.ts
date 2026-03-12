@@ -58,9 +58,6 @@ export const FlowRequestSchema = z.object({
     extract_rules: z.array(TextSliceRuleSchema).default([]),
     exclude_rules: z.array(TextSliceRuleSchema).default([]),
   }),
-  worldbook: z.object({
-    worldbook_name: z.string().default(''),
-  }),
   serial_results: z.array(z.record(z.string(), z.any())).default([]),
 });
 

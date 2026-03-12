@@ -1,7 +1,6 @@
 import { FlowRequestSchema, FlowRequestV1, FlowTriggerV1 } from './contracts';
 import { uuidv4 } from './helpers';
 import { EwFlowConfig, EwSettings } from './types';
-import { resolveTargetWorldbook } from './worldbook-runtime';
 
 export type BuildRequestInput = {
   settings: EwSettings;
@@ -19,15 +18,6 @@ export async function buildFlowRequest(input: BuildRequestInput): Promise<FlowRe
       'unknown',
   );
   const requestId = input.request_id ?? uuidv4();
-
-  // Resolve the target worldbook name (needed for write operations).
-  let worldbookName = '';
-  try {
-    const target = await resolveTargetWorldbook(input.settings);
-    worldbookName = target.worldbook_name;
-  } catch (e) {
-    console.debug('[Evolution World] worldbook resolution failed in buildFlowRequest:', e);
-  }
 
   const payload = FlowRequestSchema.parse({
     version: 'ew-flow/v1',
@@ -48,9 +38,6 @@ export async function buildFlowRequest(input: BuildRequestInput): Promise<FlowRe
       turns: input.flow.context_turns,
       extract_rules: input.flow.extract_rules,
       exclude_rules: input.flow.exclude_rules,
-    },
-    worldbook: {
-      worldbook_name: worldbookName,
     },
     serial_results: input.serial_results ?? [],
   });

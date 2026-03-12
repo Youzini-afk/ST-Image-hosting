@@ -158,7 +158,6 @@ export interface ResolvedWorldInfo {
 declare function getWorldbook(name: string): Promise<RawWbEntry[]>;
 declare function getLorebookEntries(name: string): Promise<Array<{ uid: number; comment: string; content: string }>>;
 declare function getCharWorldbookNames(target: 'current'): { primary: string | null; additional: string[] };
-declare function getGlobalWorldbookNames(): string[];
 declare const SillyTavern: { getContext(): Record<string, any> } | undefined;
 
 function getStContext(): Record<string, any> {
@@ -657,17 +656,7 @@ async function collectAllWorldbookEntries(): Promise<NormalizedEntry[]> {
     console.debug('[EW WI Engine] Cannot read character worldbooks:', e);
   }
 
-  // 2. Global worldbooks (selected_world_info)
-  try {
-    const globalNames = getGlobalWorldbookNames();
-    for (const wbName of globalNames) {
-      await loadWbOnce(wbName);
-    }
-  } catch (e) {
-    console.debug('[EW WI Engine] Cannot read global worldbooks:', e);
-  }
-
-  // 3. Fix #2: Persona lorebook
+  // 2. Fix #2: Persona lorebook
   try {
     const ctx = getStContext();
     const personaLorebook: string | undefined =
@@ -679,7 +668,7 @@ async function collectAllWorldbookEntries(): Promise<NormalizedEntry[]> {
     console.debug('[EW WI Engine] Cannot read persona lorebook:', e);
   }
 
-  // 4. Fix #2: Chat-bound lorebook (chat_metadata['world'])
+  // 3. Fix #2: Chat-bound lorebook (chat_metadata['world'])
   try {
     const ctx = getStContext();
     const chatWorld: string | undefined = ctx.chatMetadata?.world;
@@ -751,15 +740,6 @@ export async function collectIgnoredWorldInfoContents(): Promise<string[]> {
   }
 
   try {
-    const globalNames = getGlobalWorldbookNames();
-    for (const wbName of globalNames) {
-      await loadWbOnce(wbName);
-    }
-  } catch (e) {
-    console.debug('[EW WI Engine] Cannot read global worldbooks for ignore list:', e);
-  }
-
-  try {
     const ctx = getStContext();
     const personaLorebook: string | undefined =
       ctx.extensionSettings?.persona_description_lorebook ?? (ctx as any).power_user?.persona_description_lorebook;
@@ -810,7 +790,7 @@ function classifyPosition(entry: NormalizedEntry): 'before' | 'after' | 'atDepth
 /**
  * Resolve all active worldbook entries for the current context.
  *
- * 1. Collects entries from all relevant worldbooks (char, global, persona, chat-bound)
+ * 1. Collects entries from request-scoped worldbooks (char, persona, chat-bound)
  * 2. Runs ST-compatible activation logic (keywords, constants, decorators, groups)
  * 3. Executes EJS rendering on activated entries
  * 4. Returns structured before/after lists with entry names

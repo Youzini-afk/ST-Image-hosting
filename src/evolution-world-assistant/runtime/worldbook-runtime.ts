@@ -13,10 +13,6 @@ export type FullWorldbookContext = {
     worldbook_name: string;
     entries: Array<{ name: string; enabled: boolean; content: string }>;
   };
-  global_worldbooks: Array<{
-    worldbook_name: string;
-    entries: Array<{ name: string; enabled: boolean; content: string }>;
-  }>;
 };
 
 function toEntrySnapshot(entries: WorldbookEntry[]): Array<{ name: string; enabled: boolean; content: string }> {
@@ -77,7 +73,6 @@ export async function resolveTargetWorldbook(_settings: EwSettings): Promise<Tar
  * Reads:
  *  - Current character card info (name, description)
  *  - Character's primary worldbook entries
- *  - All global worldbook entries
  */
 export async function getFullWorldbookContext(preloadedTarget?: TargetWorldbook): Promise<FullWorldbookContext> {
   const charName = getCurrentCharacterName() ?? '';
@@ -111,22 +106,6 @@ export async function getFullWorldbookContext(preloadedTarget?: TargetWorldbook)
     }
   }
 
-  const globalWbNames = getGlobalWorldbookNames();
-  const globalWorldbooks: FullWorldbookContext['global_worldbooks'] = [];
-
-  for (const wbName of globalWbNames) {
-    try {
-      const entries = await getWorldbook(wbName);
-      globalWorldbooks.push({
-        worldbook_name: wbName,
-        entries: toEntrySnapshot(entries),
-      });
-    } catch (e) {
-      console.debug(`[Evolution World] cannot read global worldbook '${wbName}':`, e);
-      // 跳过不可读的世界书。
-    }
-  }
-
   return {
     character_name: charName,
     character_description: charDescription,
@@ -134,7 +113,6 @@ export async function getFullWorldbookContext(preloadedTarget?: TargetWorldbook)
       worldbook_name: charWbName,
       entries: charEntries,
     },
-    global_worldbooks: globalWorldbooks,
   };
 }
 
@@ -143,7 +121,13 @@ function nextUid(entries: WorldbookEntry[]): number {
   return (maxUid ?? 0) + 1;
 }
 
-export function ensureDefaultEntry(name: string, content: string, enabled: boolean, entries: WorldbookEntry[], _constant = false): WorldbookEntry {
+export function ensureDefaultEntry(
+  name: string,
+  content: string,
+  enabled: boolean,
+  entries: WorldbookEntry[],
+  _constant = false,
+): WorldbookEntry {
   return {
     uid: nextUid(entries),
     name,
