@@ -324,10 +324,20 @@ function ensureHost(doc: Document): HTMLElement {
 }
 
 function ensureWorkflowStyle(doc: Document) {
+  // Clean the style from the current document
   const existing = doc.getElementById(WORKFLOW_STYLE_ID);
   if (existing) {
     existing.remove();
   }
+
+  // Also purge old styles from parent/iframe documents to avoid cross-frame contamination
+  try {
+    const alternateDoc = doc === document ? window.parent?.document : document;
+    if (alternateDoc && alternateDoc !== doc) {
+      const altStyle = alternateDoc.getElementById(WORKFLOW_STYLE_ID);
+      if (altStyle) altStyle.remove();
+    }
+  } catch { /* cross-origin */ }
 
   const style = doc.createElement('style');
   style.id = WORKFLOW_STYLE_ID;
@@ -679,6 +689,19 @@ function ensureWorkflowStyle(doc: Document) {
         animation-duration: 1ms !important;
       }
     }
+
+    /* ── kill any leftover v2.1.0 elements ── */
+    .ew-workflow-notice__card,
+    .ew-workflow-notice__island,
+    .ew-workflow-notice__icon,
+    .ew-workflow-notice__title,
+    .ew-workflow-notice__message,
+    .ew-workflow-notice__content,
+    .ew-workflow-notice__actions,
+    .ew-workflow-notice__island-slot,
+    .ew-workflow-notice__island-orb {
+      display: none !important;
+    }
   `;
 
   (doc.head || doc.documentElement).appendChild(style);
@@ -687,6 +710,10 @@ function ensureWorkflowStyle(doc: Document) {
 function ensureWorkflowHost(doc: Document): HTMLElement {
   let host = doc.getElementById(WORKFLOW_HOST_ID);
   if (host) {
+    // Purge all old children — a fresh showManagedWorkflowNotice will recreate
+    while (host.firstChild) {
+      host.removeChild(host.firstChild);
+    }
     return host;
   }
 
@@ -695,6 +722,16 @@ function ensureWorkflowHost(doc: Document): HTMLElement {
   host.setAttribute('aria-live', 'polite');
   host.setAttribute('aria-atomic', 'false');
   (doc.body || doc.documentElement).appendChild(host);
+
+  // Also remove stale host from alternate document
+  try {
+    const alternateDoc = doc === document ? window.parent?.document : document;
+    if (alternateDoc && alternateDoc !== doc) {
+      const altHost = alternateDoc.getElementById(WORKFLOW_HOST_ID);
+      if (altHost) altHost.remove();
+    }
+  } catch { /* cross-origin */ }
+
   return host;
 }
 
