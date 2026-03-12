@@ -1,4 +1,4 @@
-import { EwWorkflowNoticeInput, showManagedWorkflowNotice } from '../ui/notice';
+import { EwWorkflowNoticeInput, EwWorkflowNoticeIslandInput, showManagedWorkflowNotice } from '../ui/notice';
 import { getEffectiveFlows } from './char-flows';
 import { disposeFloorBindingEvents, initFloorBindingEvents, rollbackBeforeFloor } from './floor-binding';
 import { runIncrementalHideCheck } from './hide-engine';
@@ -20,7 +20,7 @@ import {
   shouldHandleGenerationAfter,
   wasAfterReplyHandled,
 } from './state';
-import { DispatchFlowAttempt, DispatchFlowResult, EwSettings, WorkflowProgressUpdate } from './types';
+import { DispatchFlowResult, EwSettings, WorkflowProgressUpdate } from './types';
 
 const EW_FLOOR_WORKFLOW_EXECUTION_KEY = 'ew_workflow_execution';
 
@@ -44,30 +44,6 @@ let sendIntentRetryTimer: ReturnType<typeof setTimeout> | null = null;
 let tavernHelperRetryTimer: ReturnType<typeof setTimeout> | null = null;
 const NON_SEND_GENERATION_TYPES = new Set(['continue', 'regenerate', 'swipe']);
 const WORKFLOW_NOTICE_COLLAPSE_MS = 5000;
-const WORKFLOW_NOTICE_MAX_ISLANDS = 5;
-type WorkflowNoticeIslandTone = 'streaming';
-
-type WorkflowNoticeIslandState = {
-  id: string;
-  entry_name: string;
-  content: string;
-  tone: WorkflowNoticeIslandTone;
-  flow_order: number;
-  updated_at: number;
-  dismiss_timer: ReturnType<typeof setTimeout> | null;
-};
-
-type ProcessingReminderHandle = {
-  update: (next: Partial<EwWorkflowNoticeInput>) => void;
-  dismiss: () => void;
-  collapse: () => void;
-  expand: () => void;
-};
-
-let activeProcessingReminder: ProcessingReminderHandle | null = null;
-const activeWorkflowExecutions = new Map<string, Promise<WorkflowExecutionOutcome>>();
-
-const RUNTIME_EVENTS_CLEANUP_KEY = '__ew_runtime_events_cleanup__';
 
 function getHostWindow(): Window & typeof globalThis {
   try {
@@ -326,10 +302,6 @@ async function writeFloorWorkflowExecution(
   await setChatMessages([{ message_id: messageId, data: nextData }], { refresh: 'none' });
 }
 
-async function clearFloorWorkflowExecution(messageId: number): Promise<void> {
-  await writeFloorWorkflowExecution(messageId, null);
-}
-
 function buildFloorWorkflowExecutionState(
   requestId: string,
   attempts: Array<{ flow: { id: string }; ok: boolean; response?: Record<string, any> }>,
@@ -395,8 +367,6 @@ async function buildPreservedDispatchResults(
 }
 
 function createProcessingReminder(onAbort: () => void) {
-  activeProcessingReminder?.dismiss();
-
   let state: EwWorkflowNoticeInput = {
     title: 'Evolution World',
     message: '正在读取上下文并处理本轮工作流，请稍后…',
@@ -405,7 +375,6 @@ function createProcessingReminder(onAbort: () => void) {
     busy: true,
     collapse_after_ms: WORKFLOW_NOTICE_COLLAPSE_MS,
     island: {},
-    islands: [],
     action: {
       label: '终止处理',
       kind: 'danger',
@@ -423,166 +392,15 @@ function createProcessingReminder(onAbort: () => void) {
         ...(state.island ?? {}),
         ...(next.island ?? {}),
       },
-      islands: next.islands ?? state.islands ?? [],
     };
     handle.update(state);
   };
 
-  const reminder: ProcessingReminderHandle = {
+  return {
     update,
-    dismiss: () => {
-      handle.dismiss();
-      if (activeProcessingReminder === reminder) {
-        activeProcessingReminder = null;
-      }
-    },
+    dismiss: handle.dismiss,
     collapse: handle.collapse,
     expand: handle.expand,
-  };
-
-  activeProcessingReminder = reminder;
-
-  return reminder;
-}
-
-function trimWorkflowNoticeText(text: string | undefined, maxLength: number) {
-  const normalized = String(text ?? '')
-    .replace(/\s+/g, ' ')
-    .trim();
-  if (normalized.length <= maxLength) {
-    return normalized;
-  }
-  return `${normalized.slice(0, maxLength)}...`;
-}
-
-function createWorkflowIslandTracker(processingReminder: ReturnType<typeof createProcessingReminder>) {
-  const islands = new Map<string, WorkflowNoticeIslandState>();
-
-  const clearDismissTimer = (island: WorkflowNoticeIslandState) => {
-    if (island.dismiss_timer) {
-      clearTimeout(island.dismiss_timer);
-      island.dismiss_timer = null;
-    }
-  };
-
-  const sync = () => {
-    const activeIslands = [...islands.values()]
-      .filter(island => island.tone === 'streaming')
-      .sort((left, right) => right.updated_at - left.updated_at || left.flow_order - right.flow_order);
-    const visibleIslands = activeIslands.slice(0, WORKFLOW_NOTICE_MAX_ISLANDS);
-
-    processingReminder.update({
-      island: {
-        entry_name: '',
-        content: '',
-      },
-      islands: visibleIslands.map((island, index) => ({
-        id: island.id,
-        entry_name: island.entry_name,
-        content: island.content,
-        tone: island.tone,
-        flow_order: island.flow_order,
-        updated_at: island.updated_at,
-        extra_count: index === 0 ? Math.max(0, activeIslands.length - 1) : 0,
-      })),
-    });
-  };
-
-  const upsertIsland = (
-    id: string,
-    nextState: Omit<WorkflowNoticeIslandState, 'dismiss_timer'>,
-  ): WorkflowNoticeIslandState => {
-    const current = islands.get(id);
-    if (current) {
-      clearDismissTimer(current);
-      current.entry_name = nextState.entry_name;
-      current.content = nextState.content;
-      current.tone = nextState.tone;
-      current.flow_order = nextState.flow_order;
-      current.updated_at = nextState.updated_at;
-      return current;
-    }
-
-    const created: WorkflowNoticeIslandState = {
-      ...nextState,
-      dismiss_timer: null,
-    };
-    islands.set(id, created);
-    return created;
-  };
-
-  const setIslandState = (input: {
-    id: string;
-    entry_name: string;
-    content: string;
-    tone: WorkflowNoticeIslandTone;
-    flow_order: number;
-  }) => {
-    const island = upsertIsland(input.id, {
-      id: input.id,
-      entry_name: trimWorkflowNoticeText(input.entry_name, 28) || '未命名工作流',
-      content: trimWorkflowNoticeText(input.content, 54),
-      tone: input.tone,
-      flow_order: input.flow_order,
-      updated_at: Date.now(),
-    });
-    sync();
-  };
-
-  return {
-    markStarted(update: WorkflowProgressUpdate) {
-      const flowId = update.flow_id?.trim();
-      if (!flowId) {
-        return;
-      }
-      setIslandState({
-        id: flowId,
-        entry_name: update.flow_name?.trim() || flowId,
-        content: '正在等待首段输出…',
-        tone: 'streaming',
-        flow_order: update.flow_order ?? Number.MAX_SAFE_INTEGER,
-      });
-    },
-    markStreaming(update: WorkflowProgressUpdate) {
-      const flowId = update.flow_id?.trim();
-      if (!flowId) {
-        return;
-      }
-      const current = islands.get(flowId);
-      setIslandState({
-        id: flowId,
-        entry_name:
-          trimWorkflowNoticeText(update.stream_preview?.entry_name, 28) ||
-          current?.entry_name ||
-          update.flow_name?.trim() ||
-          flowId,
-        content:
-          trimWorkflowNoticeText(update.stream_preview?.content, 54) ||
-          trimWorkflowNoticeText(update.stream_text, 54) ||
-          current?.content ||
-          '正在流式读取输出…',
-        tone: 'streaming',
-        flow_order: update.flow_order ?? current?.flow_order ?? Number.MAX_SAFE_INTEGER,
-      });
-    },
-    settleAttempts(attempts: DispatchFlowAttempt[]) {
-      for (const attempt of attempts) {
-        const current = islands.get(attempt.flow.id);
-        if (!current) {
-          continue;
-        }
-        clearDismissTimer(current);
-        islands.delete(attempt.flow.id);
-      }
-      sync();
-    },
-    clear() {
-      for (const island of islands.values()) {
-        clearDismissTimer(island);
-      }
-      islands.clear();
-      sync();
-    },
   };
 }
 
@@ -608,21 +426,6 @@ type ExecuteWorkflowOptions = {
   reminderMessage: string;
   successMessage: string;
 };
-
-function buildWorkflowExecutionKey(options: ExecuteWorkflowOptions): string {
-  const assistantMessageId = options.trigger.assistant_message_id ?? -1;
-  const userMessageId = options.trigger.user_message_id ?? -1;
-  const flowIds = [...(options.flowIds ?? [])].filter(Boolean).sort().join(',');
-  return [
-    options.trigger.timing,
-    options.messageId,
-    assistantMessageId,
-    userMessageId,
-    options.trigger.generation_type,
-    options.injectReply ? 'inject' : 'no-inject',
-    flowIds,
-  ].join('|');
-}
 
 function setSendTextareaValue(text: string): void {
   const textarea = getChatDocument().getElementById('send_textarea') as HTMLTextAreaElement | null;
@@ -673,29 +476,6 @@ async function executeWorkflowWithPolicy(
   settings: EwSettings,
   options: ExecuteWorkflowOptions,
 ): Promise<WorkflowExecutionOutcome> {
-  const executionKey = buildWorkflowExecutionKey(options);
-  const existingExecution = activeWorkflowExecutions.get(executionKey);
-  if (existingExecution) {
-    console.debug('[Evolution World] Reusing in-flight workflow execution:', executionKey);
-    return existingExecution;
-  }
-
-  const executionPromise = executeWorkflowWithPolicyInternal(settings, options);
-  activeWorkflowExecutions.set(executionKey, executionPromise);
-
-  try {
-    return await executionPromise;
-  } finally {
-    if (activeWorkflowExecutions.get(executionKey) === executionPromise) {
-      activeWorkflowExecutions.delete(executionKey);
-    }
-  }
-}
-
-async function executeWorkflowWithPolicyInternal(
-  settings: EwSettings,
-  options: ExecuteWorkflowOptions,
-): Promise<WorkflowExecutionOutcome> {
   // Returns the workflow outcome so the primary interception path can decide
   // whether the original user message should be released after EW processing.
   // Apply incremental hide check before workflow so AI context is up-to-date
@@ -739,11 +519,30 @@ async function executeWorkflowWithPolicyInternal(
   };
 
   const processingReminder = createProcessingReminder(cancelWorkflow);
-  const workflowIslandTracker = createWorkflowIslandTracker(processingReminder);
   processingReminder.update(buildAbortableReminder(options.reminderMessage));
   let reminderSettled = false;
   let currentPreservedStoredResults = [...(options.preservedResults ?? [])];
   let currentPreservedDispatchResults = await buildPreservedDispatchResults(settings, currentPreservedStoredResults);
+
+  const trimPreview = (text: string | undefined, maxLength: number) => {
+    const normalized = String(text ?? '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (normalized.length <= maxLength) {
+      return normalized;
+    }
+    return `${normalized.slice(0, maxLength)}...`;
+  };
+
+  const activeFlows = new Map<string, EwWorkflowNoticeIslandInput>();
+
+  const buildIslandsArray = (): EwWorkflowNoticeIslandInput[] => {
+    const sorted = [...activeFlows.values()].sort((a, b) => (a.flow_order ?? 0) - (b.flow_order ?? 0));
+    if (sorted.length > 1) {
+      sorted[0] = { ...sorted[0], extra_count: sorted.length - 1 };
+    }
+    return sorted;
+  };
 
   const handleWorkflowProgress = (update: WorkflowProgressUpdate) => {
     if (reminderSettled) {
@@ -757,32 +556,66 @@ async function executeWorkflowWithPolicyInternal(
       case 'committing':
         processingReminder.update({
           message: update.message ?? options.reminderMessage,
-          level: update.phase === 'merging' || update.phase === 'committing' ? 'info' : 'info',
+          level: 'info',
           persist: true,
           busy: true,
+          islands: buildIslandsArray(),
         });
         break;
-      case 'flow_started':
-        workflowIslandTracker.markStarted(update);
+      case 'flow_started': {
+        const flowId = update.flow_id ?? update.generation_id ?? '';
+        if (flowId) {
+          activeFlows.set(flowId, {
+            id: flowId,
+            entry_name: update.flow_name?.trim() || undefined,
+            content: undefined,
+            tone: 'streaming',
+            flow_order: update.flow_order ?? 0,
+          });
+        }
         processingReminder.update({
           message: update.message ?? options.reminderMessage,
           persist: true,
           busy: true,
           level: 'info',
+          islands: buildIslandsArray(),
         });
         break;
+      }
       case 'streaming': {
-        workflowIslandTracker.markStreaming(update);
+        const flowId = update.flow_id ?? update.generation_id ?? '';
+        const previewName = trimPreview(update.stream_preview?.entry_name, 28);
+        const previewContent = trimPreview(update.stream_preview?.content, 54);
+        if (flowId) {
+          activeFlows.set(flowId, {
+            id: flowId,
+            entry_name: previewName || update.flow_name?.trim() || undefined,
+            content: previewContent || undefined,
+            tone: 'streaming',
+            flow_order: update.flow_order ?? activeFlows.get(flowId)?.flow_order ?? 0,
+          });
+        }
         processingReminder.update({
           message: update.flow_name?.trim() ? `正在流式读取「${update.flow_name}」输出…` : '正在流式读取工作流输出…',
           persist: true,
           busy: true,
           level: 'info',
+          island: {
+            entry_name: previewName,
+            content: previewContent,
+          },
+          islands: buildIslandsArray(),
         });
         break;
       }
       case 'completed':
-      case 'failed':
+      case 'failed': {
+        const flowId = update.flow_id ?? update.generation_id ?? '';
+        if (flowId) {
+          activeFlows.delete(flowId);
+        }
+        break;
+      }
       default:
         break;
     }
@@ -790,7 +623,6 @@ async function executeWorkflowWithPolicyInternal(
 
   const finalizeUserAbort = () => {
     reminderSettled = true;
-    workflowIslandTracker.clear();
     processingReminder.update({
       title: 'Evolution World',
       message: '已终止本轮处理。',
@@ -802,7 +634,6 @@ async function executeWorkflowWithPolicyInternal(
         entry_name: '',
         content: '',
       },
-      islands: [],
       duration_ms: 2200,
     });
     return {
@@ -837,8 +668,6 @@ async function executeWorkflowWithPolicyInternal(
   if (abortedByUser) {
     return finalizeUserAbort();
   }
-
-  workflowIslandTracker.settleAttempts(result.attempts);
 
   if (options.trigger.timing === 'after_reply') {
     const assistantMessageId = options.trigger.assistant_message_id ?? options.messageId;
@@ -884,8 +713,6 @@ async function executeWorkflowWithPolicyInternal(
       if (abortedByUser) {
         return finalizeUserAbort();
       }
-
-      workflowIslandTracker.settleAttempts(result.attempts);
 
       if (options.trigger.timing === 'after_reply') {
         const assistantMessageId = options.trigger.assistant_message_id ?? options.messageId;
@@ -1179,24 +1006,6 @@ function isAssistantMessage(messageId: number): boolean {
   }
 }
 
-async function invalidateAfterReplyExecutionForMessage(messageId: number): Promise<void> {
-  if (!Number.isFinite(messageId) || messageId < 0) {
-    return;
-  }
-
-  if (!isAssistantMessage(messageId)) {
-    return;
-  }
-
-  const executionState = readFloorWorkflowExecution(messageId);
-  if (!executionState) {
-    return;
-  }
-
-  await clearFloorWorkflowExecution(messageId);
-  console.info(`[Evolution World] Cleared stale workflow execution state for floor #${messageId}`);
-}
-
 async function onAfterReplyMessage(messageId: number, type: string, source: 'message_received' | 'generation_ended') {
   const settings = getSettings();
   if (settings.workflow_timing !== 'after_reply') {
@@ -1344,16 +1153,6 @@ export async function rerollCurrentAfterReplyWorkflow(): Promise<{ ok: boolean; 
 }
 
 export function initRuntimeEvents() {
-  const hostWindow = getHostWindow() as Record<string, any>;
-  const existingCleanup = hostWindow[RUNTIME_EVENTS_CLEANUP_KEY];
-  if (typeof existingCleanup === 'function') {
-    try {
-      existingCleanup();
-    } catch (error) {
-      console.warn('[Evolution World] Failed to dispose previously registered runtime events:', error);
-    }
-  }
-
   // Primary path: TavernHelper.generate hook
   installTavernHelperHook();
 
@@ -1379,18 +1178,6 @@ export function initRuntimeEvents() {
   listenerStops.push(
     eventOn(tavern_events.MESSAGE_RECEIVED, async (messageId, type) => {
       await onAfterReplyMessage(messageId, type, 'message_received');
-    }),
-  );
-
-  listenerStops.push(
-    eventOn(tavern_events.MESSAGE_EDITED, async messageId => {
-      await invalidateAfterReplyExecutionForMessage(messageId);
-    }),
-  );
-
-  listenerStops.push(
-    eventOn(tavern_events.MESSAGE_SWIPED, async messageId => {
-      await invalidateAfterReplyExecutionForMessage(messageId);
     }),
   );
 
@@ -1422,14 +1209,9 @@ export function initRuntimeEvents() {
 
   // Initialize floor binding event listeners for automatic cleanup.
   initFloorBindingEvents(getSettings);
-
-  hostWindow[RUNTIME_EVENTS_CLEANUP_KEY] = () => {
-    disposeRuntimeEvents();
-  };
 }
 
 export function disposeRuntimeEvents() {
-  const hostWindow = getHostWindow() as Record<string, any>;
   for (const stopper of listenerStops.splice(0, listenerStops.length)) {
     stopper.stop();
   }
@@ -1447,11 +1229,4 @@ export function disposeRuntimeEvents() {
   uninstallTavernHelperHook();
   resetInterceptGuard();
   disposeFloorBindingEvents();
-  activeProcessingReminder?.dismiss();
-  activeProcessingReminder = null;
-  activeWorkflowExecutions.clear();
-
-  if (hostWindow[RUNTIME_EVENTS_CLEANUP_KEY]) {
-    delete hostWindow[RUNTIME_EVENTS_CLEANUP_KEY];
-  }
 }

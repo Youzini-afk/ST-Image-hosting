@@ -16,6 +16,15 @@ export type EwNoticeInput = {
   action?: EwNoticeAction;
 };
 
+export type EwWorkflowNoticeIslandInput = {
+  id: string;
+  entry_name?: string;
+  content?: string;
+  tone?: 'streaming' | 'success' | 'warning';
+  flow_order?: number;
+  extra_count?: number;
+};
+
 export type EwWorkflowNoticeInput = EwNoticeInput & {
   collapse_after_ms?: number;
   island?: {
@@ -23,16 +32,6 @@ export type EwWorkflowNoticeInput = EwNoticeInput & {
     content?: string;
   };
   islands?: EwWorkflowNoticeIslandInput[];
-};
-
-export type EwWorkflowNoticeIslandInput = {
-  id: string;
-  entry_name?: string;
-  content?: string;
-  tone?: 'streaming' | 'success' | 'warning';
-  flow_order?: number;
-  updated_at?: number;
-  extra_count?: number;
 };
 
 export type EwNoticeHandle = {
@@ -361,17 +360,12 @@ function ensureWorkflowStyle(doc: Document) {
       animation: ewWorkflowNoticeIn 220ms ease forwards;
       transition: transform 220ms ease, opacity 220ms ease;
       font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei UI', sans-serif;
+      cursor: pointer;
     }
 
     .ew-workflow-notice[data-level='success'] { --ew-notice-accent: #65d39c; }
     .ew-workflow-notice[data-level='error']   { --ew-notice-accent: #f57b8f; }
     .ew-workflow-notice[data-level='warning'] { --ew-notice-accent: #eab96f; }
-
-    /* idle state — just a moon orb */
-    .ew-workflow-notice[data-active='false'] {
-      min-width: 42px;
-      min-height: 42px;
-    }
 
     /* ── controls (close / action) ── */
     .ew-workflow-notice__controls {
@@ -387,13 +381,11 @@ function ensureWorkflowStyle(doc: Document) {
     }
 
     .ew-workflow-notice:hover .ew-workflow-notice__controls,
-    .ew-workflow-notice:focus-within .ew-workflow-notice__controls,
-    .ew-workflow-notice[data-active='false'] .ew-workflow-notice__controls {
+    .ew-workflow-notice:focus-within .ew-workflow-notice__controls {
       opacity: 1;
       transform: translateY(0);
     }
 
-    .ew-workflow-notice__control,
     .ew-workflow-notice__action,
     .ew-workflow-notice__close {
       pointer-events: auto;
@@ -431,10 +423,12 @@ function ensureWorkflowStyle(doc: Document) {
       padding: 0;
       font-size: 15px;
       line-height: 1;
+      display: inline-flex;
+      align-items: center;
       justify-content: center;
     }
 
-    /* ── idle moon orb (shown when no streams active) ── */
+    /* ── idle moon orb (v2.1.0 __island-orb, shown when no streaming content yet) ── */
     .ew-workflow-notice__idle-orb {
       display: none;
       width: 42px;
@@ -454,7 +448,7 @@ function ensureWorkflowStyle(doc: Document) {
       display: block;
     }
 
-    /* shared moon disc + shadow pseudo-elements */
+    /* shared moon disc + shadow pseudo-elements (used by both idle orb and row orb) */
     .ew-workflow-notice__idle-orb::before,
     .ew-workflow-notice__row-orb::before {
       content: '';
@@ -518,7 +512,6 @@ function ensureWorkflowStyle(doc: Document) {
       opacity: 0;
       animation: ewWorkflowStackIn 180ms ease forwards;
       transition: opacity 180ms ease, transform 180ms ease;
-      cursor: pointer;
     }
 
     .ew-workflow-notice__row[data-tone='success'] { --ew-row-accent: rgba(101, 211, 156, 0.95); }
@@ -570,7 +563,7 @@ function ensureWorkflowStyle(doc: Document) {
       color: color-mix(in srgb, #f2f7ff 88%, #93abc4);
     }
 
-    /* ── +N badge (visible only in collapsed mode on the first row) ── */
+    /* ── +N badge ── */
     .ew-workflow-notice__row-extra {
       position: absolute;
       top: 50%;
@@ -600,7 +593,7 @@ function ensureWorkflowStyle(doc: Document) {
       padding-right: 36px;
     }
 
-    /* ── center moon orb in each row ── */
+    /* ── center moon orb in each row (same animation as idle orb) ── */
     .ew-workflow-notice__row-orb {
       width: 32px;
       height: 32px;
@@ -616,11 +609,12 @@ function ensureWorkflowStyle(doc: Document) {
         inset 0 1px 0 rgba(255, 255, 255, 0.12);
     }
 
-    /* ── progress bar (hidden during streaming, optional) ── */
+    /* ── progress bar ── */
     .ew-workflow-notice__progress {
       display: none;
       width: min(520px, calc(100vw - 36px));
       height: 2px;
+      margin-top: 6px;
       border-radius: 999px;
       background: linear-gradient(90deg, rgba(115, 184, 255, 0.92), rgba(255, 255, 255, 0.18));
       transform-origin: left center;
@@ -929,9 +923,9 @@ function applyWorkflowNoticeState(item: HTMLElement, input: EwWorkflowNoticeInpu
 }
 
 function createWorkflowStackItem(doc: Document, island: EwWorkflowNoticeIslandInput) {
-  const item = doc.createElement('div');
-  item.className = 'ew-workflow-notice__row';
-  item.dataset.itemId = island.id;
+  const row = doc.createElement('div');
+  row.className = 'ew-workflow-notice__row';
+  row.dataset.itemId = island.id;
 
   const name = doc.createElement('span');
   name.className = 'ew-workflow-notice__row-slot ew-workflow-notice__row-slot--name';
@@ -949,33 +943,33 @@ function createWorkflowStackItem(doc: Document, island: EwWorkflowNoticeIslandIn
   extra.className = 'ew-workflow-notice__row-extra';
   extra.setAttribute('aria-hidden', 'true');
 
-  item.appendChild(name);
-  item.appendChild(orb);
-  item.appendChild(content);
+  row.appendChild(name);
+  row.appendChild(orb);
   content.appendChild(contentText);
   content.appendChild(extra);
+  row.appendChild(content);
 
-  applyWorkflowStackItemState(item, island);
-  return item;
+  applyWorkflowStackItemState(row, island);
+  return row;
 }
 
-function applyWorkflowStackItemState(item: HTMLElement, island: EwWorkflowNoticeIslandInput) {
-  item.dataset.itemId = island.id;
-  item.dataset.tone = island.tone ?? 'streaming';
-  item.dataset.hasExtra = (island.extra_count ?? 0) > 0 ? 'true' : 'false';
-  item.classList.remove('ew-workflow-notice__row--out');
+function applyWorkflowStackItemState(row: HTMLElement, island: EwWorkflowNoticeIslandInput) {
+  row.dataset.itemId = island.id;
+  row.dataset.tone = island.tone ?? 'streaming';
+  row.dataset.hasExtra = (island.extra_count ?? 0) > 0 ? 'true' : 'false';
+  row.classList.remove('ew-workflow-notice__row--out');
 
-  const name = item.querySelector('.ew-workflow-notice__row-slot--name');
+  const name = row.querySelector('.ew-workflow-notice__row-slot--name');
   if (name) {
     name.textContent = island.entry_name?.trim() || '未命名工作流';
   }
 
-  const contentText = item.querySelector('.ew-workflow-notice__row-content-text');
+  const contentText = row.querySelector('.ew-workflow-notice__row-content-text');
   if (contentText) {
-    contentText.textContent = island.content?.trim() || '';
+    contentText.textContent = island.content?.trim() || '正在等待首段输出…';
   }
 
-  const extra = item.querySelector('.ew-workflow-notice__row-extra');
+  const extra = row.querySelector('.ew-workflow-notice__row-extra');
   if (extra) {
     extra.textContent = (island.extra_count ?? 0) > 0 ? `+${island.extra_count}` : '';
   }
@@ -1022,6 +1016,7 @@ export function showManagedWorkflowNotice(input: EwWorkflowNoticeInput): EwWorkf
   ensureWorkflowStyle(doc);
   const host = ensureWorkflowHost(doc);
 
+  // Remove any existing workflow notice (singleton)
   host.querySelectorAll('.ew-workflow-notice').forEach(existing => existing.remove());
 
   const item = doc.createElement('article');
