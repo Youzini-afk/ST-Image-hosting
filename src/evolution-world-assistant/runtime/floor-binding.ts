@@ -39,6 +39,24 @@ function controllerSnapshotKey(snapshot: ControllerEntrySnapshot): string {
 }
 
 const floorBindingListenerStops: EventOnReturn[] = [];
+let floorBindingRestoreTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleFloorBindingRestore(getSettings: () => EwSettings, delayMs: number): void {
+  if (floorBindingRestoreTimer) {
+    clearTimeout(floorBindingRestoreTimer);
+  }
+
+  floorBindingRestoreTimer = setTimeout(() => {
+    floorBindingRestoreTimer = null;
+
+    const freshSettings = getSettings();
+    if (!freshSettings.enabled || !freshSettings.floor_binding_enabled) {
+      return;
+    }
+
+    void onChatChanged(freshSettings);
+  }, delayMs);
+}
 
 function clearInlineSnapshotFields(data: Record<string, unknown>) {
   delete data[EW_CONTROLLER_DATA_KEY];
@@ -627,12 +645,17 @@ export function initFloorBindingEvents(getSettings: () => EwSettings): void {
     eventOn(tavern_events.CHAT_CHANGED, () => {
       const currentSettings = getSettings();
       if (currentSettings.enabled && currentSettings.floor_binding_enabled) {
-        setTimeout(() => {
-          const freshSettings = getSettings();
-          if (freshSettings.enabled && freshSettings.floor_binding_enabled) {
-            onChatChanged(freshSettings);
-          }
-        }, 500);
+        scheduleFloorBindingRestore(getSettings, 500);
+      }
+    }),
+  );
+
+  floorBindingListenerStops.push(
+    eventOn(tavern_events.MESSAGE_DELETED, () => {
+      const currentSettings = getSettings();
+      if (currentSettings.enabled && currentSettings.floor_binding_enabled) {
+        // Let SillyTavern finish mutating the chat array before reading snapshots.
+        scheduleFloorBindingRestore(getSettings, 180);
       }
     }),
   );
@@ -642,6 +665,11 @@ export function initFloorBindingEvents(getSettings: () => EwSettings): void {
  * Dispose floor binding event listeners.
  */
 export function disposeFloorBindingEvents(): void {
+  if (floorBindingRestoreTimer) {
+    clearTimeout(floorBindingRestoreTimer);
+    floorBindingRestoreTimer = null;
+  }
+
   for (const stopper of floorBindingListenerStops.splice(0, floorBindingListenerStops.length)) {
     stopper.stop();
   }
