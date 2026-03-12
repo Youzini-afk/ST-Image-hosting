@@ -569,11 +569,11 @@ function ensureWorkflowStyle(doc: Document) {
       position: relative;
       flex: 0 0 auto;
       overflow: hidden;
-      background: #163864;
-      border: 2px solid #4c7fbd;
+      background: #184477;
+      border: 2px solid #6fa4ea;
       box-shadow:
         0 10px 18px rgba(3, 8, 17, 0.28),
-        0 0 14px rgba(96, 159, 255, 0.22),
+        0 0 14px rgba(96, 159, 255, 0.18),
         inset 0 1px 0 rgba(255, 255, 255, 0.12);
     }
 
@@ -582,31 +582,32 @@ function ensureWorkflowStyle(doc: Document) {
       position: absolute;
       inset: 4px;
       border-radius: 50%;
-      background: #f5e7a3;
+      background: #ffe27a;
       box-shadow:
-        inset 2px 2px 0 rgba(255, 251, 229, 0.9),
-        inset -2px -2px 0 rgba(203, 178, 92, 0.5),
-        0 0 8px rgba(245, 231, 163, 0.18);
+        inset 2px 2px 0 rgba(255, 247, 196, 0.95),
+        inset -2px -2px 0 rgba(219, 177, 58, 0.45),
+        0 0 6px rgba(255, 226, 122, 0.14);
     }
 
     .ew-workflow-notice__island-orb::after {
       content: '';
       position: absolute;
       top: 4px;
-      left: -8px;
-      width: 24px;
+      left: -20px;
+      width: 26px;
       height: 24px;
       border-radius: inherit;
       background: #102746;
       box-shadow:
-        0 0 0 1px rgba(9, 22, 39, 0.05),
-        inset 1px 0 0 rgba(255, 255, 255, 0.05);
-      transform: translateX(0);
-      animation: ewWorkflowMoonPhase 4.4s linear infinite;
+        46px 0 0 #102746,
+        inset 1px 0 0 rgba(255, 255, 255, 0.04);
+      transform: translate3d(0, 0, 0);
+      will-change: transform;
+      animation: ewWorkflowMoonPhase 4.8s linear infinite;
     }
 
     .ew-workflow-notice[data-busy='false'] .ew-workflow-notice__island-orb::after {
-      animation-duration: 6.8s;
+      animation-duration: 7.4s;
     }
 
     .ew-workflow-notice--out {
@@ -622,19 +623,10 @@ function ensureWorkflowStyle(doc: Document) {
 
     @keyframes ewWorkflowMoonPhase {
       0% {
-        transform: translateX(-2px) scaleX(0.72);
-      }
-      25% {
-        transform: translateX(4px) scaleX(0.9);
-      }
-      50% {
-        transform: translateX(10px) scaleX(1.02);
-      }
-      75% {
-        transform: translateX(16px) scaleX(0.9);
+        transform: translate3d(0, 0, 0);
       }
       100% {
-        transform: translateX(22px) scaleX(0.72);
+        transform: translate3d(46px, 0, 0);
       }
     }
 
