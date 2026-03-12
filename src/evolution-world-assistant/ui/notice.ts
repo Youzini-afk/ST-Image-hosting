@@ -22,6 +22,16 @@ export type EwWorkflowNoticeInput = EwNoticeInput & {
     entry_name?: string;
     content?: string;
   };
+  islands?: EwWorkflowNoticeIslandInput[];
+};
+
+export type EwWorkflowNoticeIslandInput = {
+  id: string;
+  entry_name?: string;
+  content?: string;
+  tone?: 'streaming' | 'success' | 'warning';
+  flow_order?: number;
+  updated_at?: number;
 };
 
 export type EwNoticeHandle = {
@@ -524,12 +534,13 @@ function ensureWorkflowStyle(doc: Document) {
     }
 
     .ew-workflow-notice__island {
-      display: none;
+      display: flex;
       align-items: center;
       justify-content: center;
       gap: 10px;
       padding: 8px 12px;
       min-height: 48px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
     }
 
     .ew-workflow-notice[data-collapsed='true'] .ew-workflow-notice__island {
@@ -560,6 +571,146 @@ function ensureWorkflowStyle(doc: Document) {
 
     .ew-workflow-notice[data-has-preview='false'] .ew-workflow-notice__island-slot {
       display: none;
+    }
+
+    .ew-workflow-notice__stack {
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      padding: 0 14px 14px;
+      max-height: min(320px, calc(100vh - 120px));
+      overflow: hidden;
+    }
+
+    .ew-workflow-notice[data-has-stack='true'] .ew-workflow-notice__stack {
+      display: flex;
+    }
+
+    .ew-workflow-notice__stack-item {
+      --ew-stack-accent: rgba(115, 184, 255, 0.86);
+      position: relative;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      align-items: center;
+      gap: 10px;
+      min-height: 46px;
+      padding: 9px 12px;
+      border-radius: 14px;
+      border: 1px solid color-mix(in srgb, var(--ew-stack-accent) 38%, rgba(255, 255, 255, 0.1));
+      background:
+        linear-gradient(135deg, rgba(17, 33, 56, 0.76), rgba(9, 19, 35, 0.72)),
+        radial-gradient(circle at 12% -40%, color-mix(in srgb, var(--ew-stack-accent) 18%, transparent), transparent 58%);
+      box-shadow:
+        0 10px 22px rgba(3, 8, 17, 0.22),
+        0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+      transform: translateY(6px);
+      opacity: 0;
+      animation: ewWorkflowStackIn 180ms ease forwards;
+      transition:
+        opacity 180ms ease,
+        transform 180ms ease,
+        border-color 180ms ease,
+        background 180ms ease;
+    }
+
+    .ew-workflow-notice__stack-item::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      border-left: 2px solid var(--ew-stack-accent);
+      opacity: 0.78;
+      pointer-events: none;
+    }
+
+    .ew-workflow-notice__stack-item[data-tone='success'] {
+      --ew-stack-accent: rgba(101, 211, 156, 0.92);
+    }
+
+    .ew-workflow-notice__stack-item[data-tone='warning'] {
+      --ew-stack-accent: rgba(234, 185, 111, 0.94);
+    }
+
+    .ew-workflow-notice__stack-item--out {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+
+    .ew-workflow-notice__stack-orb {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      position: relative;
+      flex: 0 0 auto;
+      overflow: hidden;
+      background: #163a68;
+      border: 2px solid color-mix(in srgb, var(--ew-stack-accent) 88%, #9ec5ff);
+      box-shadow:
+        0 8px 16px rgba(3, 8, 17, 0.22),
+        0 0 12px color-mix(in srgb, var(--ew-stack-accent) 16%, transparent),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    }
+
+    .ew-workflow-notice__stack-orb::before {
+      content: '';
+      position: absolute;
+      inset: 3px;
+      border-radius: 50%;
+      background: #ffe27a;
+      box-shadow:
+        inset 2px 2px 0 rgba(255, 247, 196, 0.95),
+        inset -2px -2px 0 rgba(219, 177, 58, 0.45),
+        0 0 5px rgba(255, 226, 122, 0.14);
+    }
+
+    .ew-workflow-notice__stack-orb::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: -18px;
+      width: 22px;
+      height: 22px;
+      border-radius: inherit;
+      background: #102746;
+      box-shadow:
+        40px 0 0 #102746,
+        inset 1px 0 0 rgba(255, 255, 255, 0.04);
+      transform: translate3d(0, 0, 0);
+      will-change: transform;
+      animation: ewWorkflowMoonPhase 4.8s linear infinite;
+    }
+
+    .ew-workflow-notice__stack-item[data-tone='success'] .ew-workflow-notice__stack-orb::after,
+    .ew-workflow-notice__stack-item[data-tone='warning'] .ew-workflow-notice__stack-orb::after {
+      animation-duration: 7.4s;
+    }
+
+    .ew-workflow-notice__stack-body {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .ew-workflow-notice__stack-name {
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.2;
+      color: #edf4ff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      letter-spacing: 0.01em;
+    }
+
+    .ew-workflow-notice__stack-content {
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.25;
+      color: color-mix(in srgb, #f2f7ff 86%, #8ea6be);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .ew-workflow-notice__island-orb {
@@ -630,6 +781,13 @@ function ensureWorkflowStyle(doc: Document) {
       }
     }
 
+    @keyframes ewWorkflowStackIn {
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
     @media (max-width: 900px) {
       .ew-workflow-notice {
         width: min(92vw, 520px);
@@ -646,13 +804,19 @@ function ensureWorkflowStyle(doc: Document) {
       .ew-workflow-notice__island-slot {
         max-width: min(34vw, 180px);
       }
+
+      .ew-workflow-notice__stack {
+        padding: 0 10px 12px;
+      }
     }
 
     @media (prefers-reduced-motion: reduce) {
       .ew-workflow-notice,
       .ew-workflow-notice--out,
       .ew-workflow-notice__progress,
-      .ew-workflow-notice__island-orb::after {
+      .ew-workflow-notice__island-orb::after,
+      .ew-workflow-notice__stack-item,
+      .ew-workflow-notice__stack-orb::after {
         animation-duration: 1ms !important;
       }
     }
@@ -857,10 +1021,12 @@ export function showEwNotice(input: EwNoticeInput) {
 function applyWorkflowNoticeState(item: HTMLElement, input: EwWorkflowNoticeInput, progress: HTMLElement) {
   const level = input.level ?? 'info';
   const hasPreview = Boolean(input.island?.entry_name?.trim() || input.island?.content?.trim());
+  const islands = input.islands ?? [];
 
   item.dataset.level = level;
   item.dataset.busy = input.busy ? 'true' : 'false';
   item.dataset.hasPreview = hasPreview ? 'true' : 'false';
+  item.dataset.hasStack = islands.length > 0 ? 'true' : 'false';
 
   const icon = item.querySelector('.ew-workflow-notice__icon');
   if (icon) {
@@ -903,6 +1069,11 @@ function applyWorkflowNoticeState(item: HTMLElement, input: EwWorkflowNoticeInpu
     islandContent.textContent = input.island?.content?.trim() || '';
   }
 
+  const stack = item.querySelector('.ew-workflow-notice__stack') as HTMLElement | null;
+  if (stack) {
+    reconcileWorkflowNoticeStack(stack, islands);
+  }
+
   if (input.persist) {
     progress.style.display = 'none';
     progress.style.animationDuration = '';
@@ -910,6 +1081,81 @@ function applyWorkflowNoticeState(item: HTMLElement, input: EwWorkflowNoticeInpu
     const duration = Math.max(1400, input.duration_ms ?? 3200);
     progress.style.display = '';
     progress.style.animationDuration = `${duration}ms`;
+  }
+}
+
+function createWorkflowStackItem(doc: Document, island: EwWorkflowNoticeIslandInput) {
+  const item = doc.createElement('div');
+  item.className = 'ew-workflow-notice__stack-item';
+  item.dataset.itemId = island.id;
+
+  const orb = doc.createElement('span');
+  orb.className = 'ew-workflow-notice__stack-orb';
+
+  const body = doc.createElement('div');
+  body.className = 'ew-workflow-notice__stack-body';
+
+  const name = doc.createElement('span');
+  name.className = 'ew-workflow-notice__stack-name';
+
+  const content = doc.createElement('span');
+  content.className = 'ew-workflow-notice__stack-content';
+
+  body.appendChild(name);
+  body.appendChild(content);
+  item.appendChild(orb);
+  item.appendChild(body);
+
+  applyWorkflowStackItemState(item, island);
+  return item;
+}
+
+function applyWorkflowStackItemState(item: HTMLElement, island: EwWorkflowNoticeIslandInput) {
+  item.dataset.itemId = island.id;
+  item.dataset.tone = island.tone ?? 'streaming';
+  item.classList.remove('ew-workflow-notice__stack-item--out');
+
+  const name = item.querySelector('.ew-workflow-notice__stack-name');
+  if (name) {
+    name.textContent = island.entry_name?.trim() || '未命名工作流';
+  }
+
+  const content = item.querySelector('.ew-workflow-notice__stack-content');
+  if (content) {
+    content.textContent = island.content?.trim() || '';
+  }
+}
+
+function reconcileWorkflowNoticeStack(stack: HTMLElement, islands: EwWorkflowNoticeIslandInput[]) {
+  const doc = stack.ownerDocument;
+  const existing = new Map<string, HTMLElement>();
+
+  Array.from(stack.children).forEach(child => {
+    if (child instanceof HTMLElement && child.dataset.itemId) {
+      existing.set(child.dataset.itemId, child);
+    }
+  });
+
+  const nextIds = new Set<string>();
+  for (const island of islands) {
+    if (!island.id.trim()) {
+      continue;
+    }
+
+    nextIds.add(island.id);
+    const current = existing.get(island.id) ?? createWorkflowStackItem(doc, island);
+    applyWorkflowStackItemState(current, island);
+    stack.appendChild(current);
+  }
+
+  for (const [id, current] of existing) {
+    if (nextIds.has(id) || current.dataset.removing === 'true') {
+      continue;
+    }
+
+    current.dataset.removing = 'true';
+    current.classList.add('ew-workflow-notice__stack-item--out');
+    setTimeout(() => current.remove(), 190);
   }
 }
 
@@ -965,6 +1211,9 @@ export function showManagedWorkflowNotice(input: EwWorkflowNoticeInput): EwWorkf
   const islandContent = doc.createElement('span');
   islandContent.className = 'ew-workflow-notice__island-slot ew-workflow-notice__island-slot--content';
 
+  const stack = doc.createElement('div');
+  stack.className = 'ew-workflow-notice__stack';
+
   const progress = doc.createElement('div');
   progress.className = 'ew-workflow-notice__progress';
 
@@ -980,6 +1229,7 @@ export function showManagedWorkflowNotice(input: EwWorkflowNoticeInput): EwWorkf
   island.appendChild(islandContent);
   item.appendChild(card);
   item.appendChild(island);
+  item.appendChild(stack);
   item.appendChild(progress);
 
   let closed = false;

@@ -20,7 +20,7 @@ import {
   shouldHandleGenerationAfter,
   wasAfterReplyHandled,
 } from './state';
-import { DispatchFlowResult, EwSettings, WorkflowProgressUpdate } from './types';
+import { DispatchFlowAttempt, DispatchFlowResult, EwSettings, WorkflowProgressUpdate } from './types';
 
 const EW_FLOOR_WORKFLOW_EXECUTION_KEY = 'ew_workflow_execution';
 
@@ -44,6 +44,21 @@ let sendIntentRetryTimer: ReturnType<typeof setTimeout> | null = null;
 let tavernHelperRetryTimer: ReturnType<typeof setTimeout> | null = null;
 const NON_SEND_GENERATION_TYPES = new Set(['continue', 'regenerate', 'swipe']);
 const WORKFLOW_NOTICE_COLLAPSE_MS = 5000;
+const WORKFLOW_NOTICE_MAX_ISLANDS = 5;
+const WORKFLOW_NOTICE_SUCCESS_LINGER_MS = 2200;
+const WORKFLOW_NOTICE_WARNING_LINGER_MS = 3600;
+
+type WorkflowNoticeIslandTone = 'streaming' | 'success' | 'warning';
+
+type WorkflowNoticeIslandState = {
+  id: string;
+  entry_name: string;
+  content: string;
+  tone: WorkflowNoticeIslandTone;
+  flow_order: number;
+  updated_at: number;
+  dismiss_timer: ReturnType<typeof setTimeout> | null;
+};
 
 function getHostWindow(): Window & typeof globalThis {
   try {
@@ -379,6 +394,7 @@ function createProcessingReminder(onAbort: () => void) {
     busy: true,
     collapse_after_ms: WORKFLOW_NOTICE_COLLAPSE_MS,
     island: {},
+    islands: [],
     action: {
       label: '终止处理',
       kind: 'danger',
@@ -396,6 +412,7 @@ function createProcessingReminder(onAbort: () => void) {
         ...(state.island ?? {}),
         ...(next.island ?? {}),
       },
+      islands: next.islands ?? state.islands ?? [],
     };
     handle.update(state);
   };
@@ -405,6 +422,188 @@ function createProcessingReminder(onAbort: () => void) {
     dismiss: handle.dismiss,
     collapse: handle.collapse,
     expand: handle.expand,
+  };
+}
+
+function trimWorkflowNoticeText(text: string | undefined, maxLength: number) {
+  const normalized = String(text ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+  return `${normalized.slice(0, maxLength)}...`;
+}
+
+function createWorkflowIslandTracker(processingReminder: ReturnType<typeof createProcessingReminder>) {
+  const islands = new Map<string, WorkflowNoticeIslandState>();
+
+  const clearDismissTimer = (island: WorkflowNoticeIslandState) => {
+    if (island.dismiss_timer) {
+      clearTimeout(island.dismiss_timer);
+      island.dismiss_timer = null;
+    }
+  };
+
+  const sync = () => {
+    const allIslands = [...islands.values()];
+    const activeIslands = allIslands
+      .filter(island => island.tone === 'streaming')
+      .sort((left, right) => left.flow_order - right.flow_order || right.updated_at - left.updated_at);
+    const settledIslands = allIslands
+      .filter(island => island.tone !== 'streaming')
+      .sort((left, right) => right.updated_at - left.updated_at || left.flow_order - right.flow_order);
+    const visibleIslands = [...activeIslands, ...settledIslands].slice(0, WORKFLOW_NOTICE_MAX_ISLANDS);
+    const latestIsland = [...allIslands].sort((left, right) => right.updated_at - left.updated_at)[0];
+
+    const summaryName =
+      activeIslands.length > 1
+        ? `${activeIslands.length} 条工作流并行中`
+        : latestIsland?.entry_name?.trim() || latestIsland?.id || '';
+    const summaryContent = latestIsland
+      ? activeIslands.length > 1
+        ? trimWorkflowNoticeText(
+            latestIsland.content?.trim()
+              ? `${latestIsland.entry_name} · ${latestIsland.content}`
+              : `${latestIsland.entry_name} 正在更新`,
+            54,
+          )
+        : trimWorkflowNoticeText(latestIsland.content, 54)
+      : '';
+
+    processingReminder.update({
+      island: {
+        entry_name: summaryName,
+        content: summaryContent,
+      },
+      islands: visibleIslands.map(island => ({
+        id: island.id,
+        entry_name: island.entry_name,
+        content: island.content,
+        tone: island.tone,
+        flow_order: island.flow_order,
+        updated_at: island.updated_at,
+      })),
+    });
+  };
+
+  const upsertIsland = (
+    id: string,
+    nextState: Omit<WorkflowNoticeIslandState, 'dismiss_timer'>,
+  ): WorkflowNoticeIslandState => {
+    const current = islands.get(id);
+    if (current) {
+      clearDismissTimer(current);
+      current.entry_name = nextState.entry_name;
+      current.content = nextState.content;
+      current.tone = nextState.tone;
+      current.flow_order = nextState.flow_order;
+      current.updated_at = nextState.updated_at;
+      return current;
+    }
+
+    const created: WorkflowNoticeIslandState = {
+      ...nextState,
+      dismiss_timer: null,
+    };
+    islands.set(id, created);
+    return created;
+  };
+
+  const scheduleDismiss = (island: WorkflowNoticeIslandState) => {
+    clearDismissTimer(island);
+    if (island.tone === 'streaming') {
+      return;
+    }
+
+    const lingerMs = island.tone === 'success' ? WORKFLOW_NOTICE_SUCCESS_LINGER_MS : WORKFLOW_NOTICE_WARNING_LINGER_MS;
+    island.dismiss_timer = setTimeout(() => {
+      const current = islands.get(island.id);
+      if (!current || current.updated_at !== island.updated_at || current.tone === 'streaming') {
+        return;
+      }
+      clearDismissTimer(current);
+      islands.delete(island.id);
+      sync();
+    }, lingerMs);
+  };
+
+  const setIslandState = (input: {
+    id: string;
+    entry_name: string;
+    content: string;
+    tone: WorkflowNoticeIslandTone;
+    flow_order: number;
+  }) => {
+    const island = upsertIsland(input.id, {
+      id: input.id,
+      entry_name: trimWorkflowNoticeText(input.entry_name, 28) || '未命名工作流',
+      content: trimWorkflowNoticeText(input.content, 54),
+      tone: input.tone,
+      flow_order: input.flow_order,
+      updated_at: Date.now(),
+    });
+    scheduleDismiss(island);
+    sync();
+  };
+
+  return {
+    markStarted(update: WorkflowProgressUpdate) {
+      const flowId = update.flow_id?.trim();
+      if (!flowId) {
+        return;
+      }
+      setIslandState({
+        id: flowId,
+        entry_name: update.flow_name?.trim() || flowId,
+        content: '正在等待首段输出…',
+        tone: 'streaming',
+        flow_order: update.flow_order ?? Number.MAX_SAFE_INTEGER,
+      });
+    },
+    markStreaming(update: WorkflowProgressUpdate) {
+      const flowId = update.flow_id?.trim();
+      if (!flowId) {
+        return;
+      }
+      const current = islands.get(flowId);
+      setIslandState({
+        id: flowId,
+        entry_name:
+          trimWorkflowNoticeText(update.stream_preview?.entry_name, 28) ||
+          current?.entry_name ||
+          update.flow_name?.trim() ||
+          flowId,
+        content:
+          trimWorkflowNoticeText(update.stream_preview?.content, 54) ||
+          trimWorkflowNoticeText(update.stream_text, 54) ||
+          current?.content ||
+          '正在流式读取输出…',
+        tone: 'streaming',
+        flow_order: update.flow_order ?? current?.flow_order ?? Number.MAX_SAFE_INTEGER,
+      });
+    },
+    settleAttempts(attempts: DispatchFlowAttempt[]) {
+      for (const attempt of attempts) {
+        const current = islands.get(attempt.flow.id);
+        setIslandState({
+          id: attempt.flow.id,
+          entry_name: current?.entry_name || attempt.flow.name.trim() || attempt.flow.id,
+          content: attempt.ok
+            ? current?.content || '处理完成，已纳入本楼结果'
+            : trimWorkflowNoticeText(attempt.error || '执行失败', 54),
+          tone: attempt.ok ? 'success' : 'warning',
+          flow_order: attempt.flow_order,
+        });
+      }
+    },
+    clear() {
+      for (const island of islands.values()) {
+        clearDismissTimer(island);
+      }
+      islands.clear();
+      sync();
+    },
   };
 }
 
@@ -523,20 +722,11 @@ async function executeWorkflowWithPolicy(
   };
 
   const processingReminder = createProcessingReminder(cancelWorkflow);
+  const workflowIslandTracker = createWorkflowIslandTracker(processingReminder);
   processingReminder.update(buildAbortableReminder(options.reminderMessage));
   let reminderSettled = false;
   let currentPreservedStoredResults = [...(options.preservedResults ?? [])];
   let currentPreservedDispatchResults = await buildPreservedDispatchResults(settings, currentPreservedStoredResults);
-
-  const trimPreview = (text: string | undefined, maxLength: number) => {
-    const normalized = String(text ?? '')
-      .replace(/\s+/g, ' ')
-      .trim();
-    if (normalized.length <= maxLength) {
-      return normalized;
-    }
-    return `${normalized.slice(0, maxLength)}...`;
-  };
 
   const handleWorkflowProgress = (update: WorkflowProgressUpdate) => {
     if (reminderSettled) {
@@ -556,6 +746,7 @@ async function executeWorkflowWithPolicy(
         });
         break;
       case 'flow_started':
+        workflowIslandTracker.markStarted(update);
         processingReminder.update({
           message: update.message ?? options.reminderMessage,
           persist: true,
@@ -564,17 +755,12 @@ async function executeWorkflowWithPolicy(
         });
         break;
       case 'streaming': {
-        const previewName = trimPreview(update.stream_preview?.entry_name, 28);
-        const previewContent = trimPreview(update.stream_preview?.content, 54);
+        workflowIslandTracker.markStreaming(update);
         processingReminder.update({
           message: update.flow_name?.trim() ? `正在流式读取「${update.flow_name}」输出…` : '正在流式读取工作流输出…',
           persist: true,
           busy: true,
           level: 'info',
-          island: {
-            entry_name: previewName,
-            content: previewContent,
-          },
         });
         break;
       }
@@ -587,6 +773,7 @@ async function executeWorkflowWithPolicy(
 
   const finalizeUserAbort = () => {
     reminderSettled = true;
+    workflowIslandTracker.clear();
     processingReminder.update({
       title: 'Evolution World',
       message: '已终止本轮处理。',
@@ -598,6 +785,7 @@ async function executeWorkflowWithPolicy(
         entry_name: '',
         content: '',
       },
+      islands: [],
       duration_ms: 2200,
     });
     return {
@@ -632,6 +820,8 @@ async function executeWorkflowWithPolicy(
   if (abortedByUser) {
     return finalizeUserAbort();
   }
+
+  workflowIslandTracker.settleAttempts(result.attempts);
 
   if (options.trigger.timing === 'after_reply') {
     const assistantMessageId = options.trigger.assistant_message_id ?? options.messageId;
@@ -677,6 +867,8 @@ async function executeWorkflowWithPolicy(
       if (abortedByUser) {
         return finalizeUserAbort();
       }
+
+      workflowIslandTracker.settleAttempts(result.attempts);
 
       if (options.trigger.timing === 'after_reply') {
         const assistantMessageId = options.trigger.assistant_message_id ?? options.messageId;
