@@ -1025,7 +1025,19 @@ function reconcileWorkflowNoticeStack(stack: HTMLElement, islands: EwWorkflowNot
     }
   });
 
+  // Also check detached cache
+  const detached = (stack as any)._ewDetachedRows as Map<string, HTMLElement> | undefined;
+  if (detached) {
+    for (const [id, el] of detached) {
+      if (!existing.has(id)) {
+        existing.set(id, el);
+      }
+    }
+  }
+
   const nextIds = new Set<string>();
+  const nextDetached = new Map<string, HTMLElement>();
+
   islands.forEach((island, index) => {
     if (!island.id.trim()) {
       return;
@@ -1037,35 +1049,41 @@ function reconcileWorkflowNoticeStack(stack: HTMLElement, islands: EwWorkflowNot
     current.dataset.rowIndex = String(index);
     current.dataset.removing = 'false';
 
-    // JS-driven visibility: hide non-first rows when collapsed
-    if (collapsed && index > 0) {
-      current.style.display = 'none';
-    } else {
-      current.style.display = '';
-    }
-    console.warn(`[EW-NOTICE] row ${index}/${islands.length}: id=${island.id}, collapsed=${collapsed}, display=${current.style.display}, extra=${island.extra_count ?? 0}`);
-
-    // JS-driven +N badge visibility: only on first row when collapsed
+    // +N badge visibility
     const extraBadge = current.querySelector('.ew-workflow-notice__row-extra') as HTMLElement | null;
     if (extraBadge) {
-      if (collapsed && index === 0 && (island.extra_count ?? 0) > 0) {
-        extraBadge.style.display = 'inline-flex';
-      } else {
-        extraBadge.style.display = 'none';
-      }
+      extraBadge.textContent = (island.extra_count ?? 0) > 0 ? `+${island.extra_count}` : '';
+      extraBadge.style.cssText = (collapsed && index === 0 && (island.extra_count ?? 0) > 0)
+        ? 'display:inline-flex !important'
+        : 'display:none !important';
     }
 
-    stack.appendChild(current);
+    // KEY FIX: When collapsed, only row 0 goes into the DOM; others stay detached
+    if (collapsed && index > 0) {
+      // Remove from DOM if currently attached
+      if (current.parentNode === stack) {
+        current.remove();
+      }
+      nextDetached.set(island.id, current);
+    } else {
+      stack.appendChild(current);
+    }
   });
 
+  // Store detached rows for later reuse
+  (stack as any)._ewDetachedRows = nextDetached;
+
+  // Remove stale rows (not in nextIds and not detached)
   for (const [id, current] of existing) {
     if (nextIds.has(id) || current.dataset.removing === 'true') {
       continue;
     }
 
     current.dataset.removing = 'true';
-    current.classList.add('ew-workflow-notice__row--out');
-    setTimeout(() => current.remove(), 190);
+    if (current.parentNode === stack) {
+      current.classList.add('ew-workflow-notice__row--out');
+      setTimeout(() => current.remove(), 190);
+    }
   }
 }
 
