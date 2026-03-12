@@ -949,7 +949,12 @@ function applyWorkflowNoticeState(item: HTMLElement, input: EwWorkflowNoticeInpu
   }
 
   if (stack) {
-    reconcileWorkflowNoticeStack(stack, islands, isCollapsed);
+    // When collapsed, only create 1 DOM row — pass only the first island.
+    // The full islands array is preserved in currentInput for expand().
+    const visibleIslands = isCollapsed && islands.length > 1
+      ? [{ ...islands[0], extra_count: islands.length - 1 }]
+      : islands;
+    reconcileWorkflowNoticeStack(stack, visibleIslands, isCollapsed);
   }
 
   if (input.persist) {
@@ -1025,19 +1030,7 @@ function reconcileWorkflowNoticeStack(stack: HTMLElement, islands: EwWorkflowNot
     }
   });
 
-  // Also check detached cache
-  const detached = (stack as any)._ewDetachedRows as Map<string, HTMLElement> | undefined;
-  if (detached) {
-    for (const [id, el] of detached) {
-      if (!existing.has(id)) {
-        existing.set(id, el);
-      }
-    }
-  }
-
   const nextIds = new Set<string>();
-  const nextDetached = new Map<string, HTMLElement>();
-
   islands.forEach((island, index) => {
     if (!island.id.trim()) {
       return;
@@ -1058,32 +1051,18 @@ function reconcileWorkflowNoticeStack(stack: HTMLElement, islands: EwWorkflowNot
         : 'display:none !important';
     }
 
-    // KEY FIX: When collapsed, only row 0 goes into the DOM; others stay detached
-    if (collapsed && index > 0) {
-      // Remove from DOM if currently attached
-      if (current.parentNode === stack) {
-        current.remove();
-      }
-      nextDetached.set(island.id, current);
-    } else {
-      stack.appendChild(current);
-    }
+    stack.appendChild(current);
   });
 
-  // Store detached rows for later reuse
-  (stack as any)._ewDetachedRows = nextDetached;
-
-  // Remove stale rows (not in nextIds and not detached)
+  // Remove stale rows
   for (const [id, current] of existing) {
     if (nextIds.has(id) || current.dataset.removing === 'true') {
       continue;
     }
 
     current.dataset.removing = 'true';
-    if (current.parentNode === stack) {
-      current.classList.add('ew-workflow-notice__row--out');
-      setTimeout(() => current.remove(), 190);
-    }
+    current.classList.add('ew-workflow-notice__row--out');
+    setTimeout(() => current.remove(), 190);
   }
 }
 
