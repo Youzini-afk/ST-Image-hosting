@@ -612,15 +612,15 @@ type ExecuteWorkflowOptions = {
 function buildWorkflowExecutionKey(options: ExecuteWorkflowOptions): string {
   const assistantMessageId = options.trigger.assistant_message_id ?? -1;
   const userMessageId = options.trigger.user_message_id ?? -1;
+  const flowIds = [...(options.flowIds ?? [])].filter(Boolean).sort().join(',');
   return [
     options.trigger.timing,
-    options.trigger.source,
     options.messageId,
     assistantMessageId,
     userMessageId,
     options.trigger.generation_type,
     options.injectReply ? 'inject' : 'no-inject',
-    (options.flowIds ?? []).join(','),
+    flowIds,
   ].join('|');
 }
 
