@@ -346,6 +346,7 @@ function ensureWorkflowStyle(doc: Document) {
       pointer-events: none;
     }
 
+    /* ── root container ── */
     .ew-workflow-notice {
       --ew-notice-accent: #73b8ff;
       pointer-events: auto;
@@ -353,7 +354,7 @@ function ensureWorkflowStyle(doc: Document) {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 8px;
+      gap: 0;
       color: #eef5ff;
       transform: translateY(-8px) scale(0.985);
       opacity: 0;
@@ -362,23 +363,17 @@ function ensureWorkflowStyle(doc: Document) {
       font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei UI', sans-serif;
     }
 
-    .ew-workflow-notice[data-level='success'] {
-      --ew-notice-accent: #65d39c;
-    }
+    .ew-workflow-notice[data-level='success'] { --ew-notice-accent: #65d39c; }
+    .ew-workflow-notice[data-level='error']   { --ew-notice-accent: #f57b8f; }
+    .ew-workflow-notice[data-level='warning'] { --ew-notice-accent: #eab96f; }
 
-    .ew-workflow-notice[data-level='error'] {
-      --ew-notice-accent: #f57b8f;
-    }
-
-    .ew-workflow-notice[data-level='warning'] {
-      --ew-notice-accent: #eab96f;
-    }
-
+    /* idle state — just a moon orb */
     .ew-workflow-notice[data-active='false'] {
-      min-width: 46px;
-      min-height: 46px;
+      min-width: 42px;
+      min-height: 42px;
     }
 
+    /* ── controls (close / action) ── */
     .ew-workflow-notice__controls {
       position: absolute;
       top: -2px;
@@ -439,6 +434,7 @@ function ensureWorkflowStyle(doc: Document) {
       justify-content: center;
     }
 
+    /* ── idle moon orb (shown when no streams active) ── */
     .ew-workflow-notice__idle-orb {
       display: none;
       width: 42px;
@@ -458,6 +454,7 @@ function ensureWorkflowStyle(doc: Document) {
       display: block;
     }
 
+    /* shared moon disc + shadow pseudo-elements */
     .ew-workflow-notice__idle-orb::before,
     .ew-workflow-notice__row-orb::before {
       content: '';
@@ -495,13 +492,13 @@ function ensureWorkflowStyle(doc: Document) {
       animation-duration: 7.2s;
     }
 
+    /* ── stack container (holds all capsule rows) ── */
     .ew-workflow-notice__stack {
       display: none;
       flex-direction: column;
       align-items: center;
-      gap: 8px;
-      width: min(860px, calc(100vw - 28px));
-      max-height: min(310px, calc(100vh - 120px));
+      gap: 6px;
+      max-height: min(320px, calc(100vh - 120px));
       overflow: hidden;
     }
 
@@ -509,47 +506,27 @@ function ensureWorkflowStyle(doc: Document) {
       display: flex;
     }
 
-    .ew-workflow-notice[data-collapsed='true'][data-active='true'] .ew-workflow-notice__stack {
-      width: auto;
-    }
-
+    /* ── single capsule row: [ name ] 🌙 [ content ] ── */
     .ew-workflow-notice__row {
       --ew-row-accent: rgba(115, 184, 255, 0.9);
-      width: fit-content;
-      max-width: 100%;
       display: grid;
-      grid-template-columns: minmax(94px, 140px) auto minmax(220px, 420px);
+      grid-template-columns: auto 32px 1fr;
       align-items: center;
-      justify-content: center;
-      gap: 10px;
+      gap: 8px;
+      max-width: min(820px, calc(100vw - 32px));
       transform: translateY(6px);
       opacity: 0;
       animation: ewWorkflowStackIn 180ms ease forwards;
-      transition: opacity 180ms ease, transform 180ms ease, margin-left 180ms ease;
+      transition: opacity 180ms ease, transform 180ms ease;
       cursor: pointer;
     }
 
+    .ew-workflow-notice__row[data-tone='success'] { --ew-row-accent: rgba(101, 211, 156, 0.95); }
+    .ew-workflow-notice__row[data-tone='warning'] { --ew-row-accent: rgba(234, 185, 111, 0.95); }
+
+    /* collapsed: only first row visible */
     .ew-workflow-notice[data-collapsed='true'] .ew-workflow-notice__row:not([data-row-index='0']) {
       display: none;
-    }
-
-    .ew-workflow-notice[data-collapsed='true'] .ew-workflow-notice__row[data-row-index='0'] {
-      margin-left: 0;
-    }
-
-    .ew-workflow-notice__row[data-row-index='1'],
-    .ew-workflow-notice__row[data-row-index='2'],
-    .ew-workflow-notice__row[data-row-index='3'],
-    .ew-workflow-notice__row[data-row-index='4'] {
-      margin-left: 24px;
-    }
-
-    .ew-workflow-notice__row[data-tone='success'] {
-      --ew-row-accent: rgba(101, 211, 156, 0.95);
-    }
-
-    .ew-workflow-notice__row[data-tone='warning'] {
-      --ew-row-accent: rgba(234, 185, 111, 0.95);
     }
 
     .ew-workflow-notice__row--out {
@@ -557,16 +534,17 @@ function ensureWorkflowStyle(doc: Document) {
       transform: translateY(-10px);
     }
 
+    /* ── name + content pills ── */
     .ew-workflow-notice__row-slot {
       min-width: 0;
-      padding: 8px 14px;
+      padding: 7px 14px;
       border-radius: 999px;
       border: 1px solid color-mix(in srgb, var(--ew-row-accent) 52%, rgba(255, 255, 255, 0.08));
       background:
         linear-gradient(180deg, rgba(16, 34, 58, 0.92), rgba(8, 20, 38, 0.95)),
         radial-gradient(circle at 10% -60%, color-mix(in srgb, var(--ew-row-accent) 18%, transparent), transparent 62%);
       box-shadow:
-        0 10px 22px rgba(3, 8, 17, 0.2),
+        0 8px 18px rgba(3, 8, 17, 0.2),
         0 0 0 1px rgba(255, 255, 255, 0.03) inset;
       white-space: nowrap;
       overflow: hidden;
@@ -575,40 +553,35 @@ function ensureWorkflowStyle(doc: Document) {
       -webkit-backdrop-filter: blur(12px) saturate(125%);
     }
 
-    .ew-workflow-notice__row-slot--content {
-      position: relative;
-      padding-right: 14px;
-    }
-
-    .ew-workflow-notice__row[data-has-extra='true'] .ew-workflow-notice__row-slot--content {
-      padding-right: 50px;
-    }
-
     .ew-workflow-notice__row-slot--name {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 800;
       line-height: 1.2;
       color: #edf4ff;
       text-align: center;
+      flex-shrink: 0;
     }
 
     .ew-workflow-notice__row-slot--content {
+      position: relative;
       font-size: 13px;
       font-weight: 650;
       line-height: 1.2;
       color: color-mix(in srgb, #f2f7ff 88%, #93abc4);
     }
 
+    /* ── +N badge (visible only in collapsed mode on the first row) ── */
     .ew-workflow-notice__row-extra {
       position: absolute;
-      top: -7px;
-      right: -5px;
+      top: 50%;
+      right: -6px;
+      transform: translateY(-50%);
       display: none;
       align-items: center;
       justify-content: center;
-      min-width: 28px;
+      min-width: 26px;
       height: 20px;
-      padding: 0 8px;
+      padding: 0 7px;
       border-radius: 999px;
       border: 1px solid rgba(163, 207, 255, 0.36);
       background: rgba(13, 30, 52, 0.92);
@@ -616,27 +589,34 @@ function ensureWorkflowStyle(doc: Document) {
       font-size: 11px;
       font-weight: 800;
       line-height: 1;
-      box-shadow: 0 8px 16px rgba(3, 8, 17, 0.22);
+      box-shadow: 0 6px 14px rgba(3, 8, 17, 0.22);
     }
 
     .ew-workflow-notice[data-collapsed='true'] .ew-workflow-notice__row[data-has-extra='true'] .ew-workflow-notice__row-extra {
       display: inline-flex;
     }
 
+    .ew-workflow-notice__row[data-has-extra='true'] .ew-workflow-notice__row-slot--content {
+      padding-right: 36px;
+    }
+
+    /* ── center moon orb in each row ── */
     .ew-workflow-notice__row-orb {
       width: 32px;
       height: 32px;
       border-radius: 50%;
       position: relative;
       overflow: hidden;
+      flex-shrink: 0;
       background: linear-gradient(180deg, rgba(24, 68, 119, 0.96), rgba(12, 36, 67, 0.98));
       border: 2px solid color-mix(in srgb, var(--ew-row-accent) 82%, #7bb1ff);
       box-shadow:
-        0 10px 18px rgba(3, 8, 17, 0.24),
-        0 0 14px color-mix(in srgb, var(--ew-row-accent) 18%, transparent),
+        0 8px 16px rgba(3, 8, 17, 0.24),
+        0 0 12px color-mix(in srgb, var(--ew-row-accent) 18%, transparent),
         inset 0 1px 0 rgba(255, 255, 255, 0.12);
     }
 
+    /* ── progress bar (hidden during streaming, optional) ── */
     .ew-workflow-notice__progress {
       display: none;
       width: min(520px, calc(100vw - 36px));
@@ -660,12 +640,8 @@ function ensureWorkflowStyle(doc: Document) {
     }
 
     @keyframes ewWorkflowMoonPhase {
-      0% {
-        transform: translate3d(0, 0, 0);
-      }
-      100% {
-        transform: translate3d(46px, 0, 0);
-      }
+      0%   { transform: translate3d(0, 0, 0); }
+      100% { transform: translate3d(46px, 0, 0); }
     }
 
     @keyframes ewWorkflowStackIn {
@@ -676,10 +652,6 @@ function ensureWorkflowStyle(doc: Document) {
     }
 
     @media (max-width: 900px) {
-      .ew-workflow-notice__stack {
-        width: min(95vw, 720px);
-      }
-
       .ew-workflow-notice__controls {
         position: static;
         opacity: 1;
@@ -688,28 +660,17 @@ function ensureWorkflowStyle(doc: Document) {
       }
 
       .ew-workflow-notice__row {
-        grid-template-columns: minmax(84px, 120px) auto minmax(120px, 1fr);
-        gap: 8px;
-        width: min(95vw, 720px);
+        grid-template-columns: auto 28px 1fr;
+        gap: 6px;
+        max-width: calc(100vw - 20px);
       }
 
-      .ew-workflow-notice__row[data-row-index='1'],
-      .ew-workflow-notice__row[data-row-index='2'],
-      .ew-workflow-notice__row[data-row-index='3'],
-      .ew-workflow-notice__row[data-row-index='4'] {
-        margin-left: 12px;
-      }
+      .ew-workflow-notice__row-slot--name { font-size: 12px; }
+      .ew-workflow-notice__row-slot--content { font-size: 12px; }
 
-      .ew-workflow-notice__row-slot--name {
-        font-size: 13px;
-      }
-
-      .ew-workflow-notice__row-slot--content {
-        font-size: 12px;
-      }
-
-      .ew-workflow-notice__row[data-has-extra='true'] .ew-workflow-notice__row-slot--content {
-        padding-right: 42px;
+      .ew-workflow-notice__row-orb {
+        width: 28px;
+        height: 28px;
       }
     }
 
