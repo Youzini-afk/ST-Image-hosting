@@ -511,14 +511,25 @@ function ensureWorkflowStyle(doc: Document) {
       display: flex;
     }
 
-    /* ── single capsule row: [ name ] 🌙 [ content ] ── */
+    /* ── single unified capsule: [ name  🌙  content ] ── */
     .ew-workflow-notice__row {
       --ew-row-accent: rgba(115, 184, 255, 0.9);
       display: grid;
-      grid-template-columns: auto 32px 1fr;
+      grid-template-columns: auto 32px 1fr auto;
       align-items: center;
-      gap: 8px;
+      gap: 0;
       max-width: min(820px, calc(100vw - 32px));
+      padding: 6px 16px;
+      border-radius: 999px;
+      border: 1px solid color-mix(in srgb, var(--ew-row-accent) 42%, rgba(255, 255, 255, 0.12));
+      background:
+        linear-gradient(180deg, rgba(16, 34, 58, 0.92), rgba(8, 20, 38, 0.95)),
+        radial-gradient(circle at 10% -60%, color-mix(in srgb, var(--ew-row-accent) 18%, transparent), transparent 62%);
+      box-shadow:
+        0 8px 18px rgba(3, 8, 17, 0.2),
+        0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+      backdrop-filter: blur(12px) saturate(125%);
+      -webkit-backdrop-filter: blur(12px) saturate(125%);
       transform: translateY(6px);
       opacity: 0;
       animation: ewWorkflowStackIn 180ms ease forwards;
@@ -538,36 +549,26 @@ function ensureWorkflowStyle(doc: Document) {
       transform: translateY(-10px);
     }
 
-    /* ── name + content pills ── */
+    /* ── name + content: plain text inside the unified capsule ── */
     .ew-workflow-notice__row-slot {
       min-width: 0;
-      padding: 7px 14px;
-      border-radius: 999px;
-      border: 1px solid color-mix(in srgb, var(--ew-row-accent) 52%, rgba(255, 255, 255, 0.08));
-      background:
-        linear-gradient(180deg, rgba(16, 34, 58, 0.92), rgba(8, 20, 38, 0.95)),
-        radial-gradient(circle at 10% -60%, color-mix(in srgb, var(--ew-row-accent) 18%, transparent), transparent 62%);
-      box-shadow:
-        0 8px 18px rgba(3, 8, 17, 0.2),
-        0 0 0 1px rgba(255, 255, 255, 0.03) inset;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      backdrop-filter: blur(12px) saturate(125%);
-      -webkit-backdrop-filter: blur(12px) saturate(125%);
     }
 
     .ew-workflow-notice__row-slot--name {
+      padding-right: 10px;
       font-size: 13px;
       font-weight: 800;
       line-height: 1.2;
       color: #edf4ff;
-      text-align: center;
       flex-shrink: 0;
     }
 
     .ew-workflow-notice__row-slot--content {
       position: relative;
+      padding-left: 10px;
       font-size: 13px;
       font-weight: 650;
       line-height: 1.2;
@@ -576,11 +577,8 @@ function ensureWorkflowStyle(doc: Document) {
 
     /* ── +N badge ── */
     .ew-workflow-notice__row-extra {
-      position: absolute;
-      top: 50%;
-      right: -6px;
-      transform: translateY(-50%);
       display: none;
+      margin-left: 8px;
       align-items: center;
       justify-content: center;
       min-width: 26px;
@@ -594,14 +592,11 @@ function ensureWorkflowStyle(doc: Document) {
       font-weight: 800;
       line-height: 1;
       box-shadow: 0 6px 14px rgba(3, 8, 17, 0.22);
+      flex-shrink: 0;
     }
 
     .ew-workflow-notice[data-collapsed='true'] .ew-workflow-notice__row[data-has-extra='true'] .ew-workflow-notice__row-extra {
       display: inline-flex;
-    }
-
-    .ew-workflow-notice__row[data-has-extra='true'] .ew-workflow-notice__row-slot--content {
-      padding-right: 36px;
     }
 
     /* ── center moon orb in each row (same animation as idle orb) ── */
@@ -665,8 +660,9 @@ function ensureWorkflowStyle(doc: Document) {
       }
 
       .ew-workflow-notice__row {
-        grid-template-columns: auto 28px 1fr;
-        gap: 6px;
+        grid-template-columns: auto 28px 1fr auto;
+        padding: 5px 12px;
+        gap: 0;
         max-width: calc(100vw - 20px);
       }
 
@@ -987,8 +983,8 @@ function createWorkflowStackItem(doc: Document, island: EwWorkflowNoticeIslandIn
   row.appendChild(name);
   row.appendChild(orb);
   content.appendChild(contentText);
-  content.appendChild(extra);
   row.appendChild(content);
+  row.appendChild(extra);
 
   applyWorkflowStackItemState(row, island);
   return row;
