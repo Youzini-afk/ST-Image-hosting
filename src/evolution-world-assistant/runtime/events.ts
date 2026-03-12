@@ -65,6 +65,9 @@ type ProcessingReminderHandle = {
 };
 
 let activeProcessingReminder: ProcessingReminderHandle | null = null;
+const activeWorkflowExecutions = new Map<string, Promise<WorkflowExecutionOutcome>>();
+
+const RUNTIME_EVENTS_CLEANUP_KEY = '__ew_runtime_events_cleanup__';
 
 function getHostWindow(): Window & typeof globalThis {
   try {
@@ -606,6 +609,21 @@ type ExecuteWorkflowOptions = {
   successMessage: string;
 };
 
+function buildWorkflowExecutionKey(options: ExecuteWorkflowOptions): string {
+  const assistantMessageId = options.trigger.assistant_message_id ?? -1;
+  const userMessageId = options.trigger.user_message_id ?? -1;
+  return [
+    options.trigger.timing,
+    options.trigger.source,
+    options.messageId,
+    assistantMessageId,
+    userMessageId,
+    options.trigger.generation_type,
+    options.injectReply ? 'inject' : 'no-inject',
+    (options.flowIds ?? []).join(','),
+  ].join('|');
+}
+
 function setSendTextareaValue(text: string): void {
   const textarea = getChatDocument().getElementById('send_textarea') as HTMLTextAreaElement | null;
   if (!textarea) {
@@ -652,6 +670,29 @@ function shouldReleaseInterceptedMessage(settings: EwSettings, outcome: Workflow
 // ---------------------------------------------------------------------------
 
 async function executeWorkflowWithPolicy(
+  settings: EwSettings,
+  options: ExecuteWorkflowOptions,
+): Promise<WorkflowExecutionOutcome> {
+  const executionKey = buildWorkflowExecutionKey(options);
+  const existingExecution = activeWorkflowExecutions.get(executionKey);
+  if (existingExecution) {
+    console.debug('[Evolution World] Reusing in-flight workflow execution:', executionKey);
+    return existingExecution;
+  }
+
+  const executionPromise = executeWorkflowWithPolicyInternal(settings, options);
+  activeWorkflowExecutions.set(executionKey, executionPromise);
+
+  try {
+    return await executionPromise;
+  } finally {
+    if (activeWorkflowExecutions.get(executionKey) === executionPromise) {
+      activeWorkflowExecutions.delete(executionKey);
+    }
+  }
+}
+
+async function executeWorkflowWithPolicyInternal(
   settings: EwSettings,
   options: ExecuteWorkflowOptions,
 ): Promise<WorkflowExecutionOutcome> {
@@ -1303,6 +1344,16 @@ export async function rerollCurrentAfterReplyWorkflow(): Promise<{ ok: boolean; 
 }
 
 export function initRuntimeEvents() {
+  const hostWindow = getHostWindow() as Record<string, any>;
+  const existingCleanup = hostWindow[RUNTIME_EVENTS_CLEANUP_KEY];
+  if (typeof existingCleanup === 'function') {
+    try {
+      existingCleanup();
+    } catch (error) {
+      console.warn('[Evolution World] Failed to dispose previously registered runtime events:', error);
+    }
+  }
+
   // Primary path: TavernHelper.generate hook
   installTavernHelperHook();
 
@@ -1371,9 +1422,14 @@ export function initRuntimeEvents() {
 
   // Initialize floor binding event listeners for automatic cleanup.
   initFloorBindingEvents(getSettings);
+
+  hostWindow[RUNTIME_EVENTS_CLEANUP_KEY] = () => {
+    disposeRuntimeEvents();
+  };
 }
 
 export function disposeRuntimeEvents() {
+  const hostWindow = getHostWindow() as Record<string, any>;
   for (const stopper of listenerStops.splice(0, listenerStops.length)) {
     stopper.stop();
   }
@@ -1391,4 +1447,11 @@ export function disposeRuntimeEvents() {
   uninstallTavernHelperHook();
   resetInterceptGuard();
   disposeFloorBindingEvents();
+  activeProcessingReminder?.dismiss();
+  activeProcessingReminder = null;
+  activeWorkflowExecutions.clear();
+
+  if (hostWindow[RUNTIME_EVENTS_CLEANUP_KEY]) {
+    delete hostWindow[RUNTIME_EVENTS_CLEANUP_KEY];
+  }
 }
