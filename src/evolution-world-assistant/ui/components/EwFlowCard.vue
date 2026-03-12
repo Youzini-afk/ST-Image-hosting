@@ -21,6 +21,7 @@
         <button type="button" class="ew-flow-card__action" @click="$emit('toggle-expand')">
           {{ expanded ? '收起' : '编辑' }}
         </button>
+        <button type="button" class="ew-flow-card__action" @click="$emit('duplicate')">复制</button>
         <button type="button" class="ew-flow-card__action" @click="$emit('export')">导出</button>
         <button type="button" class="ew-flow-card__action" @click="openFlowFilePicker">导入</button>
         <input
@@ -611,6 +612,7 @@ type BehaviorSelectKey = 'name_behavior' | 'reasoning_effort' | 'verbosity';
 const props = defineProps<{ modelValue: EwFlowConfig; apiPresets: EwApiPreset[]; index: number; expanded: boolean }>();
 const emit = defineEmits<{
   (event: 'toggle-expand'): void;
+  (event: 'duplicate'): void;
   (event: 'remove'): void;
   (event: 'export'): void;
   (event: 'update:modelValue', value: EwFlowConfig): void;

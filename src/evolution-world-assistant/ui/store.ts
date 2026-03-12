@@ -159,6 +159,19 @@ export const useEwStore = defineStore('evolution-world-store', () => {
     activeTab.value = 'api';
   }
 
+  function duplicateApiPreset(presetId: string) {
+    const source = settings.value.api_presets.find(p => p.id === presetId);
+    if (!source) return;
+    const next = klona(settings.value);
+    const copy = klona(source);
+    copy.id = `${copy.id}_${Date.now()}`;
+    copy.name = `${copy.name} (副本)`;
+    const insertIndex = next.api_presets.findIndex(p => p.id === presetId) + 1;
+    next.api_presets.splice(insertIndex, 0, copy);
+    settings.value = next;
+    expandedApiPresetId.value = copy.id;
+  }
+
   function removeApiPreset(presetId: string) {
     const next = klona(settings.value);
     _.remove(next.api_presets, preset => preset.id === presetId);
@@ -209,6 +222,19 @@ export const useEwStore = defineStore('evolution-world-store', () => {
     if (expandedFlowId.value === flowId) {
       expandedFlowId.value = next.flows[0]?.id ?? null;
     }
+  }
+
+  function duplicateFlow(flowId: string) {
+    const source = settings.value.flows.find(f => f.id === flowId);
+    if (!source) return;
+    const next = klona(settings.value);
+    const copy = klona(source);
+    copy.id = `${copy.id}_${Date.now()}`;
+    copy.name = `${copy.name} (副本)`;
+    const insertIndex = next.flows.findIndex(f => f.id === flowId) + 1;
+    next.flows.splice(insertIndex, 0, copy);
+    settings.value = next;
+    expandedFlowId.value = copy.id;
   }
 
   function setActiveTab(tab: TabKey) {
@@ -536,6 +562,19 @@ export const useEwStore = defineStore('evolution-world-store', () => {
     }
   }
 
+  function duplicateCharFlow(flowId: string) {
+    const source = charFlows.value.find(f => f.id === flowId);
+    if (!source) return;
+    const copy = klona(source);
+    copy.id = `${copy.id}_${Date.now()}`;
+    copy.name = `${copy.name} (副本)`;
+    const insertIndex = charFlows.value.findIndex(f => f.id === flowId) + 1;
+    const next = [...charFlows.value];
+    next.splice(insertIndex, 0, copy);
+    charFlows.value = next;
+    expandedFlowId.value = copy.id;
+  }
+
   function setFlowScope(scope: 'global' | 'character') {
     flowScope.value = scope;
     if (scope === 'character') {
@@ -633,8 +672,10 @@ export const useEwStore = defineStore('evolution-world-store', () => {
     flowScope,
     charFlowsLoading,
     addApiPreset,
+    duplicateApiPreset,
     removeApiPreset,
     addFlow,
+    duplicateFlow,
     removeFlow,
     setActiveTab,
     setGlobalAdvancedOpen,
@@ -658,6 +699,7 @@ export const useEwStore = defineStore('evolution-world-store', () => {
     loadCharFlows,
     saveCharFlows,
     addCharFlow,
+    duplicateCharFlow,
     removeCharFlow,
     setFlowScope,
     // 调试

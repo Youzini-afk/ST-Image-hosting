@@ -133,6 +133,7 @@
                   :expanded="store.expandedApiPresetId === preset.id"
                   :bind-count="bindCountByPresetId[preset.id] ?? 0"
                   @toggle-expand="store.toggleApiPresetExpanded(preset.id)"
+                  @duplicate="store.duplicateApiPreset(preset.id)"
                   @remove="store.removeApiPreset(preset.id)"
                   @update:model-value="value => updateApiPreset(index, value)"
                 />
@@ -352,6 +353,7 @@
                     :api-presets="store.settings.api_presets"
                     :expanded="store.expandedFlowId === flow.id"
                     @toggle-expand="store.toggleFlowExpanded(flow.id)"
+                    @duplicate="store.duplicateFlow(flow.id)"
                     @remove="store.removeFlow(flow.id)"
                     @export="store.exportSingleFlow(flow.id)"
                     @update:model-value="value => updateFlow(index, value)"
@@ -384,6 +386,7 @@
                     :api-presets="store.settings.api_presets"
                     :expanded="store.expandedFlowId === flow.id"
                     @toggle-expand="store.toggleFlowExpanded(flow.id)"
+                    @duplicate="store.duplicateCharFlow(flow.id)"
                     @remove="store.removeCharFlow(flow.id)"
                     @update:model-value="value => updateCharFlow(index, value)"
                   />

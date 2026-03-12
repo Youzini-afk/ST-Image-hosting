@@ -17,6 +17,9 @@
         <button type="button" class="ew-api-card__action" @click="$emit('toggle-expand')">
           {{ expanded ? '收起' : '编辑' }}
         </button>
+        <button type="button" class="ew-api-card__action" @click="$emit('duplicate')">
+          复制
+        </button>
         <button type="button" class="ew-api-card__action ew-api-card__action--danger" @click="$emit('remove')">
           删除
         </button>
@@ -107,6 +110,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (event: 'toggle-expand'): void;
+  (event: 'duplicate'): void;
   (event: 'remove'): void;
   (event: 'update:modelValue', value: EwApiPreset): void;
 }>();
