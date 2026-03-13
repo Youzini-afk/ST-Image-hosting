@@ -6,31 +6,26 @@
         @add-node="onAddNode"
       />
     </div>
-    <div class="ew-graph-editor__canvas">
+    <div ref="canvasRef" class="ew-graph-editor__canvas">
       <VueFlow
         v-if="activeGraph"
-        :nodes="flowNodes"
-        :edges="flowEdges"
+        v-model:nodes="vfNodes"
+        v-model:edges="vfEdges"
         :node-types="nodeTypes"
-        :default-viewport="{ x: 0, y: 0, zoom: 0.85 }"
+        :default-viewport="{ x: 0, y: 0, zoom: 0.8 }"
         :snap-to-grid="true"
         :snap-grid="[20, 20]"
         :connection-mode="ConnectionMode.Loose"
-        :fit-view-on-init="true"
-        @nodes-change="onNodesChange"
-        @edges-change="onEdgesChange"
+        fit-view-on-init
         @connect="onConnect"
       >
-        <Background :gap="20" :size="1" pattern-color="rgba(255,255,255,0.04)" />
-        <MiniMap
-          :node-color="miniMapNodeColor"
-          :mask-color="'rgba(0,0,0,0.7)'"
-        />
+        <Background :gap="20" :size="1" pattern-color="rgba(255,255,255,0.05)" />
+        <MiniMap :node-color="miniMapNodeColor" />
         <Controls />
       </VueFlow>
       <div v-else class="ew-graph-editor__empty">
         <p>暂无工作流图</p>
-        <p class="ew-graph-editor__empty-hint">请从左侧列表选择或创建工作流</p>
+        <p class="ew-graph-editor__empty-hint">进入工作流配置后切换至此视图</p>
       </div>
     </div>
   </div>
@@ -52,13 +47,13 @@ import EwPromptNode from './nodes/EwPromptNode.vue';
 import EwAiCallNode from './nodes/EwAiCallNode.vue';
 import EwWorldbookOutputNode from './nodes/EwWorldbookOutputNode.vue';
 
-// 注入 Vue Flow 基础 CSS（绕过 webpack 的 node_modules CSS 限制）
+// 注入 Vue Flow 基础 CSS
 injectVueFlowCSS();
 
 const graphStore = useGraphStore();
 const activeGraph = computed(() => graphStore.graph);
 
-// 注册自定义节点类型
+// 自定义节点类型
 const nodeTypes = {
   trigger: markRaw(EwTriggerNode),
   context_builder: markRaw(EwContextNode),
@@ -67,77 +62,61 @@ const nodeTypes = {
   worldbook_output: markRaw(EwWorldbookOutputNode),
 };
 
-// Vue Flow 使用的节点/边数据
-const flowNodes = computed(() => {
-  if (!activeGraph.value) return [];
-  return activeGraph.value.nodes.map(n => ({
+/**
+ * 使用 v-model 双向绑定 — Vue Flow 内部管理节点位置、选中态等。
+ * 初始化时从 store 加载，变化时同步回 store。
+ */
+const vfNodes = ref<any[]>([]);
+const vfEdges = ref<any[]>([]);
+
+// 当 graph 数据加载时填充 Vue Flow
+watch(activeGraph, (graph) => {
+  if (!graph) {
+    vfNodes.value = [];
+    vfEdges.value = [];
+    return;
+  }
+  vfNodes.value = graph.nodes.map(n => ({
     id: n.id,
     type: n.type,
     position: { ...n.position },
     data: { ...n.data },
+    label: n.data?.flow_name || NODE_TYPE_DEFS[n.type as NodeTypeName]?.label || n.type,
   }));
-});
-
-const flowEdges = computed(() => {
-  if (!activeGraph.value) return [];
-  return activeGraph.value.edges.map(e => ({
+  vfEdges.value = graph.edges.map(e => ({
     id: e.id,
     source: e.source,
-    sourceHandle: e.sourceHandle,
+    sourceHandle: e.sourceHandle ?? undefined,
     target: e.target,
-    targetHandle: e.targetHandle,
+    targetHandle: e.targetHandle ?? undefined,
     animated: true,
     style: { stroke: 'rgba(255,255,255,0.3)', strokeWidth: 2 },
   }));
-});
-
-function onNodesChange(changes: any[]) {
-  if (!activeGraph.value) return;
-  const currentNodes = [...activeGraph.value.nodes];
-  for (const change of changes) {
-    if (change.type === 'position' && change.position) {
-      const node = currentNodes.find(n => n.id === change.id);
-      if (node) {
-        node.position = { ...change.position };
-      }
-    }
-  }
-  graphStore.updateNodes(currentNodes);
-}
-
-function onEdgesChange(changes: any[]) {
-  if (!activeGraph.value) return;
-  let currentEdges = [...activeGraph.value.edges];
-  for (const change of changes) {
-    if (change.type === 'remove') {
-      currentEdges = currentEdges.filter(e => e.id !== change.id);
-    }
-  }
-  graphStore.updateEdges(currentEdges);
-}
+}, { immediate: true });
 
 function onConnect(connection: Connection) {
-  if (!activeGraph.value || !connection.source || !connection.target) return;
-  const newEdge = {
+  if (!connection.source || !connection.target) return;
+  vfEdges.value.push({
     id: `e_${connection.source}_${connection.target}_${Date.now()}`,
     source: connection.source,
     sourceHandle: connection.sourceHandle ?? undefined,
     target: connection.target,
     targetHandle: connection.targetHandle ?? undefined,
-  };
-  graphStore.updateEdges([...activeGraph.value.edges, newEdge]);
+    animated: true,
+    style: { stroke: 'rgba(255,255,255,0.3)', strokeWidth: 2 },
+  });
 }
 
 function onAddNode(type: NodeTypeName) {
-  if (!activeGraph.value) return;
   const id = `n_${Date.now().toString(36)}`;
-  const newNode = {
+  const def = NODE_TYPE_DEFS[type];
+  vfNodes.value.push({
     id,
     type,
     position: { x: 200, y: 200 },
     data: {},
-  };
-  graphStore.updateNodes([...activeGraph.value.nodes, newNode]);
+    label: def?.label || type,
+  });
 }
 
 function miniMapNodeColor(node: any): string {
@@ -166,6 +145,7 @@ function miniMapNodeColor(node: any): string {
 .ew-graph-editor__canvas {
   flex: 1;
   position: relative;
+  overflow: hidden;
 }
 
 .ew-graph-editor__empty {
@@ -184,7 +164,7 @@ function miniMapNodeColor(node: any): string {
   color: rgba(255, 255, 255, 0.15);
 }
 
-/* 深色主题覆盖 */
+/* 深色主题覆盖 — minimap / controls */
 :deep(.vue-flow__minimap) {
   background: rgba(0, 0, 0, 0.5) !important;
   border-radius: 8px;
@@ -196,7 +176,7 @@ function miniMapNodeColor(node: any): string {
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-  padding: 2px;
+  padding: 4px;
 }
 
 :deep(.vue-flow__controls-button) {
@@ -211,5 +191,25 @@ function miniMapNodeColor(node: any): string {
 
 :deep(.vue-flow__controls-button svg) {
   fill: currentColor;
+}
+
+/* 节点默认样式 */
+:deep(.vue-flow__node) {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* 连接线高亮 */
+:deep(.vue-flow__edge-path) {
+  stroke: rgba(255, 255, 255, 0.25);
+  stroke-width: 2;
+}
+
+:deep(.vue-flow__edge.selected .vue-flow__edge-path) {
+  stroke: rgba(255, 255, 255, 0.6);
+}
+
+:deep(.vue-flow__connection-path) {
+  stroke: rgba(255, 255, 255, 0.4);
+  stroke-width: 2;
 }
 </style>
