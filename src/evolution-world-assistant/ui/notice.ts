@@ -568,9 +568,17 @@ function ensureWorkflowStyle(doc: Document) {
       font-weight: 600;
     }
 
-    /* A: marquee scroll for overflow content */
+    /* A: inner text wrapper for marquee scroll */
+    .ew-workflow-notice__island-text {
+      display: inline-block;
+      white-space: nowrap;
+    }
+
+    /* A: marquee scroll — animate inner text only, container stays fixed */
     .ew-workflow-notice__island-slot--content[data-overflow='true'] {
       text-overflow: clip;
+    }
+    .ew-workflow-notice__island-slot--content[data-overflow='true'] .ew-workflow-notice__island-text {
       animation: ewIslandScroll 8s linear infinite;
       animation-delay: 2s;
     }
@@ -998,15 +1006,21 @@ function applyWorkflowNoticeState(item: HTMLElement, input: EwWorkflowNoticeInpu
   const islandContent = item.querySelector('.ew-workflow-notice__island-slot--content') as HTMLElement | null;
   if (islandContent) {
     const contentText = input.island?.content?.trim() || '';
-    islandContent.textContent = contentText;
+    const textSpan = islandContent.querySelector('.ew-workflow-notice__island-text') as HTMLElement | null;
+    if (textSpan) {
+      textSpan.textContent = contentText;
+    } else {
+      islandContent.textContent = contentText;
+    }
 
-    // A: detect overflow for marquee scroll
+    // A: detect overflow for marquee scroll — compare inner text width vs container
     requestAnimationFrame(() => {
-      const overflows = islandContent.scrollWidth > islandContent.clientWidth + 4;
+      const inner = textSpan ?? islandContent;
+      const overflows = inner.scrollWidth > islandContent.clientWidth + 4;
       islandContent.dataset.overflow = overflows ? 'true' : 'false';
-      if (overflows) {
-        const dist = islandContent.scrollWidth - islandContent.clientWidth;
-        islandContent.style.setProperty('--ew-scroll-dist', `-${dist}px`);
+      if (overflows && textSpan) {
+        const dist = inner.scrollWidth - islandContent.clientWidth;
+        textSpan.style.setProperty('--ew-scroll-dist', `-${dist}px`);
       }
     });
   }
@@ -1097,6 +1111,10 @@ export function showManagedWorkflowNotice(input: EwWorkflowNoticeInput): EwWorkf
 
   const islandContent = doc.createElement('span');
   islandContent.className = 'ew-workflow-notice__island-slot ew-workflow-notice__island-slot--content';
+
+  const islandContentText = doc.createElement('span');
+  islandContentText.className = 'ew-workflow-notice__island-text';
+  islandContent.appendChild(islandContentText);
 
   const islandExtra = doc.createElement('span');
   islandExtra.className = 'ew-workflow-notice__island-extra';
