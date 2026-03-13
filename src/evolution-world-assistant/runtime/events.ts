@@ -415,6 +415,7 @@ type ExecuteWorkflowOptions = {
   userInput?: string;
   injectReply: boolean;
   flowIds?: string[];
+  timingFilter?: 'before_reply' | 'after_reply';
   preservedResults?: FloorWorkflowStoredResult[];
   trigger: {
     timing: 'before_reply' | 'after_reply' | 'manual';
@@ -468,19 +469,24 @@ function shouldReleaseInterceptedMessage(settings: EwSettings, outcome: Workflow
 }
 
 // ---------------------------------------------------------------------------
-// Per-flow timing resolution.
-// Returns the IDs of enabled flows whose effective timing matches the given
-// timing, or undefined if no flows match (caller should skip).
+// Per-flow timing gate (fast sync check).
+// Returns true if there are potentially matching flows for the given timing.
+// This only checks global flows as a fast-path; char-flows are filtered by
+// the pipeline's timing_filter after getEffectiveFlows().
 // ---------------------------------------------------------------------------
 
-function getFlowIdsForTiming(settings: EwSettings, timing: 'before_reply' | 'after_reply'): string[] | undefined {
-  const matched = settings.flows
-    .filter(f => f.enabled)
-    .filter(f => {
-      const effective = f.timing === 'default' ? settings.workflow_timing : f.timing;
-      return effective === timing;
-    });
-  return matched.length > 0 ? matched.map(f => f.id) : undefined;
+function hasFlowsForTiming(settings: EwSettings, timing: 'before_reply' | 'after_reply'): boolean {
+  // Fast path: any global flow explicitly or effectively matches
+  const globalMatch = settings.flows.some(f => {
+    if (!f.enabled) return false;
+    const effective = f.timing === 'default' ? settings.workflow_timing : f.timing;
+    return effective === timing;
+  });
+  if (globalMatch) return true;
+  // Fallback: if the global default equals the requested timing,
+  // char-flows with timing:'default' would resolve to it — proceed
+  // and let the pipeline's timing_filter do the authoritative check.
+  return settings.workflow_timing === timing;
 }
 
 // ---------------------------------------------------------------------------
@@ -724,6 +730,7 @@ async function executeWorkflowWithPolicy(
       mode: 'auto',
       inject_reply: options.injectReply,
       flow_ids: options.flowIds,
+      timing_filter: options.timingFilter,
       preserved_results: currentPreservedDispatchResults,
       abortSignal: workflowAbortController.signal,
       isCancelled: () => abortedByUser,
@@ -769,6 +776,7 @@ async function executeWorkflowWithPolicy(
           mode: 'auto',
           inject_reply: options.injectReply,
           flow_ids: options.flowIds,
+          timing_filter: options.timingFilter,
           preserved_results: currentPreservedDispatchResults,
           abortSignal: workflowAbortController.signal,
           isCancelled: () => abortedByUser,
@@ -910,8 +918,7 @@ function installTavernHelperHook() {
     }
 
     const settings = getSettings();
-    const beforeReplyFlowIds = getFlowIdsForTiming(settings, 'before_reply');
-    if (!settings.enabled || !beforeReplyFlowIds || getRuntimeState().is_processing) {
+    if (!settings.enabled || !hasFlowsForTiming(settings, 'before_reply') || getRuntimeState().is_processing) {
       return win._ew_originalGenerate.apply(this, args);
     }
 
@@ -944,7 +951,7 @@ function installTavernHelperHook() {
         messageId,
         userInput,
         injectReply: true,
-        flowIds: beforeReplyFlowIds,
+        timingFilter: 'before_reply',
         trigger: {
           timing: 'before_reply',
           source: 'tavernhelper',
@@ -1017,8 +1024,7 @@ async function onGenerationAfterCommands(
   }
 
   const settings = getSettings();
-  const beforeReplyFlowIds = getFlowIdsForTiming(settings, 'before_reply');
-  if (!beforeReplyFlowIds) {
+  if (!hasFlowsForTiming(settings, 'before_reply')) {
     return;
   }
   const decision = shouldHandleGenerationAfter(type, params, dryRun, settings);
@@ -1057,7 +1063,7 @@ async function onGenerationAfterCommands(
       messageId,
       userInput,
       injectReply: true,
-      flowIds: beforeReplyFlowIds,
+      timingFilter: 'before_reply',
       trigger: {
         timing: 'before_reply',
         source: 'generation_after_commands',
@@ -1092,8 +1098,7 @@ function isAssistantMessage(messageId: number): boolean {
 
 async function onAfterReplyMessage(messageId: number, type: string, source: 'message_received' | 'generation_ended') {
   const settings = getSettings();
-  const afterReplyFlowIds = getFlowIdsForTiming(settings, 'after_reply');
-  if (!afterReplyFlowIds) {
+  if (!hasFlowsForTiming(settings, 'after_reply')) {
     return;
   }
 
@@ -1121,7 +1126,7 @@ async function onAfterReplyMessage(messageId: number, type: string, source: 'mes
       messageId,
       userInput,
       injectReply: false,
-      flowIds: afterReplyFlowIds,
+      timingFilter: 'after_reply',
       trigger: {
         timing: 'after_reply',
         source,
@@ -1142,8 +1147,7 @@ async function onAfterReplyMessage(messageId: number, type: string, source: 'mes
 
 export async function rerollCurrentAfterReplyWorkflow(): Promise<{ ok: boolean; reason?: string }> {
   const settings = getSettings();
-  const afterReplyFlowIds = getFlowIdsForTiming(settings, 'after_reply');
-  if (!afterReplyFlowIds) {
+  if (!hasFlowsForTiming(settings, 'after_reply')) {
     return { ok: false, reason: 'no flows configured for after_reply timing' };
   }
   if (!settings.enabled) {
@@ -1171,7 +1175,7 @@ export async function rerollCurrentAfterReplyWorkflow(): Promise<{ ok: boolean; 
   const userInput = resolveAfterReplyUserInput();
   const rerollScope = settings.reroll_scope ?? 'all';
 
-  let flowIds: string[] | undefined = afterReplyFlowIds;
+  let flowIds: string[] | undefined;
   let preservedResults: FloorWorkflowStoredResult[] = [];
 
   if (rerollScope === 'failed_only') {
@@ -1204,6 +1208,7 @@ export async function rerollCurrentAfterReplyWorkflow(): Promise<{ ok: boolean; 
       userInput,
       injectReply: false,
       flowIds,
+      timingFilter: 'after_reply',
       preservedResults,
       trigger: {
         timing: 'after_reply',

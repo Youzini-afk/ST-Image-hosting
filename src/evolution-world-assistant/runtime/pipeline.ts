@@ -21,6 +21,7 @@ type RunWorkflowInput = {
   mode: 'auto' | 'manual';
   inject_reply?: boolean;
   flow_ids?: string[];
+  timing_filter?: 'before_reply' | 'after_reply';
   preserved_results?: DispatchFlowResult[];
   abortSignal?: AbortSignal;
   isCancelled?: () => boolean;
@@ -126,9 +127,28 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowO
     // Merge global flows + per-character flows (from EW/Flows worldbook entry).
     const allEnabledFlows = await getEffectiveFlows(settings);
     const selectedFlowIds = new Set((input.flow_ids ?? []).filter(Boolean));
-    const enabledFlows =
+    let enabledFlows =
       selectedFlowIds.size > 0 ? allEnabledFlows.filter(flow => selectedFlowIds.has(flow.id)) : allEnabledFlows;
+
+    // Per-flow timing filter: resolve 'default' to global workflow_timing, then keep only matching.
+    if (input.timing_filter) {
+      enabledFlows = enabledFlows.filter(f => {
+        const effective = f.timing === 'default' ? settings.workflow_timing : f.timing;
+        return effective === input.timing_filter;
+      });
+    }
+
     if (enabledFlows.length === 0) {
+      // If timing filter caused 0 flows, this is a no-op — not an error.
+      if (input.timing_filter) {
+        return {
+          ok: true,
+          reason: `no flows match timing '${input.timing_filter}'`,
+          request_id: requestId,
+          attempts: [],
+          results: [],
+        };
+      }
       throw new Error('no enabled flows');
     }
 
