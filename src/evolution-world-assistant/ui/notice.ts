@@ -21,7 +21,10 @@ export type EwWorkflowNoticeInput = EwNoticeInput & {
   island?: {
     entry_name?: string;
     content?: string;
+    extra_count?: number;
   };
+  workflow_name?: string;
+  flow_progress?: { completed: number; total: number };
 };
 
 export type EwNoticeHandle = {
@@ -344,24 +347,31 @@ function ensureWorkflowStyle(doc: Document) {
       border-radius: 18px;
       border: 1px solid color-mix(in srgb, var(--ew-notice-accent) 42%, rgba(255, 255, 255, 0.18));
       background:
-        radial-gradient(circle at 12% -18%, color-mix(in srgb, var(--ew-notice-accent) 28%, transparent), transparent 48%),
-        linear-gradient(135deg, rgba(10, 23, 44, 0.95), rgba(5, 15, 29, 0.92));
+        radial-gradient(circle at 12% -18%, color-mix(in srgb, var(--ew-notice-accent) 22%, transparent), transparent 52%),
+        radial-gradient(circle at 88% 120%, rgba(60, 100, 180, 0.06), transparent 50%),
+        linear-gradient(135deg, rgba(8, 20, 40, 0.96), rgba(4, 12, 26, 0.94));
       box-shadow:
         0 18px 40px rgba(3, 8, 17, 0.48),
         0 0 0 1px rgba(255, 255, 255, 0.04) inset;
-      backdrop-filter: blur(16px) saturate(130%);
-      -webkit-backdrop-filter: blur(16px) saturate(130%);
-      transform: translateY(-8px) scale(0.985);
+      backdrop-filter: blur(24px) saturate(150%);
+      -webkit-backdrop-filter: blur(24px) saturate(150%);
+      transform: translateY(-12px) scale(0.92);
       opacity: 0;
-      animation: ewWorkflowNoticeIn 220ms ease forwards;
+      animation: ewWorkflowNoticeIn 320ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
       overflow: hidden;
       transition:
         width 240ms ease,
         border-radius 240ms ease,
         box-shadow 240ms ease,
         background 240ms ease,
-        transform 220ms ease;
+        transform 220ms ease,
+        border-color 1.5s ease;
       cursor: pointer;
+    }
+
+    /* border breathing glow — only when busy */
+    .ew-workflow-notice[data-busy='true'] {
+      animation: ewWorkflowNoticeIn 320ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards, ewBorderGlow 3s ease-in-out infinite 0.4s;
     }
 
     .ew-workflow-notice::after {
@@ -558,6 +568,30 @@ function ensureWorkflowStyle(doc: Document) {
       font-weight: 600;
     }
 
+    /* A: marquee scroll for overflow content */
+    .ew-workflow-notice__island-slot--content[data-overflow='true'] {
+      text-overflow: clip;
+      animation: ewIslandScroll 8s linear infinite;
+      animation-delay: 2s;
+    }
+
+    /* D: +N badge for multi-flow */
+    .ew-workflow-notice__island-extra {
+      min-width: 22px;
+      height: 18px;
+      padding: 0 6px;
+      border-radius: 999px;
+      border: 1px solid rgba(163, 207, 255, 0.36);
+      background: rgba(13, 30, 52, 0.92);
+      color: #eef5ff;
+      font-size: 11px;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
     .ew-workflow-notice[data-has-preview='false'] .ew-workflow-notice__island-slot {
       display: none;
     }
@@ -575,6 +609,7 @@ function ensureWorkflowStyle(doc: Document) {
         0 10px 18px rgba(3, 8, 17, 0.28),
         0 0 14px rgba(96, 159, 255, 0.18),
         inset 0 1px 0 rgba(255, 255, 255, 0.12);
+      transition: border-color 400ms ease, box-shadow 400ms ease;
     }
 
     .ew-workflow-notice__island-orb::before {
@@ -587,6 +622,7 @@ function ensureWorkflowStyle(doc: Document) {
         inset 2px 2px 0 rgba(255, 247, 196, 0.95),
         inset -2px -2px 0 rgba(219, 177, 58, 0.45),
         0 0 6px rgba(255, 226, 122, 0.14);
+      transition: background 500ms ease, box-shadow 500ms ease;
     }
 
     .ew-workflow-notice__island-orb::after {
@@ -604,30 +640,85 @@ function ensureWorkflowStyle(doc: Document) {
       transform: translate3d(0, 0, 0);
       will-change: transform;
       animation: ewWorkflowMoonPhase 4.8s linear infinite;
+      transition: transform 600ms ease;
     }
 
     .ew-workflow-notice[data-busy='false'] .ew-workflow-notice__island-orb::after {
       animation-duration: 7.4s;
     }
 
+    /* B: success full moon — gold, shadow mask slides away */
+    .ew-workflow-notice__island-orb[data-moon='full']::before {
+      background: #ffe27a;
+      box-shadow:
+        inset 2px 2px 0 rgba(255, 247, 196, 0.95),
+        inset -2px -2px 0 rgba(219, 177, 58, 0.45),
+        0 0 12px rgba(255, 226, 122, 0.6);
+    }
+    .ew-workflow-notice__island-orb[data-moon='full']::after {
+      animation: none;
+      transform: translate3d(-30px, 0, 0);
+    }
+    .ew-workflow-notice__island-orb[data-moon='full'] {
+      border-color: #eac85a;
+      box-shadow:
+        0 8px 16px rgba(3, 8, 17, 0.24),
+        0 0 18px rgba(255, 226, 122, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    }
+
+    /* B: failure blood moon — red, shadow mask slides away */
+    .ew-workflow-notice__island-orb[data-moon='blood']::before {
+      background: #e84060;
+      box-shadow:
+        inset 2px 2px 0 rgba(255, 140, 160, 0.6),
+        inset -2px -2px 0 rgba(180, 40, 60, 0.45),
+        0 0 12px rgba(232, 64, 96, 0.5);
+    }
+    .ew-workflow-notice__island-orb[data-moon='blood']::after {
+      animation: none;
+      transform: translate3d(-30px, 0, 0);
+    }
+    .ew-workflow-notice__island-orb[data-moon='blood'] {
+      border-color: #c44060;
+      box-shadow:
+        0 8px 16px rgba(3, 8, 17, 0.24),
+        0 0 18px rgba(232, 64, 96, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    }
+
     .ew-workflow-notice--out {
       animation: ewNoticeOut 160ms ease forwards;
     }
 
+    /* G: spring enter animation */
     @keyframes ewWorkflowNoticeIn {
-      to {
-        transform: translateY(0) scale(1);
-        opacity: 1;
-      }
+      0%   { transform: translateY(-12px) scale(0.92); opacity: 0; }
+      60%  { transform: translateY(2px) scale(1.01); opacity: 1; }
+      100% { transform: translateY(0) scale(1); opacity: 1; }
+    }
+
+    /* G: spring exit animation */
+    @keyframes ewNoticeOut {
+      0%   { transform: translateY(0) scale(1); opacity: 1; }
+      100% { transform: translateY(-16px) scale(0.94); opacity: 0; }
     }
 
     @keyframes ewWorkflowMoonPhase {
-      0% {
-        transform: translate3d(0, 0, 0);
-      }
-      100% {
-        transform: translate3d(46px, 0, 0);
-      }
+      0%   { transform: translate3d(0, 0, 0); }
+      100% { transform: translate3d(46px, 0, 0); }
+    }
+
+    /* F: border breathing glow */
+    @keyframes ewBorderGlow {
+      0%, 100% { border-color: color-mix(in srgb, var(--ew-notice-accent) 42%, rgba(255, 255, 255, 0.18)); }
+      50%      { border-color: color-mix(in srgb, var(--ew-notice-accent) 62%, rgba(255, 255, 255, 0.28)); }
+    }
+
+    /* A: marquee scroll for long content */
+    @keyframes ewIslandScroll {
+      0%, 15%  { transform: translateX(0); }
+      85%, 100% { transform: translateX(var(--ew-scroll-dist, -50%)); }
     }
 
     @media (max-width: 900px) {
@@ -872,9 +963,15 @@ function applyWorkflowNoticeState(item: HTMLElement, input: EwWorkflowNoticeInpu
     title.textContent = input.title;
   }
 
+  // H: expanded view shows workflow name + flow progress
   const message = item.querySelector('.ew-workflow-notice__message');
   if (message) {
-    message.textContent = input.message;
+    let text = input.message;
+    if (input.flow_progress && input.flow_progress.total > 0) {
+      const wfName = input.workflow_name?.trim() || '工作流';
+      text += `\n━━━ ${wfName}  ·  ${input.flow_progress.completed}/${input.flow_progress.total} 流已完成`;
+    }
+    message.textContent = text;
   }
 
   const actionButton = item.querySelector('.ew-workflow-notice__action') as HTMLButtonElement | null;
@@ -898,9 +995,45 @@ function applyWorkflowNoticeState(item: HTMLElement, input: EwWorkflowNoticeInpu
     islandName.textContent = input.island?.entry_name?.trim() || '';
   }
 
-  const islandContent = item.querySelector('.ew-workflow-notice__island-slot--content');
+  const islandContent = item.querySelector('.ew-workflow-notice__island-slot--content') as HTMLElement | null;
   if (islandContent) {
-    islandContent.textContent = input.island?.content?.trim() || '';
+    const contentText = input.island?.content?.trim() || '';
+    islandContent.textContent = contentText;
+
+    // A: detect overflow for marquee scroll
+    requestAnimationFrame(() => {
+      const overflows = islandContent.scrollWidth > islandContent.clientWidth + 4;
+      islandContent.dataset.overflow = overflows ? 'true' : 'false';
+      if (overflows) {
+        const dist = islandContent.scrollWidth - islandContent.clientWidth;
+        islandContent.style.setProperty('--ew-scroll-dist', `-${dist}px`);
+      }
+    });
+  }
+
+  // B: moon state for success/fail
+  const orb = item.querySelector('.ew-workflow-notice__island-orb') as HTMLElement | null;
+  if (orb) {
+    if (level === 'success' && !input.busy) {
+      orb.dataset.moon = 'full';
+    } else if (level === 'error' && !input.busy) {
+      orb.dataset.moon = 'blood';
+    } else {
+      delete orb.dataset.moon;
+    }
+  }
+
+  // D: +N badge
+  const extraBadge = item.querySelector('.ew-workflow-notice__island-extra') as HTMLElement | null;
+  if (extraBadge) {
+    const count = input.island?.extra_count ?? 0;
+    if (count > 0) {
+      extraBadge.textContent = `+${count}`;
+      extraBadge.style.display = '';
+    } else {
+      extraBadge.textContent = '';
+      extraBadge.style.display = 'none';
+    }
   }
 
   if (input.persist) {
@@ -965,6 +1098,10 @@ export function showManagedWorkflowNotice(input: EwWorkflowNoticeInput): EwWorkf
   const islandContent = doc.createElement('span');
   islandContent.className = 'ew-workflow-notice__island-slot ew-workflow-notice__island-slot--content';
 
+  const islandExtra = doc.createElement('span');
+  islandExtra.className = 'ew-workflow-notice__island-extra';
+  islandExtra.style.display = 'none';
+
   const progress = doc.createElement('div');
   progress.className = 'ew-workflow-notice__progress';
 
@@ -978,6 +1115,7 @@ export function showManagedWorkflowNotice(input: EwWorkflowNoticeInput): EwWorkf
   island.appendChild(islandName);
   island.appendChild(islandOrb);
   island.appendChild(islandContent);
+  island.appendChild(islandExtra);
   item.appendChild(card);
   item.appendChild(island);
   item.appendChild(progress);

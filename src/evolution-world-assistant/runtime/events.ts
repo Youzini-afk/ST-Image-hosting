@@ -534,6 +534,47 @@ async function executeWorkflowWithPolicy(
     return `${normalized.slice(0, maxLength)}...`;
   };
 
+  // D: multi-flow tracking
+  type FlowIslandData = { flow_id: string; entry_name?: string; content?: string; flow_order: number };
+  const activeFlows = new Map<string, FlowIslandData>();
+  let carouselIndex = 0;
+  let carouselTimer: ReturnType<typeof setInterval> | null = null;
+  let totalFlowCount = 0;
+  let completedFlowCount = 0;
+
+  const getRotatedIsland = (): { entry_name?: string; content?: string; extra_count: number } => {
+    const flows = [...activeFlows.values()].sort((a, b) => a.flow_order - b.flow_order);
+    if (flows.length === 0) {
+      return { extra_count: 0 };
+    }
+    const idx = carouselIndex % flows.length;
+    const current = flows[idx];
+    return {
+      entry_name: current.entry_name,
+      content: current.content,
+      extra_count: Math.max(0, flows.length - 1),
+    };
+  };
+
+  const startCarousel = () => {
+    if (carouselTimer) return;
+    carouselTimer = setInterval(() => {
+      if (activeFlows.size > 1) {
+        carouselIndex++;
+        processingReminder.update({
+          island: getRotatedIsland(),
+        });
+      }
+    }, 3000);
+  };
+
+  const stopCarousel = () => {
+    if (carouselTimer) {
+      clearInterval(carouselTimer);
+      carouselTimer = null;
+    }
+  };
+
   const handleWorkflowProgress = (update: WorkflowProgressUpdate) => {
     if (reminderSettled) {
       return;
@@ -541,36 +582,88 @@ async function executeWorkflowWithPolicy(
 
     switch (update.phase) {
       case 'preparing':
-      case 'dispatching':
-      case 'merging':
-      case 'committing':
         processingReminder.update({
           message: update.message ?? options.reminderMessage,
-          level: update.phase === 'merging' || update.phase === 'committing' ? 'info' : 'info',
+          level: 'info',
           persist: true,
           busy: true,
         });
         break;
-      case 'flow_started':
+      case 'dispatching':
+        // extract total flow count from message (e.g. "已装载 3 条工作流")
+        {
+          const match = update.message?.match(/装载\s*(\d+)\s*条/);
+          if (match) {
+            totalFlowCount = parseInt(match[1], 10);
+          }
+        }
+        processingReminder.update({
+          message: update.message ?? options.reminderMessage,
+          level: 'info',
+          persist: true,
+          busy: true,
+          flow_progress: totalFlowCount > 0 ? { completed: completedFlowCount, total: totalFlowCount } : undefined,
+        });
+        break;
+      case 'merging':
+      case 'committing':
+        // All flows complete — clear active flows
+        completedFlowCount = activeFlows.size;
+        activeFlows.clear();
+        stopCarousel();
+        processingReminder.update({
+          message: update.message ?? options.reminderMessage,
+          level: 'info',
+          persist: true,
+          busy: true,
+          island: { extra_count: 0 },
+          flow_progress: totalFlowCount > 0 ? { completed: completedFlowCount, total: totalFlowCount } : undefined,
+        });
+        break;
+      case 'flow_started': {
+        const flowId = update.flow_id ?? '';
+        if (flowId) {
+          activeFlows.set(flowId, {
+            flow_id: flowId,
+            entry_name: update.flow_name?.trim() || undefined,
+            content: undefined,
+            flow_order: update.flow_order ?? 0,
+          });
+          if (activeFlows.size > 1) {
+            startCarousel();
+          }
+        }
         processingReminder.update({
           message: update.message ?? options.reminderMessage,
           persist: true,
           busy: true,
           level: 'info',
+          island: getRotatedIsland(),
+          workflow_name: update.flow_name?.trim() || undefined,
+          flow_progress: totalFlowCount > 0 ? { completed: completedFlowCount, total: totalFlowCount } : undefined,
         });
         break;
+      }
       case 'streaming': {
+        const flowId = update.flow_id ?? '';
         const previewName = trimPreview(update.stream_preview?.entry_name, 28);
         const previewContent = trimPreview(update.stream_preview?.content, 54);
+
+        // Update the active flow's data
+        if (flowId && activeFlows.has(flowId)) {
+          const flow = activeFlows.get(flowId)!;
+          flow.entry_name = previewName || flow.entry_name;
+          flow.content = previewContent || flow.content;
+        }
+
         processingReminder.update({
           message: update.flow_name?.trim() ? `正在流式读取「${update.flow_name}」输出…` : '正在流式读取工作流输出…',
           persist: true,
           busy: true,
           level: 'info',
-          island: {
-            entry_name: previewName,
-            content: previewContent,
-          },
+          island: getRotatedIsland(),
+          workflow_name: update.flow_name?.trim() || undefined,
+          flow_progress: totalFlowCount > 0 ? { completed: completedFlowCount, total: totalFlowCount } : undefined,
         });
         break;
       }
@@ -583,6 +676,7 @@ async function executeWorkflowWithPolicy(
 
   const finalizeUserAbort = () => {
     reminderSettled = true;
+    stopCarousel();
     processingReminder.update({
       title: 'Evolution World',
       message: '已终止本轮处理。',
@@ -593,8 +687,10 @@ async function executeWorkflowWithPolicy(
       island: {
         entry_name: '',
         content: '',
+        extra_count: 0,
       },
-      duration_ms: 2200,
+      collapse_after_ms: 0,
+      duration_ms: 2500,
     });
     return {
       shouldAbortGeneration: true,
@@ -692,6 +788,7 @@ async function executeWorkflowWithPolicy(
       switch (policy) {
         case 'continue_generation':
           reminderSettled = true;
+          stopCarousel();
           processingReminder.update({
             title: 'Evolution World',
             message: `工作流失败：${displayReason}。原消息是否继续发送取决于放行策略。`,
@@ -699,13 +796,15 @@ async function executeWorkflowWithPolicy(
             persist: false,
             busy: false,
             action: undefined,
-            duration_ms: 3200,
+            collapse_after_ms: 0,
+            duration_ms: 3500,
           });
           toastr.warning(`工作流失败，原消息是否继续发送取决于放行策略: ${displayReason}`, 'Evolution World');
           break;
         case 'allow_partial_success':
         case 'notify_only':
           reminderSettled = true;
+          stopCarousel();
           processingReminder.update({
             title: 'Evolution World',
             message: `工作流失败：${displayReason}`,
@@ -713,7 +812,8 @@ async function executeWorkflowWithPolicy(
             persist: false,
             busy: false,
             action: undefined,
-            duration_ms: 3200,
+            collapse_after_ms: 0,
+            duration_ms: 3500,
           });
           toastr.info(`工作流失败: ${displayReason}`, 'Evolution World');
           break;
@@ -721,6 +821,7 @@ async function executeWorkflowWithPolicy(
         case 'retry_once':
         default:
           reminderSettled = true;
+          stopCarousel();
           processingReminder.update({
             title: 'Evolution World',
             message: `动态世界流程失败，本轮已中止：${displayReason}`,
@@ -728,7 +829,8 @@ async function executeWorkflowWithPolicy(
             persist: false,
             busy: false,
             action: undefined,
-            duration_ms: 4200,
+            collapse_after_ms: 0,
+            duration_ms: 3500,
           });
           stopGenerationNow();
           toastr.error(`动态世界流程失败，本轮已中止: ${displayReason}`, 'Evolution World');
@@ -748,6 +850,7 @@ async function executeWorkflowWithPolicy(
   }
 
   reminderSettled = true;
+  stopCarousel();
   processingReminder.update({
     title: 'Evolution World',
     message: options.successMessage,
@@ -755,7 +858,8 @@ async function executeWorkflowWithPolicy(
     persist: false,
     busy: false,
     action: undefined,
-    duration_ms: 2200,
+    collapse_after_ms: 0,
+    duration_ms: 2500,
   });
   return {
     shouldAbortGeneration: false,
