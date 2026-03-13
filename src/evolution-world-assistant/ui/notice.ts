@@ -1037,12 +1037,17 @@ function applyWorkflowNoticeState(item: HTMLElement, input: EwWorkflowNoticeInpu
     }
   }
 
-  // D: +N badge
+  // D: badge — ×N (total) when no preview, +N (remaining) when streaming
   const extraBadge = item.querySelector('.ew-workflow-notice__island-extra') as HTMLElement | null;
   if (extraBadge) {
     const count = input.island?.extra_count ?? 0;
-    if (count > 0) {
+    if (hasPreview && count > 0) {
+      // streaming visible: show "+N" (other flows besides the one displayed)
       extraBadge.textContent = `+${count}`;
+      extraBadge.style.display = '';
+    } else if (!hasPreview && count > 0) {
+      // no streaming yet: show "×N" (total active flows = extra_count + 1)
+      extraBadge.textContent = `×${count + 1}`;
       extraBadge.style.display = '';
     } else {
       extraBadge.textContent = '';

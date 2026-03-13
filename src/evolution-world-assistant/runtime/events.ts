@@ -690,7 +690,7 @@ async function executeWorkflowWithPolicy(
         extra_count: 0,
       },
       collapse_after_ms: 0,
-      duration_ms: 2500,
+      duration_ms: 3500,
     });
     return {
       shouldAbortGeneration: true,
@@ -797,7 +797,7 @@ async function executeWorkflowWithPolicy(
             busy: false,
             action: undefined,
             collapse_after_ms: 0,
-            duration_ms: 3500,
+            duration_ms: 5500,
           });
           toastr.warning(`工作流失败，原消息是否继续发送取决于放行策略: ${displayReason}`, 'Evolution World');
           break;
@@ -813,7 +813,7 @@ async function executeWorkflowWithPolicy(
             busy: false,
             action: undefined,
             collapse_after_ms: 0,
-            duration_ms: 3500,
+            duration_ms: 5500,
           });
           toastr.info(`工作流失败: ${displayReason}`, 'Evolution World');
           break;
@@ -830,7 +830,7 @@ async function executeWorkflowWithPolicy(
             busy: false,
             action: undefined,
             collapse_after_ms: 0,
-            duration_ms: 3500,
+            duration_ms: 5500,
           });
           stopGenerationNow();
           toastr.error(`动态世界流程失败，本轮已中止: ${displayReason}`, 'Evolution World');
@@ -859,7 +859,7 @@ async function executeWorkflowWithPolicy(
     busy: false,
     action: undefined,
     collapse_after_ms: 0,
-    duration_ms: 2500,
+    duration_ms: 4000,
   });
   return {
     shouldAbortGeneration: false,
