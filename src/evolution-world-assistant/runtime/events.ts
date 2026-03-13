@@ -468,6 +468,22 @@ function shouldReleaseInterceptedMessage(settings: EwSettings, outcome: Workflow
 }
 
 // ---------------------------------------------------------------------------
+// Per-flow timing resolution.
+// Returns the IDs of enabled flows whose effective timing matches the given
+// timing, or undefined if no flows match (caller should skip).
+// ---------------------------------------------------------------------------
+
+function getFlowIdsForTiming(settings: EwSettings, timing: 'before_reply' | 'after_reply'): string[] | undefined {
+  const matched = settings.flows
+    .filter(f => f.enabled)
+    .filter(f => {
+      const effective = f.timing === 'default' ? settings.workflow_timing : f.timing;
+      return effective === timing;
+    });
+  return matched.length > 0 ? matched.map(f => f.id) : undefined;
+}
+
+// ---------------------------------------------------------------------------
 // Shared workflow execution with failure-policy handling.
 // Both the TavernHelper hook and GENERATION_AFTER_COMMANDS fallback call this.
 // ---------------------------------------------------------------------------
@@ -894,7 +910,8 @@ function installTavernHelperHook() {
     }
 
     const settings = getSettings();
-    if (!settings.enabled || settings.workflow_timing !== 'before_reply' || getRuntimeState().is_processing) {
+    const beforeReplyFlowIds = getFlowIdsForTiming(settings, 'before_reply');
+    if (!settings.enabled || !beforeReplyFlowIds || getRuntimeState().is_processing) {
       return win._ew_originalGenerate.apply(this, args);
     }
 
@@ -927,6 +944,7 @@ function installTavernHelperHook() {
         messageId,
         userInput,
         injectReply: true,
+        flowIds: beforeReplyFlowIds,
         trigger: {
           timing: 'before_reply',
           source: 'tavernhelper',
@@ -999,7 +1017,8 @@ async function onGenerationAfterCommands(
   }
 
   const settings = getSettings();
-  if (settings.workflow_timing !== 'before_reply') {
+  const beforeReplyFlowIds = getFlowIdsForTiming(settings, 'before_reply');
+  if (!beforeReplyFlowIds) {
     return;
   }
   const decision = shouldHandleGenerationAfter(type, params, dryRun, settings);
@@ -1038,6 +1057,7 @@ async function onGenerationAfterCommands(
       messageId,
       userInput,
       injectReply: true,
+      flowIds: beforeReplyFlowIds,
       trigger: {
         timing: 'before_reply',
         source: 'generation_after_commands',
@@ -1072,7 +1092,8 @@ function isAssistantMessage(messageId: number): boolean {
 
 async function onAfterReplyMessage(messageId: number, type: string, source: 'message_received' | 'generation_ended') {
   const settings = getSettings();
-  if (settings.workflow_timing !== 'after_reply') {
+  const afterReplyFlowIds = getFlowIdsForTiming(settings, 'after_reply');
+  if (!afterReplyFlowIds) {
     return;
   }
 
@@ -1100,6 +1121,7 @@ async function onAfterReplyMessage(messageId: number, type: string, source: 'mes
       messageId,
       userInput,
       injectReply: false,
+      flowIds: afterReplyFlowIds,
       trigger: {
         timing: 'after_reply',
         source,
@@ -1120,8 +1142,9 @@ async function onAfterReplyMessage(messageId: number, type: string, source: 'mes
 
 export async function rerollCurrentAfterReplyWorkflow(): Promise<{ ok: boolean; reason?: string }> {
   const settings = getSettings();
-  if (settings.workflow_timing !== 'after_reply') {
-    return { ok: false, reason: 'workflow timing is not after_reply' };
+  const afterReplyFlowIds = getFlowIdsForTiming(settings, 'after_reply');
+  if (!afterReplyFlowIds) {
+    return { ok: false, reason: 'no flows configured for after_reply timing' };
   }
   if (!settings.enabled) {
     return { ok: false, reason: 'workflow disabled' };

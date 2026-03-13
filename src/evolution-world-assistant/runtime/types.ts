@@ -1,4 +1,4 @@
-﻿import { TextSliceRuleSchema } from './contracts';
+import { TextSliceRuleSchema } from './contracts';
 
 export const EwApiPresetSchema = z.object({
   id: z.string().min(1),
@@ -230,6 +230,7 @@ export const EwFlowConfigSchema = z.object({
   id: z.string().min(1),
   name: z.string().default('Flow'),
   enabled: z.boolean().default(true),
+  timing: z.enum(['default', 'after_reply', 'before_reply']).default('default'),
   priority: z.coerce.number().int().default(100),
   timeout_ms: z.coerce.number().int().positive().default(300000),
   api_preset_id: z.string().default(''),

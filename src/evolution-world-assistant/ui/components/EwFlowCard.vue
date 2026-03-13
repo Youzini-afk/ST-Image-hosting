@@ -48,6 +48,13 @@
             <EwFieldRow label="工作流ID" :help="help('flow.id')">
               <input :value="flow.id" type="text" @input="setText('id', $event)" />
             </EwFieldRow>
+            <EwFieldRow label="执行时机">
+              <select :value="flow.timing" @change="setTiming">
+                <option value="default">跟随全局（{{ timingLabel }}）</option>
+                <option value="after_reply">回复后更新</option>
+                <option value="before_reply">回复前拦截</option>
+              </select>
+            </EwFieldRow>
             <EwFieldRow label="API配置预设" :help="help('flow.api_preset_id')">
               <select :value="flow.api_preset_id" @change="setApiPresetId">
                 <option v-if="apiPresets.length === 0" value="">无可用API配置</option>
@@ -590,7 +597,9 @@ import EwFieldRow from './EwFieldRow.vue';
 
 import EwPromptOrderList from './EwPromptOrderList.vue';
 import EwRulesEditor from './EwRulesEditor.vue';
+import { useEwStore } from '../store';
 
+const ewStore = useEwStore();
 type FlowNumberKey = 'priority' | 'timeout_ms' | 'context_turns';
 type GenerationNumberKey =
   | 'max_context_tokens'
@@ -809,6 +818,13 @@ function setFlowNumber(key: FlowNumberKey, event: Event) {
 function setApiPresetId(event: Event) {
   patch({ api_preset_id: (event.target as HTMLSelectElement).value });
 }
+function setTiming(event: Event) {
+  patch({ timing: (event.target as HTMLSelectElement).value as 'default' | 'after_reply' | 'before_reply' });
+}
+const timingLabel = computed(() => {
+  const global = ewStore.settings.workflow_timing;
+  return global === 'before_reply' ? '回复前拦截' : '回复后更新';
+});
 function setGenerationNumber(key: GenerationNumberKey, event: Event) {
   const raw = toNumber((event.target as HTMLInputElement).value, flow.value.generation_options[key]);
   if (key === 'max_context_tokens') return patchGeneration({ max_context_tokens: Math.max(16000, Math.trunc(raw)) });
